@@ -1,0 +1,479 @@
+[
+  {
+    "legal": "BASE LEGAL: Manual específico para el control financiero previo al pago, Ley de Contratación Pública y su Reglamento, Decreto Ejecutivo Nro.372, Normas técnicas del Sistema Nacional de Finanzas Públicas SINFIP, Normas de Control Interno.",
+    "title": "CONTROL PREVIO POR CONTRATACIÓN DE SERVICIOS BÁSICOS",
+    "sheet": "Servicios básicos",
+    "rows": [
+      {
+        "number": "1",
+        "requirement": "Certificación Presupuestaria"
+      },
+      {
+        "number": "2",
+        "requirement": "Solicitud de pago con el respectivo informe de conformidad, indicando el período de pago, la satisfacción del servicio, número de medidor por suministro de energía eléctrica, número de código por suministro de agua potable"
+      },
+      {
+        "number": "3",
+        "requirement": "Cuadro de control de servicios básicos."
+      },
+      {
+        "number": "4",
+        "requirement": "Factura original física o electrónica  autorizada por el SRI"
+      }
+    ]
+  },
+  {
+    "legal": "BASE LEGAL: Manual específico para el control financiero previo al pago, Ley de Contratación Pública y su Reglamento, Decreto Ejecutivo Nro.372, Normas técnicas del Sistema Nacional de Finanzas Públicas SINFIP,Normas de Control Interno.",
+    "title": "CONTROL PREVIO POR CONTRATACIÓN DE BIENES, OBRAS Y/O SERVICIOS",
+    "sheet": "Contratos",
+    "rows": [
+      {
+        "number": "1",
+        "requirement": "Expediente Precontractual  y Contractual remitido por la Direccion de Contratación Pública mediante memorando"
+      },
+      {
+        "number": "2",
+        "requirement": "Certificación presupuestaria"
+      },
+      {
+        "number": "3",
+        "requirement": "Oficio de delegación de Administrador y fiscalizador de contrato por la autoridad competente (de ser el caso)"
+      },
+      {
+        "number": "4",
+        "requirement": "Ingreso de Contrato en el Módulo de Catálogo de Contratos (Contabilidad) para generar el CUR de compromiso"
+      },
+      {
+        "number": "5",
+        "requirement": "Informe de Conformidad  del Fiscalizador."
+      },
+      {
+        "number": "6",
+        "requirement": "Informe de Conformidad  del Administrador del Contrato  y Solicitud de pago dirigida a la Dirección Financiera Aduanera donde conste que el bien, obra o servicio fue recibido a entera satisfacción de la Institución."
+      },
+      {
+        "number": "7",
+        "requirement": "Memorando de delegación de un técnico que no haya intervenido en el proceso de ejecución del contrato, designado por la máxima autoridad de la Institución o su delegado"
+      },
+      {
+        "number": "8",
+        "requirement": "Actas de entrega - recepción provisional, parcial, total y definitiva de conformidad al  Art. 124 del Reglamento a la Ley Orgánica del Sistema Nacional de Contratación Pública"
+      },
+      {
+        "number": "9",
+        "requirement": "Los gastos relacionados con los ítems: “vestuario y lencería”, “materiales de oficina”, “materiales de aseo”, “materiales de impresión  fotografía  reproducción y publicaciones”, “medicinas”, “repuesto y accesorios” y “materiales de construcción”, deberán contar con el correspondiente ingreso a proveeduría"
+      },
+      {
+        "number": "10",
+        "requirement": "En la contratación de capacitaciones, se debe adjuntar el listado de los servidores inscritos lo cual será validado por la empresa que brindó el servicio."
+      },
+      {
+        "number": "11",
+        "requirement": "En la solicitud de pago por consumo de combustible, se debe adjuntar el listado de control de combustible  (Cuadro de control de combustible) que demuestre los galones consumidos por kilometro de recorrido de cada medio de transporte conforme a lo contratado."
+      },
+      {
+        "number": "12",
+        "requirement": "En la solicitud de pago de publicaciones en prensa escrita, se debe incluir el original o copia física del anuncio publicado en el diario, en cual se evidencie el cumplimiento de lo contratado por la Institución."
+      },
+      {
+        "number": "13",
+        "requirement": "Garantía Técnica en caso de bienes"
+      },
+      {
+        "number": "14",
+        "requirement": "Documentos entregables del Contrato"
+      }
+    ]
+  },
+  {
+    "legal": "BASE LEGAL: Manual específico para el control financiero previo al pago, Ley de Contratación Pública y su Reglamento, Decreto Ejecutivo Nro.372, Normas técnicas del Sistema Nacional de Finanzas Públicas SINFIP,Normas de Control Interno.",
+    "title": "CONTROL PREVIO POR CONTRATACIÓN DE BIENES, OBRAS Y/O SERVICIOS POR CATÁLOGO ELECTRÓNICO",
+    "sheet": "Catalogos",
+    "rows": [
+      {
+        "number": "1",
+        "requirement": "Expediente Precontractual  y Contractual remitido por la Direccion de Contratación Pública mediante memorando"
+      },
+      {
+        "number": "2",
+        "requirement": "Certificación presupuestaria"
+      },
+      {
+        "number": "3",
+        "requirement": "Oficio de delegación de Administrador y fiscalizador de contrato por la autoridad competente (de ser el caso)"
+      },
+      {
+        "number": "4",
+        "requirement": "Ingreso de Contrato en el Módulo de Catálogo de Contratos (Contabilidad) para generar el CUR de compromiso"
+      },
+      {
+        "number": "5",
+        "requirement": "Informe de Conformidad  del Fiscalizador."
+      },
+      {
+        "number": "6",
+        "requirement": "Informe de Conformidad  del Administrador del Contrato  y Solicitud de pago dirigida a la Dirección Financiera Aduanera donde conste que el bien, obra o servicio fue recibido a entera satisfacción de la Institución."
+      },
+      {
+        "number": "7",
+        "requirement": "Memorando de delegación de un técnico que no haya intervenido en el proceso de ejecución del contrato, designado por la máxima autoridad de la Institución o su delegado"
+      },
+      {
+        "number": "8",
+        "requirement": "Actas de entrega - recepción provisional, parcial, total y definitiva de conformidad al  Art. 124 del Reglamento a la Ley Orgánica del Sistema Nacional de Contratación Pública"
+      },
+      {
+        "number": "9",
+        "requirement": "Los gastos relacionados con los ítems: “vestuario y lencería”, “materiales de oficina”, “materiales de aseo”, “materiales de impresión  fotografía  reproducción y publicaciones”, “medicinas”, “repuesto y accesorios” y “materiales de construcción”, deberán contar con el correspondiente ingreso a proveeduría"
+      },
+      {
+        "number": "10",
+        "requirement": "En la contratación de capacitaciones, se debe adjuntar el listado de los servidores inscritos lo cual será validado por la empresa que brindó el servicio."
+      },
+      {
+        "number": "11",
+        "requirement": "En la solicitud de pago por consumo de combustible, se debe adjuntar el listado de control de combustible  (Cuadro de control de combustible) que demuestre los galones consumidos por kilometro de recorrido de cada medio de transporte conforme a lo contratado."
+      },
+      {
+        "number": "12",
+        "requirement": "En la solicitud de pago de publicaciones en prensa escrita, se debe incluir el original o copia física del anuncio publicado en el diario, en cual se evidencie el cumplimiento de lo contratado por la Institución."
+      },
+      {
+        "number": "13",
+        "requirement": "Garantía Técnica en caso de bienes"
+      },
+      {
+        "number": "14",
+        "requirement": "Documentos entregables del Contrato"
+      }
+    ]
+  },
+  {
+    "legal": "BASE LEGAL: Manual específico para el control financiero previo al pago, Ley de Contratación Pública y su Reglamento, Decreto Ejecutivo Nro.372, Normas técnicas del Sistema Nacional de Finanzas Públicas SINFIP,Normas de Control Interno.",
+    "title": "CONTROL PREVIO PROCESOS DE ÍNFIMA CUANTÍA",
+    "sheet": "Infima cuantía",
+    "rows": [
+      {
+        "number": "1",
+        "requirement": "Requerimiento o necesidad de la contratación, el mismo que puede ser realizado mediante Memorando, debidamente justificado, en el que se indiquen las características del bien o servicio solicitado"
+      },
+      {
+        "number": "2",
+        "requirement": "Términos de Referencia (TDR) o Especificaciones Técnicas, suscritos por el requirente."
+      },
+      {
+        "number": "3",
+        "requirement": "Print  de pantalla  del Portal de Compras Publicas que demuestre  que el Bien o Servicio no conste en  el Catálogo Electrónico"
+      },
+      {
+        "number": "4",
+        "requirement": "Invitaciones a los oferentes , sean éstas enviadas por correo electrónico, fax o físicas. Cabe indicar que las invitaciones físicas deben tener la fe de recepción del invitado"
+      },
+      {
+        "number": "5",
+        "requirement": "Cotización(es) del(os) oferente(s), cuyo medio de recepción debe constar"
+      },
+      {
+        "number": "6",
+        "requirement": "Print de pantalla  del Portal de Compras Públicas que demuestre que el oferente no se encuentra incurso en ninguna inhabilidad o prohibición para contratar con el Estado, al momento de la adjudicación"
+      },
+      {
+        "number": "7",
+        "requirement": "Cuadro comparativo, de existir más de una cotización; firmado por el funcionario responsable de su elaboración"
+      },
+      {
+        "number": "8",
+        "requirement": "Certificación presupuestaria"
+      },
+      {
+        "number": "9",
+        "requirement": "Informe de mercado suscrito por el técnico de adquisiciones a cargo del proceso de adquisición del bien o servicio, donde conste el resumen del proceso contractual y sugiere la oferta del proveedor más conveniente para la institución, el mismo que debe estar autorizado por el  Director de Contratación Pública. Artículo 9 de la Resolución No. RE-SERCOP-2016-0000072"
+      },
+      {
+        "number": "10",
+        "requirement": "Orden de Trabajo suscrita por el Director de Contratación Pública, que incluya sumillas de Elaborado y Revisado"
+      },
+      {
+        "number": "11",
+        "requirement": "Notificación de adjudicación, donde conste la firma de recepción del proveedor o evidenciar el medio por el cual el proveedor la recibió"
+      },
+      {
+        "number": "12",
+        "requirement": "Original del Acuerdo de Confidencialidad y de No-Divulgación de Información suscrito entre el proveedor adjudicado y el Director Nacional de Capitales y Servicios Administrativos"
+      },
+      {
+        "number": "13",
+        "requirement": "Certificación Bancaria a la cual se realizará el pago esclusivamente a nombre del proveedor quien factura"
+      },
+      {
+        "number": "14",
+        "requirement": "El analista verificará en los canales electrónicos el RUC  y cédula del beneficiario"
+      },
+      {
+        "number": "15",
+        "requirement": "Informe de Conformidad y Solicitud de pago dirigida a la Dirección Financiera Aduanera donde conste que lo requerido fue recibido a entera satisfacción de la Institución"
+      },
+      {
+        "number": "16",
+        "requirement": "Garantía Técnica en caso de bienes"
+      },
+      {
+        "number": "17",
+        "requirement": "Los gastos relacionados con los ítems: “vestuario y lencería”, “materiales de oficina”, “materiales de aseo”, “materiales de impresión  fotografía  reproducción y publicaciones”, “medicinas”, “repuesto y accesorios” y “materiales de construcción”, deberán contar con el correspondiente ingreso a proveeduría"
+      },
+      {
+        "number": "18",
+        "requirement": "En la contratación de refrigerios y almuerzos para capacitaciones,  reuniones de trabajo y actos protocolarios de la Institución, se debe adjuntar fotos o listados de asistencia que documenten el acto y servicio recibido."
+      },
+      {
+        "number": "19",
+        "requirement": "En la contratación de capacitaciones por ínfima cuantía, se debe adjuntar el listado de los servidores inscritos lo cual será validado por la empresa que brindó el servicio."
+      },
+      {
+        "number": "20",
+        "requirement": "En la solicitud de pago por consumo de combustible, se debe adjuntar el listado de control de combustible (Cuadro de control de combustible) que demuestre los galones consumidos por kilometro de recorrido de cada medio de transporte conforme a lo contratado."
+      },
+      {
+        "number": "21",
+        "requirement": "En la solicitud de pago de publicaciones en prensa escrita, se debe incluir el original o copia física del anuncio publicado en el diario, en cual se evidencie el cumplimiento de lo contratado por la Institución."
+      }
+    ]
+  },
+  {
+    "legal": "BASE LEGAL: Manual específico para el control financiero previo al pago, COPCI.",
+    "title": "CONTROL PREVIO PARA LA DEVOLUCIÓN DE LAS GARANTÍAS POR CAUCIONES",
+    "sheet": "Devolución de cauciones",
+    "rows": [
+      {
+        "number": "1",
+        "requirement": "Solicitud de devolución de la caución rendida por el demandante."
+      },
+      {
+        "number": "2",
+        "requirement": "Fotocopia de la Sentencia ejecutoriada por el respectivo órgano jurisdiccional."
+      },
+      {
+        "number": "3",
+        "requirement": "Original o copia del comprobante del depósito o Liquidación del Ecuapass estado PAGADO."
+      },
+      {
+        "number": "4",
+        "requirement": "Certificado Bancario del beneficiario"
+      },
+      {
+        "number": "5",
+        "requirement": "En caso de que el beneficiario sea tercero, se debe adjuntar original de la carta de autorización."
+      }
+    ]
+  },
+  {
+    "legal": "BASE LEGAL: Manual específico para el control financiero previo al pago, COPCI.",
+    "title": "CONTROL PREVIO PARA LA APLICACIÓN DE CAUCIÓN COMO ABONO A LA OBLIGACIÓN TRIBUTARIA",
+    "sheet": "Aplicación de Caución",
+    "rows": [
+      {
+        "number": "1",
+        "requirement": "Documento de Ejecución"
+      },
+      {
+        "number": "2",
+        "requirement": "Sentencia Ejecutoriada por el respectivo órgano jurisdiccional."
+      },
+      {
+        "number": "3",
+        "requirement": "Original o copia del comprobante del depósito o Liquidación del Ecuapass estado PAGADO."
+      },
+      {
+        "number": "4",
+        "requirement": "Liquidación emitida en el Sistema informático del SENAE correspondiente a la obligación a la cual se abonará"
+      }
+    ]
+  },
+  {
+    "legal": "BASE LEGAL: Manual específico para el control financiero previo al pago, COPCI.",
+    "title": "CONTROL PREVIO DE LOS DOCUMENTOS SOPORTES PARA LA EFECTIVACIÓN DE LAS GARANTÍAS",
+    "sheet": "Efectivización de garantías",
+    "rows": [
+      {
+        "number": "1",
+        "requirement": "Solicitud del Jefe de Procesos Aduaneros o quien haga sus veces."
+      },
+      {
+        "number": "2",
+        "requirement": "Cuadro con desglose de valores a  ejecutarse o efectivizarse, los cuales deben de coincidir con el CDA de la garantía,  aprobado por el Jefe de Procesos o Director Distrital."
+      },
+      {
+        "number": "3",
+        "requirement": "Liquidación Ecuapass en estado Pagado o Papeleta del Depósito original, de ser el caso."
+      }
+    ]
+  },
+  {
+    "legal": "BASE LEGAL: Manual específico para el control financiero previo al pago, COPCI.",
+    "title": "CONTROL PREVIO PARA LA DEVOLUCIÓN DE LAS GARANTÍAS RENDIDAS EN EFECTIVO",
+    "sheet": "Garantías rendidas en efectivo",
+    "rows": [
+      {
+        "number": "1",
+        "requirement": "Solicitud remitida por el Jefe de Procesos Aduaneros o quien haga sus veces."
+      },
+      {
+        "number": "2",
+        "requirement": "Solicitud de devolución del Importador/Agente de Aduana/Abogado."
+      },
+      {
+        "number": "3",
+        "requirement": "Liquidación Ecuapass en estado PAGADO, Papeleta de depósito original de ser el caso."
+      },
+      {
+        "number": "4",
+        "requirement": "Impresión de la consulta  “Estado de la Garantía”, debiendo corresponder al CDA de la garantía que se requiere la devolución."
+      },
+      {
+        "number": "5",
+        "requirement": "Certificado Bancario del  beneficiario."
+      },
+      {
+        "number": "6",
+        "requirement": "En caso de que el beneficiario sea tercero, se debe adjuntar original de la carta de autorización."
+      }
+    ]
+  },
+  {
+    "legal": "BASE LEGAL: Manual específico para el control financiero previo al pago, Reglamento de viáticos para servidores públicos al exterior, Acuerdo 0026 del 29 de agosto del 2017.",
+    "title": "CONTROL PREVIO POR COMISIÓN DE SERVICIOS AL INTERIOR Y EXTERIOR",
+    "sheet": "Comisión de servicios Int y Ext",
+    "rows": [
+      {
+        "number": "1",
+        "requirement": "Solicitud de Comisión de Servicios a efectuar  debidamente autorizado y verificación de disponibilidad presupuestaria"
+      },
+      {
+        "number": "2",
+        "requirement": "Certificación Presupuestaria"
+      },
+      {
+        "number": "3",
+        "requirement": "Informe de Comisión de Servicios debidamente autorizado"
+      },
+      {
+        "number": "4",
+        "requirement": "Originales de los comprobantes de Venta Autorizados por el SRI, a nombre del funcionario que realizó la comisión de servicios."
+      },
+      {
+        "number": "5",
+        "requirement": "Copia legible del pase a bordo o certificados de vuelo"
+      },
+      {
+        "number": "6",
+        "requirement": "Formulario justificación de liquidación de anticipación de viáticos donde se determine el valor a cancelar, el cual debe estar suscrito por los Responsables de la Dirección Nacional de Talento Humano (desglose del cálculo)"
+      },
+      {
+        "number": "7",
+        "requirement": "Solicitud de Pago emitido por la Dirección Nacional de Talento Humano"
+      },
+      {
+        "number": "8",
+        "requirement": "Verificar el cálculo del viático de acuerdo a la escala respectiva"
+      },
+      {
+        "number": "1",
+        "requirement": "Solicitud de Pago emitido por la Dirección Nacional de Talento Humano"
+      },
+      {
+        "number": "2",
+        "requirement": "Autorización de la Secretaría General de la Presidencia"
+      },
+      {
+        "number": "3",
+        "requirement": "Invitación al evento y/o requerimiento del viaje"
+      },
+      {
+        "number": "4",
+        "requirement": "Itinerario o reserva de pasaje"
+      },
+      {
+        "number": "5",
+        "requirement": "Informe de justificación del viaje con los resultados esperados emitido y suscrito por el funcionario que va a realizar la comisión de servicios."
+      },
+      {
+        "number": "6",
+        "requirement": "Detalle de la agenda a cumplir con el itinerario del viaje"
+      },
+      {
+        "number": "7",
+        "requirement": "Informe presentado ante la máxima autoridad o su delegado donde se detallen las actividades y productos alcanzados; deberá constar la fecha, hora de salida, hora  llegada a domicilio o lugar habitual de trabajo."
+      },
+      {
+        "number": "8",
+        "requirement": "Verificación del cálculo del valor del viático de acuerdo al coeficiente respectivo señalado en el artículo 8 del Reglamento de viáticos al exterior."
+      },
+      {
+        "number": "9",
+        "requirement": "Certificación Presupuestaria"
+      }
+    ]
+  },
+  {
+    "legal": "BASE LEGAL: Manual específico para el control financiero previo al pago, manual específico para la administración de los fondos de caja chica.",
+    "title": "CONTROL PREVIO DE LOS DOCUMENTOS SOPORTES PARA LA REPOSICIÓN DE CAJA CHICA",
+    "sheet": "Caja chica",
+    "rows": [
+      {
+        "number": "1",
+        "requirement": "Requerimiento del gasto"
+      },
+      {
+        "number": "2",
+        "requirement": "Facturas a nombre del custodio"
+      },
+      {
+        "number": "3",
+        "requirement": "Formulario AF-2 Comprobante de caja chica para unidades administrativas"
+      },
+      {
+        "number": "4",
+        "requirement": "Documentación que sustenta el gasto, conforme a los parámetros del manual específico para la Administración de los fondos de caja chica"
+      },
+      {
+        "number": "5",
+        "requirement": "Solicitud de pago elaborado remitida por el custodio o Director del área."
+      },
+      {
+        "number": "6",
+        "requirement": "Certificación presupuestaria"
+      }
+    ]
+  },
+  {
+    "legal": "BASE LEGAL: Manual específico para el control financiero previo al pago, manual específico para la administración de los fondos a rendir cuentas",
+    "title": "CONTROL PREVIO DE LOS DOCUMENTOS SOPORTES PARA LA LIQUIDACIÓN DEL \nFONDO A RENDIR CUENTAS",
+    "sheet": "Fondo a rendir cuentas",
+    "rows": [
+      {
+        "number": "1",
+        "requirement": "Requerimiento del gasto"
+      },
+      {
+        "number": "2",
+        "requirement": "Facturas a nombre del custodio del fondo"
+      },
+      {
+        "number": "3",
+        "requirement": "Formulario AF-2  Autorización de uso de recursos"
+      },
+      {
+        "number": "4",
+        "requirement": "Documentación que sustenta el gasto, conforme a los parámetros del manual específico para la Administración de los fondos a rendir cuentas"
+      },
+      {
+        "number": "5",
+        "requirement": "Solicitud de pago remitido por el custodio o Director del área."
+      },
+      {
+        "number": "6",
+        "requirement": "Certificación presupuestaria"
+      }
+    ]
+  }
+]

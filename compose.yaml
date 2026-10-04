@@ -1,0 +1,46 @@
+# ========================================================
+# SERVICIO NACIONAL DE ADUANA DEL ECUADOR - SENAE
+# Despliegue con Contenedores Docker / Podman en Rocky Linux 9
+# ========================================================
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: senae_control_previo_app
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:${APP_PORT:-3000}:3000"
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      HOSTNAME: "0.0.0.0"
+      DATABASE_URL: "postgresql://${POSTGRES_USER:-senae_admin}:${POSTGRES_PASSWORD:-senae_segura_2026}@db:5432/${POSTGRES_DB:-senae_control_previo}?schema=public"
+      NEXT_PUBLIC_APP_URL: "${APP_URL:-http://localhost:3000}"
+      CAPTCHA_SECRET: "${CAPTCHA_SECRET:-senae_captcha_secret_prod_2026}"
+      AUTH_SECRET: "${AUTH_SECRET:-senae_auth_secret_prod_2026}"
+    depends_on:
+      db:
+        condition: service_healthy
+
+  db:
+    image: postgres:16-alpine
+    container_name: senae_control_previo_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-senae_admin}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-senae_segura_2026}
+      POSTGRES_DB: ${POSTGRES_DB:-senae_control_previo}
+    volumes:
+      - senae_postgres_data:/var/lib/postgresql/data
+      - ./backups:/backups
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 8s
+      timeout: 5s
+      retries: 8
+
+volumes:
+  senae_postgres_data:
+    name: senae_control_previo_data

@@ -1,0 +1,369 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+model areas {
+  id_area                                                            Int                     @id @default(autoincrement())
+  nombre                                                             String                  @unique(map: "nombre") @db.VarChar(100)
+  codigo                                                             String                  @unique(map: "codigo") @db.VarChar(20)
+  orden_flujo                                                        Int
+  activo                                                             Boolean?                @default(true)
+  created_at                                                         DateTime?               @default(now()) @db.Timestamp(0)
+  asignacion_turnos                                                  asignacion_turnos?
+  historial_movimientos_historial_movimientos_id_area_destinoToareas historial_movimientos[] @relation("historial_movimientos_id_area_destinoToareas")
+  historial_movimientos_historial_movimientos_id_area_origenToareas  historial_movimientos[] @relation("historial_movimientos_id_area_origenToareas")
+  observaciones                                                      observaciones[]
+  tramites                                                           tramites[]
+  usuarios                                                           usuarios[]
+}
+
+model asignacion_turnos {
+  id_turno                   Int       @id @default(autoincrement())
+  id_area                    Int       @unique(map: "id_area")
+  id_ultimo_usuario_asignado Int?
+  fecha_ultima_asignacion    DateTime? @default(now()) @db.Timestamp(0)
+  areas                      areas     @relation(fields: [id_area], references: [id_area], onUpdate: Restrict, map: "fk_turnos_area")
+  usuarios                   usuarios? @relation(fields: [id_ultimo_usuario_asignado], references: [id_usuario], onDelete: Restrict, onUpdate: Restrict, map: "fk_turnos_usuario")
+
+  @@index([id_ultimo_usuario_asignado], map: "fk_turnos_usuario")
+}
+
+model campos_tramite {
+  id_campo     Int       @id @default(autoincrement())
+  clave        String    @unique(map: "clave") @db.VarChar(60)
+  etiqueta     String    @db.VarChar(120)
+  tipo_dato    String    @default("TEXT") @db.VarChar(30)
+  departamento String    @default("GLOBAL") @db.VarChar(50)
+  orden        Int?      @default(0)
+  activo       Boolean?  @default(true)
+  created_at   DateTime? @default(now()) @db.Timestamp(0)
+}
+
+model documentos_tramite {
+  id_documento    Int                                @id @default(autoincrement())
+  id_tramite      Int
+  tipo_documento  documentos_tramite_tipo_documento? @default(OTRO)
+  nombre_original String                             @db.VarChar(255)
+  nombre_guardado String                             @db.VarChar(255)
+  ruta_archivo    String                             @db.VarChar(255)
+  mimetype        String?                            @default("application/pdf") @db.VarChar(100)
+  tamano_bytes    BigInt
+  id_usuario_sube Int
+  fecha_subida    DateTime?                          @default(now()) @db.Timestamp(0)
+  activo          Boolean?                           @default(true)
+
+  @@index([id_tramite], map: "id_tramite")
+}
+
+model feriados {
+  id_feriado  Int            @id @default(autoincrement())
+  fecha       DateTime       @unique(map: "fecha") @db.Date
+  descripcion String         @db.VarChar(150)
+  anio        Int
+  tipo        feriados_tipo? @default(NACIONAL)
+  activo      Boolean?       @default(true)
+  created_at  DateTime?      @default(now()) @db.Timestamp(0)
+
+  @@index([anio], map: "idx_anio")
+  @@index([fecha], map: "idx_fecha")
+}
+
+model historial_movimientos {
+  id_movimiento                                               Int       @id @default(autoincrement())
+  id_tramite                                                  Int
+  id_usuario_entrega                                          Int
+  id_usuario_recibe                                           Int
+  id_area_origen                                              Int
+  id_area_destino                                             Int
+  tipo_accion                                                 String    @db.VarChar(60)
+  comentarios                                                 String?   @db.Text
+  fecha_hora                                                  DateTime? @default(now()) @db.Timestamp(0)
+  areas_historial_movimientos_id_area_destinoToareas          areas     @relation("historial_movimientos_id_area_destinoToareas", fields: [id_area_destino], references: [id_area], onUpdate: Restrict, map: "fk_hist_area_dest")
+  areas_historial_movimientos_id_area_origenToareas           areas     @relation("historial_movimientos_id_area_origenToareas", fields: [id_area_origen], references: [id_area], onUpdate: Restrict, map: "fk_hist_area_orig")
+  usuarios_historial_movimientos_id_usuario_entregaTousuarios usuarios  @relation("historial_movimientos_id_usuario_entregaTousuarios", fields: [id_usuario_entrega], references: [id_usuario], onUpdate: Restrict, map: "fk_hist_entrega")
+  usuarios_historial_movimientos_id_usuario_recibeTousuarios  usuarios  @relation("historial_movimientos_id_usuario_recibeTousuarios", fields: [id_usuario_recibe], references: [id_usuario], onUpdate: Restrict, map: "fk_hist_recibe")
+  tramites                                                    tramites  @relation(fields: [id_tramite], references: [id_tramite], onUpdate: Restrict, map: "fk_hist_tramite")
+
+  @@index([id_area_destino], map: "fk_hist_area_dest")
+  @@index([id_area_origen], map: "fk_hist_area_orig")
+  @@index([id_usuario_entrega], map: "fk_hist_entrega")
+  @@index([id_usuario_recibe], map: "fk_hist_recibe")
+  @@index([id_tramite], map: "fk_hist_tramite")
+}
+
+model observaciones {
+  id_observacion                                                 Int       @id @default(autoincrement())
+  id_tramite                                                     Int
+  id_area_origen                                                 Int       @default(1)
+  id_usuario_origen                                              Int       @default(1)
+  id_area_destino                                                Int       @default(1)
+  id_area_reporta                                                Int
+  id_usuario_reporta                                             Int
+  detalle_observacion                                            String    @db.Text
+  fecha_reporte                                                  DateTime? @default(now()) @db.Timestamp(0)
+  estado_observacion                                             String?   @default("PENDIENTE") @db.VarChar(40)
+  respuesta_observacion                                          String?   @db.Text
+  id_usuario_responde                                            Int?
+  fecha_respuesta                                                DateTime? @db.DateTime(0)
+  respuesta_dfi                                                  String?   @db.Text
+  id_usuario_destino_devolucion                                  Int?
+  fecha_resolucion                                               DateTime? @db.DateTime(0)
+  areas                                                          areas     @relation(fields: [id_area_reporta], references: [id_area], onUpdate: Restrict, map: "fk_obs_area")
+  usuarios_observaciones_id_usuario_destino_devolucionTousuarios usuarios? @relation("observaciones_id_usuario_destino_devolucionTousuarios", fields: [id_usuario_destino_devolucion], references: [id_usuario], onDelete: Restrict, onUpdate: Restrict, map: "fk_obs_destino_dev")
+  usuarios_observaciones_id_usuario_reportaTousuarios            usuarios  @relation("observaciones_id_usuario_reportaTousuarios", fields: [id_usuario_reporta], references: [id_usuario], onUpdate: Restrict, map: "fk_obs_reporta")
+  tramites                                                       tramites  @relation(fields: [id_tramite], references: [id_tramite], onUpdate: Restrict, map: "fk_obs_tramite")
+
+  @@index([id_area_reporta], map: "fk_obs_area")
+  @@index([id_usuario_destino_devolucion], map: "fk_obs_destino_dev")
+  @@index([id_usuario_reporta], map: "fk_obs_reporta")
+  @@index([id_tramite], map: "fk_obs_tramite")
+}
+
+model parametros_sistema {
+  clave       String    @id @db.VarChar(50)
+  valor       String    @db.VarChar(255)
+  descripcion String?   @db.VarChar(255)
+  tipo_dato   String?   @default("STRING") @db.VarChar(20)
+  updated_at  DateTime? @default(now()) @db.Timestamp(0)
+}
+
+model reglas_campo_flujo {
+  id_regla        Int       @id @default(autoincrement())
+  clave_campo     String    @db.VarChar(60)
+  tipo_flujo      String?   @default("TODOS") @db.VarChar(50)
+  id_tipo_tramite Int?
+  etapa_flujo     String    @db.VarChar(50)
+  visibilidad     String?   @default("VISIBLE") @db.VarChar(20)
+  obligatoriedad  String?   @default("OPCIONAL") @db.VarChar(20)
+  updated_at      DateTime? @default(now()) @db.Timestamp(0)
+
+  @@index([clave_campo], map: "clave_campo")
+  @@index([etapa_flujo], map: "etapa_flujo")
+}
+
+model requisitos_checklist {
+  id_requisito         Int                       @id @default(autoincrement())
+  id_tipo_tramite      Int
+  fase                 requisitos_checklist_fase
+  descripcion          String                    @db.Text
+  orden                Int?                      @default(1)
+  es_obligatorio       Boolean?                  @default(true)
+  activo               Boolean?                  @default(true)
+  tipos_tramite        tipos_tramite             @relation(fields: [id_tipo_tramite], references: [id_tipo_tramite], onUpdate: Restrict, map: "fk_req_tipo")
+  respuestas_checklist respuestas_checklist[]
+
+  @@index([id_tipo_tramite], map: "fk_req_tipo")
+}
+
+model respuestas_checklist {
+  id_respuesta           Int                                      @id @default(autoincrement())
+  id_tramite             Int
+  id_requisito           Int
+  estado_cumplimiento    respuestas_checklist_estado_cumplimiento
+  observacion_especifica String?                                  @db.VarChar(255)
+  id_usuario_evaluador   Int
+  fecha_evaluacion       DateTime?                                @default(now()) @db.Timestamp(0)
+  usuarios               usuarios                                 @relation(fields: [id_usuario_evaluador], references: [id_usuario], onUpdate: Restrict, map: "fk_resp_evaluador")
+  requisitos_checklist   requisitos_checklist                     @relation(fields: [id_requisito], references: [id_requisito], onUpdate: Restrict, map: "fk_resp_requisito")
+  tramites               tramites                                 @relation(fields: [id_tramite], references: [id_tramite], onUpdate: Restrict, map: "fk_resp_tramite")
+
+  @@unique([id_tramite, id_requisito], map: "uk_tramite_requisito")
+  @@index([id_usuario_evaluador], map: "fk_resp_evaluador")
+  @@index([id_requisito], map: "fk_resp_requisito")
+}
+
+model solicitudes_devolucion {
+  id_solicitud        Int       @id @default(autoincrement())
+  id_tramite          Int
+  id_area_solicita    Int
+  id_usuario_solicita Int
+  id_area_custodio    Int
+  id_usuario_custodio Int
+  motivo_solicitud    String    @db.Text
+  estado_solicitud    String?   @default("PENDIENTE") @db.VarChar(30)
+  respuesta_solicitud String?   @db.Text
+  fecha_solicitud     DateTime? @default(now()) @db.Timestamp(0)
+  fecha_respuesta     DateTime? @db.DateTime(0)
+
+  @@index([id_tramite], map: "id_tramite")
+  @@index([id_usuario_custodio], map: "id_usuario_custodio")
+}
+
+model tipos_gestion {
+  id_tipo_gestion Int       @id @default(autoincrement())
+  codigo          String    @unique(map: "codigo") @db.VarChar(40)
+  nombre          String    @db.VarChar(120)
+  descripcion     String?   @db.Text
+  activo          Boolean?  @default(true)
+  created_at      DateTime? @default(now()) @db.Timestamp(0)
+}
+
+model tipos_tramite {
+  id_tipo_tramite              Int                    @id @default(autoincrement())
+  codigo                       String                 @unique(map: "codigo") @db.VarChar(30)
+  nombre                       String                 @db.VarChar(150)
+  descripcion                  String?                @db.Text
+  activo                       Boolean?               @default(true)
+  tipo_cur_permitido           String?                @default("DEVENGADO") @db.VarChar(20)
+  requiere_item_presupuestario Boolean?               @default(true)
+  requiere_factura             Boolean?               @default(true)
+  requisitos_checklist         requisitos_checklist[]
+  tramites                     tramites[]
+}
+
+model tramites {
+  id_tramite                        Int                     @id @default(autoincrement())
+  codigo_tramite                    String                  @unique(map: "codigo_tramite") @db.VarChar(30)
+  numero_quipux                     String                  @unique(map: "numero_quipux") @db.VarChar(50)
+  fecha_memorando                   DateTime?               @db.Date
+  fecha_recepcion_fisica            DateTime?               @db.Date
+  id_tipo_tramite                   Int
+  tipo_flujo                        String                  @default("PAGO") @db.VarChar(50)
+  proveedor_beneficiario            String                  @db.VarChar(200)
+  ruc_proveedor                     String?                 @db.VarChar(13)
+  monto_total                       Decimal                 @db.Decimal(14, 2)
+  es_alta_cuantia                   Boolean?                @default(false)
+  numero_cur_compromiso             String?                 @db.VarChar(30)
+  numero_cur_devengado              String?                 @db.VarChar(30)
+  numero_cur_contable               String?                 @db.VarChar(50)
+  numero_liquidacion                String?                 @db.VarChar(50)
+  numero_juicio                     String?                 @db.VarChar(50)
+  aprobado_presupuesto              Boolean?                @default(false)
+  fecha_aprobacion_presupuesto      DateTime?               @db.DateTime(0)
+  id_usuario_aprobador_presupuesto  Int?
+  aprobado_contabilidad             Boolean?                @default(false)
+  fecha_aprobacion_contabilidad     DateTime?               @db.DateTime(0)
+  id_usuario_aprobador_contabilidad Int?
+  autorizado_pago                   Boolean?                @default(false)
+  fecha_autorizacion_pago           DateTime?               @db.DateTime(0)
+  id_usuario_autoriza_pago          Int?
+  comprobante_pago                  String?                 @db.VarChar(60)
+  fecha_pago                        DateTime?               @db.DateTime(0)
+  ubicacion_archivo                 String?                 @db.VarChar(120)
+  certificacion_presupuestaria      String?                 @db.VarChar(60)
+  item_presupuestario               String?                 @db.VarChar(60)
+  numero_factura                    String?                 @db.VarChar(60)
+  anexos                            String?                 @db.Text
+  fojas_fisicas                     Int?                    @default(1)
+  id_area_actual                    Int
+  id_custodio_actual                Int
+  estado_general                    String                  @default("EN_RECEPCION") @db.VarChar(60)
+  sub_estado                        String                  @default("RECEPCIONADO_DFI") @db.VarChar(60)
+  esta_pausado                      Boolean?                @default(false)
+  motivo_pausa                      String?                 @db.VarChar(255)
+  fecha_pausa                       DateTime?               @db.DateTime(0)
+  dias_pausa_acumulados             Int?                    @default(0)
+  es_devuelto                       Boolean?                @default(false)
+  motivo_devolucion                 String?                 @db.Text
+  fecha_ingreso                     DateTime?               @default(now()) @db.Timestamp(0)
+  fecha_ultimo_movimiento           DateTime?               @default(now()) @db.Timestamp(0)
+  fecha_ultima_modificacion         DateTime?               @default(now()) @db.Timestamp(0)
+  subtotal                          Decimal?                @db.Decimal(14, 2)
+  monto_iva                         Decimal?                @db.Decimal(14, 2)
+  monto_retenciones                 Decimal?                @db.Decimal(14, 2)
+  monto_multas                      Decimal?                @db.Decimal(14, 2)
+  fecha_factura                     DateTime?               @db.Date
+  lote_mef                          String?                 @db.VarChar(50)
+  spi_bce_referencia                String?                 @db.VarChar(60)
+  codigo_tomo_caja                  String?                 @db.VarChar(50)
+  estanteria                        String?                 @db.VarChar(50)
+  campos_personalizados             Json?
+  historial_movimientos             historial_movimientos[]
+  observaciones                     observaciones[]
+  respuestas_checklist              respuestas_checklist[]
+  tramite_referencias               tramite_referencias[]
+  areas                             areas                   @relation(fields: [id_area_actual], references: [id_area], onUpdate: Restrict, map: "fk_tramites_area")
+  usuarios                          usuarios                @relation(fields: [id_custodio_actual], references: [id_usuario], onUpdate: Restrict, map: "fk_tramites_custodio")
+  tipos_tramite                     tipos_tramite           @relation(fields: [id_tipo_tramite], references: [id_tipo_tramite], onUpdate: Restrict, map: "fk_tramites_tipo")
+
+  @@index([id_area_actual], map: "fk_tramites_area")
+  @@index([id_custodio_actual], map: "fk_tramites_custodio")
+  @@index([id_tipo_tramite], map: "fk_tramites_tipo")
+}
+
+model usuarios {
+  id_usuario                                                               Int                             @id @default(autoincrement())
+  id_area                                                                  Int
+  nombre_completo                                                          String                          @db.VarChar(150)
+  correo_institucional                                                     String                          @unique(map: "correo_institucional") @db.VarChar(100)
+  cargo                                                                    String                          @db.VarChar(100)
+  rol                                                                      usuarios_rol
+  password_hash                                                            String?                         @db.VarChar(255)
+  activo                                                                   Boolean?                        @default(true)
+  estado_disponibilidad                                                    usuarios_estado_disponibilidad? @default(DISPONIBLE)
+  created_at                                                               DateTime?                       @default(now()) @db.Timestamp(0)
+  asignacion_turnos                                                        asignacion_turnos[]
+  historial_movimientos_historial_movimientos_id_usuario_entregaTousuarios historial_movimientos[]         @relation("historial_movimientos_id_usuario_entregaTousuarios")
+  historial_movimientos_historial_movimientos_id_usuario_recibeTousuarios  historial_movimientos[]         @relation("historial_movimientos_id_usuario_recibeTousuarios")
+  observaciones_observaciones_id_usuario_destino_devolucionTousuarios      observaciones[]                 @relation("observaciones_id_usuario_destino_devolucionTousuarios")
+  observaciones_observaciones_id_usuario_reportaTousuarios                 observaciones[]                 @relation("observaciones_id_usuario_reportaTousuarios")
+  respuestas_checklist                                                     respuestas_checklist[]
+  tramites                                                                 tramites[]
+  tramite_referencias                                                      tramite_referencias[]
+  areas                                                                    areas                           @relation(fields: [id_area], references: [id_area], onUpdate: Restrict, map: "fk_usuarios_area")
+
+  @@index([id_area], map: "fk_usuarios_area")
+}
+
+enum requisitos_checklist_fase {
+  PRESUPUESTO
+  CONTABILIDAD
+}
+
+enum documentos_tramite_tipo_documento {
+  MEMORANDO_QUIPUX
+  FACTURA_SRI
+  ACTA_ENTREGA
+  INFORME_TECNICO
+  OTRO
+}
+
+enum respuestas_checklist_estado_cumplimiento {
+  CUMPLE
+  NO_CUMPLE
+  NO_APLICA
+}
+
+enum feriados_tipo {
+  NACIONAL
+  DECRETO_EJECUTIVO
+  LOCAL
+}
+
+enum usuarios_rol {
+  DIRECTORA
+  SECRETARIA
+  JEFE
+  ANALISTA
+  ADMIN
+}
+
+enum usuarios_estado_disponibilidad {
+  DISPONIBLE
+  VACACIONES
+  PERMISO
+  INACTIVO
+}
+
+model tramite_referencias {
+  id_referencia       Int       @id @default(autoincrement())
+  id_tramite          Int
+  tipo_documento      String    @db.VarChar(60)
+  tipo_personalizado  String?   @db.VarChar(100)
+  numero_documento    String    @db.VarChar(100)
+  fecha_documento     DateTime  @db.Date
+  asunto_sumilla      String    @db.Text
+  id_usuario_registro Int
+  created_at          DateTime? @default(now()) @db.Timestamp(0)
+
+  tramites            tramites  @relation(fields: [id_tramite], references: [id_tramite], onDelete: Cascade)
+  usuarios            usuarios  @relation(fields: [id_usuario_registro], references: [id_usuario], onUpdate: Restrict)
+
+  @@index([id_tramite])
+  @@index([id_usuario_registro])
+}

@@ -1,0 +1,28 @@
+[Unit]
+Description=SENAE Control Financiero Previo al Pago v2.0
+After=network.target postgresql-16.service
+
+[Service]
+Type=simple
+User=senae
+Group=senae
+WorkingDirectory=/opt/senae-control-previo
+Environment=NODE_ENV=production
+Environment=PORT=3000
+Environment=HOSTNAME=127.0.0.1
+EnvironmentFile=/opt/senae-control-previo/.env.production
+ExecStart=/usr/bin/node /opt/senae-control-previo/.next/standalone/server.js
+Restart=always
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=senae-control-previo
+
+# Endurecimiento de Seguridad (Security Hardening)
+ProtectSystem=full
+ProtectHome=true
+NoNewPrivileges=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target
