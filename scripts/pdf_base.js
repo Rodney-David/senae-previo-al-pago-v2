@@ -390,39 +390,6 @@ const baseStyles = `
     color: #002855;
   }
 
-  /* Signatures section */
-  .signature-grid {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 24px;
-    margin-top: 36px;
-    page-break-inside: avoid;
-  }
-
-  .signature-box {
-    border: 1px dashed #94a3b8;
-    border-radius: 6px;
-    padding: 18px 14px;
-    text-align: center;
-    background-color: #fafaf9;
-  }
-
-  .signature-line {
-    width: 80%;
-    margin: 40px auto 8px auto;
-    border-top: 1.5px solid #475569;
-  }
-
-  .signature-name {
-    font-weight: 700;
-    font-size: 9pt;
-    color: #0f172a;
-  }
-
-  .signature-role {
-    font-size: 8pt;
-    color: #64748b;
-  }
 
   .page-break {
     page-break-before: always;

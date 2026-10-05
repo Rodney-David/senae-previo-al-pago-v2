@@ -229,18 +229,6 @@ sudo systemctl status postgresql-16</code></pre>
   </ol>
   <pre><code>sudo journalctl -u senae-control-previo -f</code></pre>
 
-  <div class="signature-grid">
-    <div class="signature-box">
-      <div class="signature-line"></div>
-      <div class="signature-name">Ing. Rodney David Chiluiza</div>
-      <div class="signature-role">Líder Técnico de Desarrollo · Proyecto SENAE</div>
-    </div>
-    <div class="signature-box">
-      <div class="signature-line"></div>
-      <div class="signature-name">Dirección de Tecnologías de Información (TICs)</div>
-      <div class="signature-role">Servicio Nacional de Aduana del Ecuador</div>
-    </div>
-  </div>
 `;
 
 documents.push({
@@ -555,18 +543,6 @@ const doc2Html = `
     </tbody>
   </table>
 
-  <div class="signature-grid">
-    <div class="signature-box">
-      <div class="signature-line"></div>
-      <div class="signature-name">Ing. Rodney David Chiluiza</div>
-      <div class="signature-role">Arquitecto de Base de Datos · SENAE</div>
-    </div>
-    <div class="signature-box">
-      <div class="signature-line"></div>
-      <div class="signature-name">Administrador de Base de Datos (DBA)</div>
-      <div class="signature-role">Dirección de TICs · SENAE</div>
-    </div>
-  </div>
 `;
 
 documents.push({
@@ -873,18 +849,6 @@ const doc3Html = `
     <li><strong>Interceptación en Edge Middleware:</strong> Ninguna pantalla protegida ni endpoint de la API puede ser consultado sin una sesión institucional válida; las peticiones no autorizadas son redirigidas de inmediato al login.</li>
   </ul>
 
-  <div class="signature-grid">
-    <div class="signature-box">
-      <div class="signature-line"></div>
-      <div class="signature-name">Ing. Rodney David Chiluiza</div>
-      <div class="signature-role">Oficial de Seguridad de la Información (CISO)</div>
-    </div>
-    <div class="signature-box">
-      <div class="signature-line"></div>
-      <div class="signature-name">Dirección Financiera</div>
-      <div class="signature-role">Servicio Nacional de Aduana del Ecuador</div>
-    </div>
-  </div>
 `;
 
 documents.push({
@@ -1058,18 +1022,6 @@ const doc4Html = `
   </ol>
   <pre><code>openssl rand -hex 32</code></pre>
 
-  <div class="signature-grid">
-    <div class="signature-box">
-      <div class="signature-line"></div>
-      <div class="signature-name">ENTREGADO POR:</div>
-      <div class="signature-role">Dirección de Tecnologías de Información (TICs)</div>
-    </div>
-    <div class="signature-box">
-      <div class="signature-line"></div>
-      <div class="signature-name">RECIBIDO POR:</div>
-      <div class="signature-role">Custodio Oficial · Dirección Financiera (DFI)</div>
-    </div>
-  </div>
 `;
 
 documents.push({
@@ -1149,18 +1101,6 @@ SELECT
     (SELECT COUNT(*) FROM usuarios) AS total_usuarios_activos;
 "</code></pre>
 
-  <div class="signature-grid">
-    <div class="signature-box">
-      <div class="signature-line"></div>
-      <div class="signature-name">Ing. Rodney David Chiluiza</div>
-      <div class="signature-role">Especialista en Continuidad y Respaldo · SENAE</div>
-    </div>
-    <div class="signature-box">
-      <div class="signature-line"></div>
-      <div class="signature-name">Dirección de TICs / Operaciones</div>
-      <div class="signature-role">Servicio Nacional de Aduana del Ecuador</div>
-    </div>
-  </div>
 `;
 
 documents.push({
@@ -1264,8 +1204,8 @@ const doc6Html = `
   </ol>
 
   <div class="figure-container">
-    ${imgRevision ? `<img src="${imgRevision}" class="figure-img" alt="Revisión Documental" />` : '<p>[Captura Revisión]</p>'}
-    <div class="figure-caption"><strong>Figura 5.</strong> Matriz de Control Documental, Verificación del Checklist Normativo y Registro de CURs.</div>
+    ${imgRevision ? `<img src="${imgRevision}" class="figure-img" alt="Checklist Oficial de Control Previo al Pago" />` : '<p>[Captura Checklist]</p>'}
+    <div class="figure-caption"><strong>Figura 5.</strong> Checklist Oficial de Control Previo al Pago (Manual SENAE-ME-3-6-001): Verificación Interactiva de Requisitos (Cumple, No Cumple, No Aplica), Barra de Progreso y Descarga Excel Oficial.</div>
   </div>
 
   <div class="page-break"></div>
@@ -1310,19 +1250,6 @@ const doc6Html = `
   <div class="figure-container">
     ${imgAdmin ? `<img src="${imgAdmin}" class="figure-img" alt="Módulo de Administración" />` : '<p>[Captura Administración]</p>'}
     <div class="figure-caption"><strong>Figura 8.</strong> Módulo de Administración: Gestión de Cuentas, Catálogo de Feriados Nacionales y Reglas del Sistema.</div>
-  </div>
-
-  <div class="signature-grid">
-    <div class="signature-box">
-      <div class="signature-line"></div>
-      <div class="signature-name">Ing. Rodney David Chiluiza</div>
-      <div class="signature-role">Desarrollador y Analista de Procesos · SENAE</div>
-    </div>
-    <div class="signature-box">
-      <div class="signature-line"></div>
-      <div class="signature-name">Directora Financiera</div>
-      <div class="signature-role">Servicio Nacional de Aduana del Ecuador</div>
-    </div>
   </div>
 `;
 
