@@ -77,8 +77,8 @@ export const Sidebar: React.FC = () => {
   };
 
   return (
-    <aside className="w-64 bg-slate-900 border-r border-slate-800 shrink-0 flex flex-col justify-between hidden md:flex min-h-[calc(100vh-4rem)] text-white">
-      <div className="p-4 space-y-5">
+    <aside className="w-64 h-full shrink-0 flex flex-col justify-between hidden md:flex bg-slate-900 border-r border-slate-800 text-white select-none">
+      <div className="p-4 space-y-5 overflow-y-auto flex-1">
         {/* User Card */}
         {currentUser && (
           <div className="p-3 bg-slate-800/80 border border-slate-700/70 rounded-xl space-y-1.5 shadow-xs">
@@ -143,7 +143,7 @@ export const Sidebar: React.FC = () => {
       </div>
 
       {/* Botón de Cerrar Sesión Seguro al final de la barra lateral */}
-      <div className="p-4 border-t border-slate-800 mt-auto">
+      <div className="p-4 border-t border-slate-800 shrink-0">
         <button
           onClick={handleLogout}
           className="w-full px-3.5 py-2.5 text-rose-300 hover:text-white bg-rose-950/40 hover:bg-rose-900/60 rounded-xl border border-rose-800/60 transition-colors flex items-center justify-center gap-2 text-xs font-semibold shadow-xs cursor-pointer"
