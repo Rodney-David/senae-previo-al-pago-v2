@@ -440,14 +440,14 @@ export default function AdministracionPage() {
           </div>
 
           <div className="overflow-x-auto">
-            <table className="min-w-[750px] w-full text-left border-collapse text-xs">
+            <table className="min-w-[650px] w-full text-left border-collapse text-xs">
               <thead>
-                <tr className="border-b border-slate-200 bg-slate-50/70 text-[11px] font-bold text-slate-700 uppercase">
-                  <th className="py-2.5 px-4 w-12">#</th>
-                  <th className="py-2.5 px-4">Proceso Normativo (SENAE)</th>
-                  <th className="py-2.5 px-4 w-44">CUR Exigido en Contabilidad</th>
-                  <th className="py-2.5 px-4 w-40">Ítem Presupuestario</th>
-                  <th className="py-2.5 px-4 w-28 text-center">Estado</th>
+                <tr className="border-b border-slate-200 bg-slate-50/70 text-[10px] font-bold text-slate-700 uppercase">
+                  <th className="py-2 px-3 w-10">#</th>
+                  <th className="py-2 px-3">Proceso Normativo (SENAE)</th>
+                  <th className="py-2 px-3 w-40">CUR Exigido en Contabilidad</th>
+                  <th className="py-2 px-3 w-36">Ítem Presupuestario</th>
+                  <th className="py-2 px-3 w-24 text-center">Estado</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
@@ -521,15 +521,15 @@ export default function AdministracionPage() {
               </div>
 
               <div className="overflow-x-auto">
-                <table className="min-w-[700px] w-full text-left border-collapse text-xs">
+                <table className="min-w-[650px] w-full text-left border-collapse text-xs">
                   <thead>
-                    <tr className="border-b border-slate-200 bg-slate-50 text-[11px] font-bold text-slate-700 uppercase">
-                      <th className="py-2.5 px-4">Campo Clave</th>
-                      <th className="py-2.5 px-4">Tipo Gestión</th>
-                      <th className="py-2.5 px-4">Fase / Etapa</th>
-                      <th className="py-2.5 px-4">Visibilidad</th>
-                      <th className="py-2.5 px-4">Obligatoriedad</th>
-                      <th className="py-2.5 px-4 text-center">Acción</th>
+                    <tr className="border-b border-slate-200 bg-slate-50 text-[10px] font-bold text-slate-700 uppercase">
+                      <th className="py-2 px-3">Campo Clave</th>
+                      <th className="py-2 px-3">Tipo Gestión</th>
+                      <th className="py-2 px-3">Fase / Etapa</th>
+                      <th className="py-2 px-3">Visibilidad</th>
+                      <th className="py-2 px-3">Obligatoriedad</th>
+                      <th className="py-2 px-3 text-center">Acción</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
@@ -590,13 +590,13 @@ export default function AdministracionPage() {
                 Campos Globales Registrados en el Sistema
               </div>
               <div className="overflow-x-auto">
-                <table className="min-w-[650px] w-full text-left border-collapse text-xs">
+                <table className="min-w-[560px] w-full text-left border-collapse text-xs">
                   <thead>
-                    <tr className="border-b border-slate-200 bg-slate-50 text-[11px] font-bold text-slate-700 uppercase">
-                      <th className="py-2.5 px-4">Clave</th>
-                      <th className="py-2.5 px-4">Etiqueta</th>
-                      <th className="py-2.5 px-4">Tipo Dato</th>
-                      <th className="py-2.5 px-4">Departamento</th>
+                    <tr className="border-b border-slate-200 bg-slate-50 text-[10px] font-bold text-slate-700 uppercase">
+                      <th className="py-2 px-3">Clave</th>
+                      <th className="py-2 px-3">Etiqueta</th>
+                      <th className="py-2 px-3">Tipo Dato</th>
+                      <th className="py-2 px-3">Departamento</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
@@ -797,15 +797,15 @@ export default function AdministracionPage() {
           </div>
 
           <div className="overflow-x-auto">
-            <table className="min-w-[850px] w-full text-left border-collapse text-xs">
+            <table className="min-w-[700px] w-full text-left border-collapse text-xs">
               <thead>
-                <tr className="border-b border-slate-200 bg-slate-50/70 text-[11px] font-bold text-slate-700 uppercase">
-                  <th className="py-2.5 px-4">Funcionario</th>
-                  <th className="py-2.5 px-4">Correo Institucional</th>
-                  <th className="py-2.5 px-4">Departamento</th>
-                  <th className="py-2.5 px-4">Cargo / Rol</th>
-                  <th className="py-2.5 px-4">Disponibilidad (Turno)</th>
-                  <th className="py-2.5 px-4 text-center">Acciones</th>
+                <tr className="border-b border-slate-200 bg-slate-50/70 text-[10px] font-bold text-slate-700 uppercase">
+                  <th className="py-2 px-3">Funcionario</th>
+                  <th className="py-2 px-3">Correo Institucional</th>
+                  <th className="py-2 px-3">Departamento</th>
+                  <th className="py-2 px-3">Cargo / Rol</th>
+                  <th className="py-2 px-3">Disponibilidad</th>
+                  <th className="py-2 px-3 text-center">Acciones</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
@@ -857,13 +857,13 @@ export default function AdministracionPage() {
               Calendario de Días No Laborables Registrados
             </div>
             <div className="overflow-x-auto">
-              <table className="min-w-[600px] w-full text-left border-collapse text-xs">
+              <table className="min-w-[500px] w-full text-left border-collapse text-xs">
                 <thead>
-                  <tr className="border-b border-slate-200 bg-slate-50 text-[11px] font-bold text-slate-700 uppercase">
-                    <th className="py-2.5 px-4">Fecha</th>
-                    <th className="py-2.5 px-4">Descripción del Feriado</th>
-                    <th className="py-2.5 px-4">Tipo</th>
-                    <th className="py-2.5 px-4 text-center">Acción</th>
+                  <tr className="border-b border-slate-200 bg-slate-50 text-[10px] font-bold text-slate-700 uppercase">
+                    <th className="py-2 px-3">Fecha</th>
+                    <th className="py-2 px-3">Descripción del Feriado</th>
+                    <th className="py-2 px-3">Tipo</th>
+                    <th className="py-2 px-3 text-center">Acción</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
@@ -972,14 +972,14 @@ export default function AdministracionPage() {
           </div>
 
           <div className="overflow-x-auto">
-            <table className="min-w-[850px] w-full text-left border-collapse text-xs">
+            <table className="min-w-[720px] w-full text-left border-collapse text-xs">
               <thead>
-                <tr className="border-b border-slate-200 bg-slate-50 text-[11px] font-bold text-slate-700 uppercase">
-                  <th className="py-2.5 px-4 w-36">Fecha / Hora</th>
-                  <th className="py-2.5 px-4 w-36">Trámite / Quipux</th>
-                  <th className="py-2.5 px-4 w-44">Acción Ejecutada</th>
-                  <th className="py-2.5 px-4 w-48">Servidor Responsable</th>
-                  <th className="py-2.5 px-4">Detalle / Comentarios</th>
+                <tr className="border-b border-slate-200 bg-slate-50 text-[10px] font-bold text-slate-700 uppercase">
+                  <th className="py-2 px-3 w-32">Fecha / Hora</th>
+                  <th className="py-2 px-3 w-32">Trámite / Quipux</th>
+                  <th className="py-2 px-3 w-36">Acción Ejecutada</th>
+                  <th className="py-2 px-3 w-40">Servidor Responsable</th>
+                  <th className="py-2 px-3">Detalle / Comentarios</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">

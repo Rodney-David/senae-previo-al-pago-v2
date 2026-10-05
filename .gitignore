@@ -7,4 +7,5 @@ build/
 dist/
 *.log
 *.zip
+*.tsbuildinfo
 

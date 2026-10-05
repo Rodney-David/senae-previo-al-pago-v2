@@ -43,14 +43,15 @@ export const BadgeEstado: React.FC<BadgeEstadoProps> = ({
   return (
     <span
       className={cn(
-        "inline-flex items-center justify-center gap-1.5 px-2.5 py-1 rounded text-[11px] font-bold uppercase tracking-wider border text-center whitespace-nowrap shrink-0 shadow-2xs",
+        "inline-flex items-center justify-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold uppercase border text-center shrink-0 shadow-2xs max-w-[145px]",
         style,
         className
       )}
-      title={label}
+      title={`${label}${subEstado ? ` - ${displayLabel}` : ""}`}
     >
       <span className="w-1.5 h-1.5 rounded-full bg-current opacity-75 shrink-0" />
-      <span className="whitespace-nowrap">{displayLabel}</span>
+      <span className="truncate">{displayLabel}</span>
     </span>
   );
 };
+

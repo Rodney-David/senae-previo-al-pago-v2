@@ -43,14 +43,14 @@ export const TablaReferencias: React.FC<TablaReferenciasProps> = ({
             No se han registrado referencias documentales Quipux para este trámite.
           </div>
         ) : (
-          <table className="min-w-[700px] w-full text-left border-collapse">
+          <table className="min-w-[580px] w-full text-left border-collapse text-xs">
             <thead>
-              <tr className="border-b border-slate-200 bg-slate-50 text-[11px] font-semibold text-slate-600 uppercase tracking-wider">
-                <th className="py-2.5 px-4">Tipo</th>
-                <th className="py-2.5 px-4">Número Oficial</th>
-                <th className="py-2.5 px-4">Fecha</th>
-                <th className="py-2.5 px-4">Asunto / Sumilla</th>
-                <th className="py-2.5 px-4">Registrado Por</th>
+              <tr className="border-b border-slate-200 bg-slate-50 text-[10px] font-bold text-slate-600 uppercase tracking-wider">
+                <th className="py-2 px-3">Tipo</th>
+                <th className="py-2 px-3">Número Oficial</th>
+                <th className="py-2 px-3">Fecha</th>
+                <th className="py-2 px-3">Asunto / Sumilla</th>
+                <th className="py-2 px-3">Registrado Por</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 text-xs">

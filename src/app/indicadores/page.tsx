@@ -77,98 +77,98 @@ export default function IndicadoresPage() {
       </div>
 
       {/* KPI Cards Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
         {/* Card 1: Total Registrados */}
-        <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-xs space-y-2">
+        <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-xs space-y-1.5">
           <div className="flex items-center justify-between text-slate-500 text-xs font-semibold uppercase">
             <span>Total Trámites</span>
             <BarChart3 className="w-4 h-4 text-slate-400" />
           </div>
-          <div className="text-2xl font-bold font-mono text-slate-900">
+          <div className="text-xl sm:text-2xl font-bold font-mono text-slate-900">
             {loading ? "..." : metricas?.totalRegistrados ?? 0}
           </div>
           <p className="text-[11px] text-slate-500">Expedientes radicados</p>
         </div>
 
         {/* Card 2: En Flujo Activo */}
-        <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-xs space-y-2">
+        <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-xs space-y-1.5">
           <div className="flex items-center justify-between text-blue-600 text-xs font-semibold uppercase">
             <span>En Flujo Activo</span>
             <Clock className="w-4 h-4 text-blue-500" />
           </div>
-          <div className="text-2xl font-bold font-mono text-blue-700">
+          <div className="text-xl sm:text-2xl font-bold font-mono text-blue-700">
             {loading ? "..." : metricas?.enFlujoActivo ?? 0}
           </div>
           <p className="text-[11px] text-slate-500">En gestión operativa</p>
         </div>
 
         {/* Card 3: Pausados SLA */}
-        <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-xs space-y-2">
+        <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-xs space-y-1.5">
           <div className="flex items-center justify-between text-amber-600 text-xs font-semibold uppercase">
             <span>Pausados SLA</span>
             <PauseCircle className="w-4 h-4 text-amber-500" />
           </div>
-          <div className="text-2xl font-bold font-mono text-amber-700">
+          <div className="text-xl sm:text-2xl font-bold font-mono text-amber-700">
             {loading ? "..." : metricas?.pausadosSLA ?? 0}
           </div>
           <p className="text-[11px] text-slate-500">En espera de factura</p>
         </div>
 
         {/* Card 4: Alta Cuantía */}
-        <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-xs space-y-2">
+        <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-xs space-y-1.5">
           <div className="flex items-center justify-between text-slate-700 text-xs font-semibold uppercase">
             <span>Alta Cuantía</span>
             <DollarSign className="w-4 h-4 text-amber-600" />
           </div>
-          <div className="text-2xl font-bold font-mono text-slate-900">
+          <div className="text-xl sm:text-2xl font-bold font-mono text-slate-900">
             {loading ? "..." : metricas?.altaCuantia ?? 0}
           </div>
           <p className="text-[11px] text-slate-500">Monto ≥ $10.000 (Jefatura)</p>
         </div>
 
         {/* Card 5: En Plazo 🟢 */}
-        <div className="bg-emerald-50/50 p-5 rounded-xl border border-emerald-200 shadow-xs space-y-2">
+        <div className="bg-emerald-50/50 p-4 rounded-xl border border-emerald-200 shadow-xs space-y-1.5">
           <div className="flex items-center justify-between text-emerald-800 text-xs font-semibold uppercase">
             <span>En Plazo (1-3 días)</span>
             <span className="text-sm">🟢</span>
           </div>
-          <div className="text-2xl font-bold font-mono text-emerald-700">
+          <div className="text-xl sm:text-2xl font-bold font-mono text-emerald-700">
             {loading ? "..." : metricas?.enPlazo ?? 0}
           </div>
           <p className="text-[11px] text-emerald-700">Flujo dentro de término</p>
         </div>
 
         {/* Card 6: Por Vencer 🟡 */}
-        <div className="bg-amber-50/50 p-5 rounded-xl border border-amber-200 shadow-xs space-y-2">
+        <div className="bg-amber-50/50 p-4 rounded-xl border border-amber-200 shadow-xs space-y-1.5">
           <div className="flex items-center justify-between text-amber-800 text-xs font-semibold uppercase">
             <span>Por Vencer (4-5 días)</span>
             <span className="text-sm">🟡</span>
           </div>
-          <div className="text-2xl font-bold font-mono text-amber-700">
+          <div className="text-xl sm:text-2xl font-bold font-mono text-amber-700">
             {loading ? "..." : metricas?.porVencer ?? 0}
           </div>
           <p className="text-[11px] text-amber-700">Requiere agilización</p>
         </div>
 
         {/* Card 7: Vencidos / En Mora 🔴 */}
-        <div className="bg-rose-50/50 p-5 rounded-xl border border-rose-200 shadow-xs space-y-2">
+        <div className="bg-rose-50/50 p-4 rounded-xl border border-rose-200 shadow-xs space-y-1.5">
           <div className="flex items-center justify-between text-rose-800 text-xs font-semibold uppercase">
             <span>Vencidos / Mora (≥ 6d)</span>
             <span className="text-sm">🔴</span>
           </div>
-          <div className="text-2xl font-bold font-mono text-rose-700">
+          <div className="text-xl sm:text-2xl font-bold font-mono text-rose-700">
             {loading ? "..." : metricas?.vencidos ?? 0}
           </div>
           <p className="text-[11px] text-rose-700">Fuera de término normativo</p>
         </div>
 
         {/* Card 8: Archivados Definitivos */}
-        <div className="bg-slate-50 p-5 rounded-xl border border-slate-200 shadow-xs space-y-2">
+        <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 shadow-xs space-y-1.5">
           <div className="flex items-center justify-between text-slate-700 text-xs font-semibold uppercase">
             <span>Archivados</span>
             <Archive className="w-4 h-4 text-slate-500" />
           </div>
-          <div className="text-2xl font-bold font-mono text-slate-800">
+          <div className="text-xl sm:text-2xl font-bold font-mono text-slate-800">
             {loading ? "..." : metricas?.finalizadosArchivados ?? 0}
           </div>
           <p className="text-[11px] text-slate-500">Ciclo completo cerrado</p>
