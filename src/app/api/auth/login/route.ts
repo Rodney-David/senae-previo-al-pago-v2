@@ -74,20 +74,24 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: "Cuenta institucional inactiva o no encontrada" }, { status: 403 });
       }
 
+      const { createSessionToken, SESSION_COOKIE_NAME } = await import("@/lib/session");
+      const sessionToken = await createSessionToken(user);
+
       const response = NextResponse.json({
         success: true,
         message: "Autenticación de doble factor exitosa",
         user,
       });
 
-      // Establecer cookies de sesión institucional
-      response.cookies.set("senae_simulated_user_id", String(user.id_usuario), {
+      // Establecer cookies de sesión institucional blindada
+      response.cookies.set(SESSION_COOKIE_NAME, sessionToken, {
         path: "/",
         maxAge: 60 * 60 * 24 * 7, // 7 días
         sameSite: "lax",
+        httpOnly: true,
       });
 
-      response.cookies.set("senae_auth_token", Buffer.from(`${user.id_usuario}:${Date.now()}`).toString("base64"), {
+      response.cookies.set("senae_simulated_user_id", String(user.id_usuario), {
         path: "/",
         maxAge: 60 * 60 * 24 * 7,
         sameSite: "lax",
@@ -195,6 +199,7 @@ export async function POST(request: NextRequest) {
 export async function DELETE(request: NextRequest) {
   try {
     const response = NextResponse.json({ success: true, message: "Sesión cerrada correctamente" });
+    response.cookies.delete("senae_session");
     response.cookies.delete("senae_simulated_user_id");
     response.cookies.delete("senae_auth_token");
     return response;

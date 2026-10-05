@@ -100,14 +100,20 @@ export const Navbar: React.FC = () => {
             </select>
           </div>
 
-          <a
-            href="/login"
-            className="p-2 text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg border border-slate-700 transition-colors flex items-center gap-1.5 text-xs font-semibold"
-            title="Pantalla de Acceso Institucional (Captcha + 2FA)"
+          <button
+            onClick={async () => {
+              try {
+                await fetch("/api/auth/login", { method: "DELETE" });
+              } finally {
+                window.location.href = "/login";
+              }
+            }}
+            className="p-2 text-rose-300 hover:text-white hover:bg-rose-900/40 rounded-lg border border-rose-900/50 transition-colors flex items-center gap-1.5 text-xs font-semibold"
+            title="Cerrar Sesión Segura SENAE"
           >
-            <Shield className="w-4 h-4 text-emerald-400" />
-            <span className="hidden md:inline">Login 2FA</span>
-          </a>
+            <Shield className="w-4 h-4 text-rose-400" />
+            <span className="hidden md:inline">Cerrar Sesión</span>
+          </button>
         </div>
       </div>
     </header>
