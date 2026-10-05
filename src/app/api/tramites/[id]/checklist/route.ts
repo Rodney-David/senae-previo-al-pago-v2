@@ -154,28 +154,36 @@ export async function POST(
 
     const evaluadorId = currentUser.id_usuario;
 
-    // Upsert respuesta de checklist
-    const respuesta = await prisma.respuestas_checklist.upsert({
+    // Guardar respuesta de forma segura evitando colisiones de clave única
+    const existing = await prisma.respuestas_checklist.findFirst({
       where: {
-        id_tramite_id_requisito: {
-          id_tramite: idTramite,
-          id_requisito: Number(id_requisito),
-        },
-      },
-      update: {
-        estado_cumplimiento,
-        observacion_especifica: observacion_especifica || null,
-        id_usuario_evaluador: evaluadorId,
-        fecha_evaluacion: new Date(),
-      },
-      create: {
         id_tramite: idTramite,
         id_requisito: Number(id_requisito),
-        estado_cumplimiento,
-        observacion_especifica: observacion_especifica || null,
-        id_usuario_evaluador: evaluadorId,
       },
     });
+
+    let respuesta;
+    if (existing) {
+      respuesta = await prisma.respuestas_checklist.update({
+        where: { id_respuesta: existing.id_respuesta },
+        data: {
+          estado_cumplimiento,
+          observacion_especifica: observacion_especifica || null,
+          id_usuario_evaluador: evaluadorId,
+          fecha_evaluacion: new Date(),
+        },
+      });
+    } else {
+      respuesta = await prisma.respuestas_checklist.create({
+        data: {
+          id_tramite: idTramite,
+          id_requisito: Number(id_requisito),
+          estado_cumplimiento,
+          observacion_especifica: observacion_especifica || null,
+          id_usuario_evaluador: evaluadorId,
+        },
+      });
+    }
 
     // Registrar en auditoría de forma asíncrona sin bloquear respuesta
     prisma.historial_movimientos.create({
