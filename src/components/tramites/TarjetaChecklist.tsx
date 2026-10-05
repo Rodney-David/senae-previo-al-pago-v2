@@ -354,7 +354,7 @@ export const TarjetaChecklist: React.FC<TarjetaChecklistProps> = ({
                   </div>
 
                   {/* Actions / Buttons */}
-                  <div className="flex items-center gap-1.5 self-end lg:self-center shrink-0">
+                  <div className="flex flex-wrap items-center gap-1.5 self-start sm:self-end lg:self-center shrink-0">
                     <button
                       type="button"
                       disabled={readOnly || isSaving}

@@ -142,8 +142,8 @@ export default function TramitesCatalogoPage() {
         </div>
       </div>
 
-      {/* Table Container with NO horizontal scroll */}
-      <div className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-xs">
+      {/* Responsive Table Container with Horizontal Scroll */}
+      <div className="bg-white border border-slate-200 rounded-xl overflow-x-auto shadow-xs">
         {loading ? (
           <div className="p-12 text-center text-xs text-slate-500 flex flex-col items-center gap-2">
             <RefreshCw className="w-5 h-5 animate-spin text-blue-600" />
@@ -154,17 +154,17 @@ export default function TramitesCatalogoPage() {
             No se encontraron trámites que coincidan con los filtros de búsqueda.
           </div>
         ) : (
-          <table className="w-full table-fixed border-collapse">
+          <table className="min-w-[1150px] w-full border-collapse">
             <thead>
               <tr className="border-b border-slate-200 bg-slate-50 text-[11px] font-bold text-slate-700 uppercase tracking-wider">
-                <th className="py-3 px-3 text-center w-[14%]">CÓDIGO / QUIPUX</th>
-                <th className="py-3 px-3 text-center w-[23%]">BENEFICIARIO / RUC</th>
-                <th className="py-3 px-3 text-center w-[19%]">TIPO DE PROCESO</th>
-                <th className="py-3 px-3 text-center w-[11%]">MONTO TOTAL</th>
-                <th className="py-3 px-3 text-center w-[15%]">ÁREA / CUSTODIO</th>
-                <th className="py-3 px-2 text-center w-[8%]">SLA (6D)</th>
-                <th className="py-3 px-2 text-center w-[8%]">ESTADO</th>
-                <th className="py-3 px-1 text-center w-[2%]"></th>
+                <th className="py-3 px-4 text-center w-40 min-w-[150px]">CÓDIGO / QUIPUX</th>
+                <th className="py-3 px-4 text-left w-64 min-w-[210px]">BENEFICIARIO / RUC</th>
+                <th className="py-3 px-4 text-left w-56 min-w-[190px]">TIPO DE PROCESO</th>
+                <th className="py-3 px-4 text-center w-32 min-w-[120px]">MONTO TOTAL</th>
+                <th className="py-3 px-4 text-center w-48 min-w-[170px]">ÁREA / CUSTODIO</th>
+                <th className="py-3 px-3 text-center w-28 min-w-[100px]">SLA (6D)</th>
+                <th className="py-3 px-4 text-center w-48 min-w-[160px]">ESTADO</th>
+                <th className="py-3 px-3 text-center w-24 min-w-[80px]">ACCIONES</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 text-xs">
@@ -174,7 +174,7 @@ export default function TramitesCatalogoPage() {
                   onClick={() => router.push(`/tramite/${t.id_tramite}`)}
                   className="hover:bg-blue-50/70 transition-colors cursor-pointer group"
                 >
-                  <td className="py-3 px-3 align-middle text-center">
+                  <td className="py-3.5 px-4 align-middle text-center whitespace-nowrap">
                     <div className="font-mono font-bold text-slate-900 group-hover:text-blue-700 transition-colors">
                       {t.codigo_tramite}
                     </div>
@@ -183,7 +183,7 @@ export default function TramitesCatalogoPage() {
                     </div>
                   </td>
 
-                  <td className="py-3 px-3 align-middle">
+                  <td className="py-3.5 px-4 align-middle">
                     <div
                       className="font-semibold text-slate-800 uppercase line-clamp-2 leading-tight"
                       title={t.proveedor_beneficiario}
@@ -195,16 +195,16 @@ export default function TramitesCatalogoPage() {
                     </div>
                   </td>
 
-                  <td className="py-3 px-3 align-middle">
+                  <td className="py-3.5 px-4 align-middle">
                     <div
-                      className="text-slate-700 uppercase line-clamp-3 leading-snug text-[11px] font-medium"
+                      className="text-slate-700 uppercase line-clamp-2 leading-snug text-[11px] font-medium"
                       title={t.tipos_tramite?.nombre || "CONTRATACIÓN"}
                     >
                       {t.tipos_tramite?.nombre || "CONTRATACIÓN"}
                     </div>
                   </td>
 
-                  <td className="py-3 px-3 align-middle text-center">
+                  <td className="py-3.5 px-4 align-middle text-center whitespace-nowrap">
                     <div className="font-mono font-bold text-slate-900 text-xs">
                       {formatCurrency(t.monto_total)}
                     </div>
@@ -215,7 +215,7 @@ export default function TramitesCatalogoPage() {
                     )}
                   </td>
 
-                  <td className="py-3 px-3 align-middle text-center">
+                  <td className="py-3.5 px-4 align-middle text-center">
                     <div className="uppercase text-[11px] font-semibold text-slate-800 leading-tight">
                       {t.areas?.nombre || "ÁREA"}
                     </div>
@@ -224,28 +224,36 @@ export default function TramitesCatalogoPage() {
                     </div>
                   </td>
 
-                  <td className="py-3 px-2 align-middle text-center">
+                  <td className="py-3.5 px-3 align-middle text-center whitespace-nowrap">
                     <SemaforoSLA sla={t.sla} />
                   </td>
 
-                  <td className="py-3 px-2 align-middle text-center">
+                  <td className="py-3.5 px-4 align-middle text-center whitespace-nowrap">
                     <BadgeEstado estado={t.estado_general} subEstado={t.sub_estado} />
                   </td>
 
-                  <td className="py-3 px-1 align-middle text-center" onClick={(e) => e.stopPropagation()}>
-                    {["ADMINISTRADOR", "DIRECTORA_FINANCIERA", "SECRETARIA_DFI"].includes(
-                      currentUser?.rol || ""
-                    ) &&
-                      t.estado_general !== "ANULADO" &&
-                      t.estado_general !== "ARCHIVADO" && (
-                        <button
-                          onClick={(e) => handleAnular(e, t.id_tramite)}
-                          title="Anular trámite"
-                          className="p-1 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors opacity-0 group-hover:opacity-100"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
-                      )}
+                  <td className="py-3.5 px-3 align-middle text-center whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
+                    <div className="flex items-center justify-center gap-1.5">
+                      <Link
+                        href={`/tramite/${t.id_tramite}`}
+                        className="inline-flex items-center justify-center px-2.5 py-1 text-xs font-bold uppercase text-white bg-slate-900 hover:bg-blue-700 rounded-lg transition-colors shadow-xs"
+                      >
+                        Ver
+                      </Link>
+                      {["ADMINISTRADOR", "DIRECTORA_FINANCIERA", "SECRETARIA_DFI"].includes(
+                        currentUser?.rol || ""
+                      ) &&
+                        t.estado_general !== "ANULADO" &&
+                        t.estado_general !== "ARCHIVADO" && (
+                          <button
+                            onClick={(e) => handleAnular(e, t.id_tramite)}
+                            title="Anular trámite"
+                            className="p-1 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded transition-colors"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        )}
+                    </div>
                   </td>
                 </tr>
               ))}

@@ -11,6 +11,7 @@ import {
   ShieldCheck,
   Building2,
   ChevronRight,
+  LogOut,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { UsuarioInstitucional } from "@/types";
@@ -66,6 +67,14 @@ export const Sidebar: React.FC = () => {
       adminOnly: true,
     },
   ];
+
+  const handleLogout = async () => {
+    try {
+      await fetch("/api/auth/login", { method: "DELETE" });
+    } finally {
+      window.location.href = "/login";
+    }
+  };
 
   return (
     <aside className="w-64 bg-slate-900 border-r border-slate-800 shrink-0 flex flex-col justify-between hidden md:flex min-h-[calc(100vh-4rem)] text-white">
@@ -133,10 +142,16 @@ export const Sidebar: React.FC = () => {
         </nav>
       </div>
 
-      {/* Footer Info */}
-      <div className="p-4 border-t border-slate-800 text-[10px] text-slate-400 uppercase tracking-wider">
-        <div className="font-semibold text-slate-300">SENAE v2.0 - Control Previo</div>
-        <div className="mt-0.5 text-slate-500">Normativa SENAE-ME-3-6-001</div>
+      {/* Botón de Cerrar Sesión Seguro al final de la barra lateral */}
+      <div className="p-4 border-t border-slate-800 mt-auto">
+        <button
+          onClick={handleLogout}
+          className="w-full px-3.5 py-2.5 text-rose-300 hover:text-white bg-rose-950/40 hover:bg-rose-900/60 rounded-xl border border-rose-800/60 transition-colors flex items-center justify-center gap-2 text-xs font-semibold shadow-xs cursor-pointer"
+          title="Cerrar Sesión Segura SENAE"
+        >
+          <LogOut className="w-4 h-4 text-rose-400" />
+          <span>Cerrar Sesión</span>
+        </button>
       </div>
     </aside>
   );

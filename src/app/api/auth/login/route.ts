@@ -11,92 +11,9 @@ function hashPassword(password: string): string {
   return crypto.createHash("sha256").update(password + "senae_salt_2026").digest("hex");
 }
 
-function generateTwoFactorToken(userId: number, code: string): string {
-  const expiresAt = Date.now() + 5 * 60 * 1000; // 5 minutos
-  const payload = `${userId}:${code}:${expiresAt}`;
-  const hmac = crypto.createHmac("sha256", AUTH_SECRET).update(payload).digest("hex");
-  return Buffer.from(`${payload}:${hmac}`).toString("base64");
-}
-
-function verifyTwoFactorToken(token: string, codeEntered: string): number | null {
-  try {
-    const decoded = Buffer.from(token, "base64").toString("utf-8");
-    const [userIdStr, expectedCode, expiresAtStr, receivedHmac] = decoded.split(":");
-
-    if (!userIdStr || !expectedCode || !expiresAtStr || !receivedHmac) return null;
-
-    const expiresAt = parseInt(expiresAtStr, 10);
-    if (isNaN(expiresAt) || Date.now() > expiresAt) return null;
-
-    const payload = `${userIdStr}:${expectedCode}:${expiresAt}`;
-    const calculatedHmac = crypto.createHmac("sha256", AUTH_SECRET).update(payload).digest("hex");
-
-    if (calculatedHmac !== receivedHmac) return null;
-    if (expectedCode.trim() !== codeEntered.trim() && codeEntered.trim() !== "000000") return null;
-
-    return parseInt(userIdStr, 10);
-  } catch (err) {
-    return null;
-  }
-}
-
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { action } = body;
-
-    // ==========================================
-    // PASO 2: VALIDACIÓN DE CÓDIGO 2FA
-    // ==========================================
-    if (action === "VERIFY_2FA") {
-      const { twoFactorToken, code } = body;
-      if (!twoFactorToken || !code) {
-        return NextResponse.json(
-          { error: "Debe ingresar el código de verificación 2FA de 6 dígitos" },
-          { status: 400 }
-        );
-      }
-
-      const userId = verifyTwoFactorToken(twoFactorToken, code);
-      if (!userId) {
-        return NextResponse.json(
-          { error: "Código de verificación 2FA incorrecto o expirado (Válido por 5 minutos)." },
-          { status: 400 }
-        );
-      }
-
-      const user = await prisma.usuarios.findUnique({
-        where: { id_usuario: userId },
-        include: { areas: true },
-      });
-
-      if (!user || !user.activo) {
-        return NextResponse.json({ error: "Cuenta institucional inactiva o no encontrada" }, { status: 403 });
-      }
-
-      const { createSessionToken, SESSION_COOKIE_NAME } = await import("@/lib/session");
-      const sessionToken = await createSessionToken(user);
-
-      const response = NextResponse.json({
-        success: true,
-        message: "Autenticación de doble factor exitosa",
-        user,
-      });
-
-      // Establecer cookie de sesión institucional blindada
-      response.cookies.set(SESSION_COOKIE_NAME, sessionToken, {
-        path: "/",
-        maxAge: 60 * 60 * 24 * 7, // 7 días
-        sameSite: "lax",
-        httpOnly: true,
-      });
-
-      return response;
-    }
-
-    // ==========================================
-    // PASO 1: VALIDACIÓN DE CREDENCIALES + CAPTCHA
-    // ==========================================
     const { email_or_user, password, captcha_token, captcha_answer } = body;
 
     if (!email_or_user || !password) {
@@ -165,22 +82,24 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // 4. Generar Código 2FA aleatorio de 6 dígitos
-    const randomCode = Math.floor(100000 + Math.random() * 900000).toString();
-    const twoFactorToken = generateTwoFactorToken(user.id_usuario, randomCode);
+    // 4. Autenticación exitosa: Generar sesión segura y establecer cookie institucional
+    const { createSessionToken, SESSION_COOKIE_NAME } = await import("@/lib/session");
+    const sessionToken = await createSessionToken(user);
 
-    // Ocultar email parcialmente para seguridad: d***@aduana.gob.ec
-    const emailParts = user.correo_institucional.split("@");
-    const maskedEmail = `${emailParts[0].charAt(0)}***@${emailParts[1] || "aduana.gob.ec"}`;
-
-    console.log(`[2FA SENAE] Código de seguridad emitido para ${user.correo_institucional}: ${randomCode}`);
-
-    return NextResponse.json({
-      require2FA: true,
-      twoFactorToken,
-      maskedEmail,
-      message: `Código de seguridad 2FA enviado a ${maskedEmail}`,
+    const response = NextResponse.json({
+      success: true,
+      message: "Inicio de sesión institucional exitoso",
+      user,
     });
+
+    response.cookies.set(SESSION_COOKIE_NAME, sessionToken, {
+      path: "/",
+      maxAge: 60 * 60 * 24 * 7, // 7 días
+      sameSite: "lax",
+      httpOnly: true,
+    });
+
+    return response;
   } catch (error: any) {
     console.error("Error en login institucional:", error);
     return NextResponse.json(

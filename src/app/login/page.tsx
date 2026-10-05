@@ -31,12 +31,6 @@ export default function LoginPage() {
   const [captchaToken, setCaptchaToken] = useState<string>("");
   const [loadingCaptcha, setLoadingCaptcha] = useState(true);
 
-  // Estados 2FA
-  const [step, setStep] = useState<"CREDENTIALS" | "2FA">("CREDENTIALS");
-  const [twoFactorToken, setTwoFactorToken] = useState("");
-  const [twoFactorCode, setTwoFactorCode] = useState("");
-  const [maskedEmail, setMaskedEmail] = useState("");
-
   // Feedback y loading
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -63,8 +57,8 @@ export default function LoginPage() {
     fetchCaptcha();
   }, []);
 
-  // Manejo Paso 1: Credenciales + Captcha
-  const handleCredentialsSubmit = async (e: React.FormEvent) => {
+  // Manejo de Inicio de Sesión: Credenciales + Captcha
+  const handleLoginSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
 
@@ -95,59 +89,15 @@ export default function LoginPage() {
 
       if (!res.ok) {
         setError(data.error || "Error al verificar credenciales");
-        // Si falló el captcha o credenciales, refrescar captcha
+        // Refrescar captcha ante error
         fetchCaptcha();
         return;
       }
 
-      if (data.require2FA) {
-        setTwoFactorToken(data.twoFactorToken);
-        setMaskedEmail(data.maskedEmail);
-        setStep("2FA");
-        setTwoFactorCode("");
-      } else {
-        router.push("/escritorio");
-      }
+      // Sesión iniciada con éxito -> Redirigir directamente al escritorio
+      window.location.href = "/escritorio";
     } catch (err: any) {
       setError(err.message || "Error al conectar con el servidor institucional.");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // Manejo Paso 2: Doble Factor (2FA)
-  const handle2FASubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError(null);
-
-    if (!twoFactorCode.trim() || twoFactorCode.length < 6) {
-      setError("Ingrese el código de 6 dígitos enviado a su correo institucional.");
-      return;
-    }
-
-    try {
-      setLoading(true);
-      const res = await fetch("/api/auth/login", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          action: "VERIFY_2FA",
-          twoFactorToken,
-          code: twoFactorCode.trim(),
-        }),
-      });
-
-      const data = await res.json();
-
-      if (!res.ok) {
-        setError(data.error || "Código de verificación 2FA inválido");
-        return;
-      }
-
-      // Redirigir a la bandeja de trabajo
-      router.push("/escritorio");
-    } catch (err: any) {
-      setError(err.message || "Error al validar código de doble factor.");
     } finally {
       setLoading(false);
     }
@@ -178,12 +128,10 @@ export default function LoginPage() {
           <div className="flex items-center justify-between border-b border-slate-100 pb-4">
             <div>
               <h2 className="text-sm font-bold text-slate-900 uppercase">
-                {step === "CREDENTIALS" ? "Acceso Institucional" : "Validación de Doble Factor (2FA)"}
+                Acceso Institucional
               </h2>
               <p className="text-[11px] text-slate-500 mt-0.5">
-                {step === "CREDENTIALS"
-                  ? "Ingrese sus credenciales y resuelva el desafío de seguridad."
-                  : "Ingrese el código de un solo uso enviado a su correo."}
+                Ingrese sus credenciales y resuelva el desafío de seguridad.
               </p>
             </div>
             <div className="flex items-center gap-1.5 px-2 py-1 bg-emerald-50 text-emerald-700 rounded-md border border-emerald-200 text-[10px] font-bold">
@@ -199,178 +147,108 @@ export default function LoginPage() {
             </div>
           )}
 
-          {/* ======================================================== */}
-          {/* PASO 1: USUARIO, CONTRASEÑA Y CAPTCHA                     */}
-          {/* ======================================================== */}
-          {step === "CREDENTIALS" && (
-            <form onSubmit={handleCredentialsSubmit} className="space-y-4">
-              <div>
-                <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
-                  Usuario o Correo Institucional *
-                </label>
-                <div className="relative">
-                  <Mail className="w-4 h-4 text-slate-400 absolute left-3 top-3" />
-                  <input
-                    type="text"
-                    value={emailOrUser}
-                    onChange={(e) => setEmailOrUser(e.target.value)}
-                    placeholder="ej. directora.dfi@aduana.gob.ec"
-                    className="w-full pl-9 pr-3 py-2 text-xs bg-slate-50 border border-slate-300 rounded-lg font-mono focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    required
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
-                  Contraseña Institucional *
-                </label>
-                <div className="relative">
-                  <Lock className="w-4 h-4 text-slate-400 absolute left-3 top-3" />
-                  <input
-                    type={showPassword ? "text" : "password"}
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    placeholder="••••••••••••"
-                    className="w-full pl-9 pr-10 py-2 text-xs bg-slate-50 border border-slate-300 rounded-lg font-mono focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    required
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowPassword(!showPassword)}
-                    className="p-1.5 text-slate-400 hover:text-slate-600 absolute right-2.5 top-2"
-                  >
-                    {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                  </button>
-                </div>
-              </div>
-
-              {/* BLOQUE DE CAPTCHA VISUAL */}
-              <div className="bg-slate-50 p-3.5 rounded-xl border border-slate-200 space-y-2">
-                <div className="flex items-center justify-between">
-                  <span className="text-[11px] font-bold text-slate-700 uppercase flex items-center gap-1.5">
-                    <ShieldAlert className="w-3.5 h-3.5 text-blue-600" />
-                    Desafío de Seguridad (Captcha) *
-                  </span>
-                  <button
-                    type="button"
-                    onClick={fetchCaptcha}
-                    disabled={loadingCaptcha}
-                    className="text-[11px] text-blue-600 hover:text-blue-800 font-semibold flex items-center gap-1 hover:underline"
-                    title="Generar nueva imagen"
-                  >
-                    <RefreshCw className={`w-3 h-3 ${loadingCaptcha ? "animate-spin" : ""}`} />
-                    Recargar imagen
-                  </button>
-                </div>
-
-                <div className="flex items-center gap-3">
-                  {/* Imagen SVG del Captcha */}
-                  <div
-                    className="bg-white border border-slate-300 rounded-lg overflow-hidden shrink-0 shadow-2xs"
-                    dangerouslySetInnerHTML={{ __html: captchaSvg }}
-                  />
-
-                  {/* Input del Captcha */}
-                  <div className="flex-1">
-                    <input
-                      type="text"
-                      maxLength={6}
-                      value={captchaAnswer}
-                      onChange={(e) => setCaptchaAnswer(e.target.value.toUpperCase())}
-                      placeholder="Ingrese código..."
-                      className="w-full py-2 px-3 text-xs uppercase font-mono tracking-wider font-bold bg-white border border-slate-300 rounded-lg text-center focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      required
-                    />
-                  </div>
-                </div>
-              </div>
-
-              <button
-                type="submit"
-                disabled={loading}
-                className="w-full py-2.5 px-4 text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 rounded-xl transition-all shadow-md shadow-blue-500/20 flex items-center justify-center gap-2 uppercase tracking-wide disabled:opacity-50"
-              >
-                {loading ? (
-                  <>
-                    <RefreshCw className="w-4 h-4 animate-spin" />
-                    <span>Verificando credenciales...</span>
-                  </>
-                ) : (
-                  <>
-                    <span>Continuar al Doble Factor (2FA)</span>
-                    <ArrowRight className="w-4 h-4" />
-                  </>
-                )}
-              </button>
-            </form>
-          )}
-
-          {/* ======================================================== */}
-          {/* PASO 2: CÓDIGO DE DOBLE FACTOR (2FA)                      */}
-          {/* ======================================================== */}
-          {step === "2FA" && (
-            <form onSubmit={handle2FASubmit} className="space-y-5 animate-in fade-in">
-              <div className="bg-blue-50/70 border border-blue-200 rounded-xl p-4 space-y-2">
-                <div className="flex items-center gap-2 text-xs font-bold text-blue-900">
-                  <KeyRound className="w-4 h-4 text-blue-600" />
-                  <span>Código de Autenticación 2FA</span>
-                </div>
-                <p className="text-xs text-blue-800 leading-relaxed">
-                  Por política institucional de seguridad, se ha generado un código de 6 dígitos
-                  asociado a la cuenta <strong>{maskedEmail}</strong>. Ingréselo a continuación.
-                </p>
-              </div>
-
-              <div>
-                <label className="block text-xs font-bold text-slate-700 uppercase mb-1 text-center">
-                  Ingrese el código de 6 dígitos *
-                </label>
+          {/* FORMULARIO DE ACCESO DIRECTO CON CAPTCHA */}
+          <form onSubmit={handleLoginSubmit} className="space-y-4">
+            <div>
+              <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
+                Usuario o Correo Institucional *
+              </label>
+              <div className="relative">
+                <Mail className="w-4 h-4 text-slate-400 absolute left-3 top-3" />
                 <input
                   type="text"
-                  maxLength={6}
-                  value={twoFactorCode}
-                  onChange={(e) => setTwoFactorCode(e.target.value.replace(/\D/g, ""))}
-                  placeholder="000000"
-                  className="w-full py-3 px-4 text-lg font-mono font-bold tracking-widest text-slate-900 bg-slate-50 border border-slate-300 rounded-xl text-center focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-inner"
-                  autoFocus
+                  value={emailOrUser}
+                  onChange={(e) => setEmailOrUser(e.target.value)}
+                  placeholder="ej. admin o directora.dfi@aduana.gob.ec"
+                  className="w-full pl-9 pr-3 py-2 text-xs bg-slate-50 border border-slate-300 rounded-lg font-mono focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
                   required
                 />
               </div>
+            </div>
 
-              <div className="space-y-2">
-                <button
-                  type="submit"
-                  disabled={loading}
-                  className="w-full py-2.5 px-4 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 rounded-xl transition-all shadow-md shadow-emerald-600/20 flex items-center justify-center gap-2 uppercase tracking-wide disabled:opacity-50"
-                >
-                  {loading ? (
-                    <>
-                      <RefreshCw className="w-4 h-4 animate-spin" />
-                      <span>Validando código 2FA...</span>
-                    </>
-                  ) : (
-                    <>
-                      <CheckCircle2 className="w-4 h-4" />
-                      <span>Validar y Acceder a la Bandeja</span>
-                    </>
-                  )}
-                </button>
-
+            <div>
+              <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
+                Contraseña Institucional *
+              </label>
+              <div className="relative">
+                <Lock className="w-4 h-4 text-slate-400 absolute left-3 top-3" />
+                <input
+                  type={showPassword ? "text" : "password"}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="••••••••••••"
+                  className="w-full pl-9 pr-10 py-2 text-xs bg-slate-50 border border-slate-300 rounded-lg font-mono focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  required
+                />
                 <button
                   type="button"
-                  onClick={() => {
-                    setStep("CREDENTIALS");
-                    setError(null);
-                    fetchCaptcha();
-                  }}
-                  className="w-full py-2 text-xs text-slate-500 hover:text-slate-800 font-semibold"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="p-1.5 text-slate-400 hover:text-slate-600 absolute right-2.5 top-2"
                 >
-                  ← Volver a ingresar credenciales
+                  {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                 </button>
               </div>
-            </form>
-          )}
+            </div>
+
+            {/* BLOQUE DE CAPTCHA VISUAL */}
+            <div className="bg-slate-50 p-3.5 rounded-xl border border-slate-200 space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-bold text-slate-700 uppercase flex items-center gap-1.5">
+                  <ShieldAlert className="w-3.5 h-3.5 text-blue-600" />
+                  Desafío de Seguridad (Captcha) *
+                </span>
+                <button
+                  type="button"
+                  onClick={fetchCaptcha}
+                  disabled={loadingCaptcha}
+                  className="text-[11px] text-blue-600 hover:text-blue-800 font-semibold flex items-center gap-1 hover:underline"
+                  title="Generar nueva imagen"
+                >
+                  <RefreshCw className={`w-3 h-3 ${loadingCaptcha ? "animate-spin" : ""}`} />
+                  Recargar imagen
+                </button>
+              </div>
+
+              <div className="flex items-center gap-3">
+                {/* Imagen SVG del Captcha */}
+                <div
+                  className="bg-white border border-slate-300 rounded-lg overflow-hidden shrink-0 shadow-2xs"
+                  dangerouslySetInnerHTML={{ __html: captchaSvg }}
+                />
+
+                {/* Input del Captcha */}
+                <div className="flex-1">
+                  <input
+                    type="text"
+                    maxLength={6}
+                    value={captchaAnswer}
+                    onChange={(e) => setCaptchaAnswer(e.target.value.toUpperCase())}
+                    placeholder="Código..."
+                    className="w-full py-2 px-3 text-xs uppercase font-mono tracking-wider font-bold bg-white border border-slate-300 rounded-lg text-center focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    required
+                  />
+                </div>
+              </div>
+            </div>
+
+            <button
+              type="submit"
+              disabled={loading}
+              className="w-full py-2.5 px-4 text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 rounded-xl transition-all shadow-md shadow-blue-500/20 flex items-center justify-center gap-2 uppercase tracking-wide disabled:opacity-50 cursor-pointer"
+            >
+              {loading ? (
+                <>
+                  <RefreshCw className="w-4 h-4 animate-spin" />
+                  <span>Verificando credenciales...</span>
+                </>
+              ) : (
+                <>
+                  <span>Ingresar al Sistema</span>
+                  <ArrowRight className="w-4 h-4" />
+                </>
+              )}
+            </button>
+          </form>
         </div>
 
         {/* Footer */}

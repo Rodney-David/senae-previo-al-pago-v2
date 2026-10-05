@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import "./globals.css";
-import { Navbar } from "@/components/layout/Navbar";
-import { Sidebar } from "@/components/layout/Sidebar";
+import { AppLayout } from "@/components/layout/AppLayout";
 
 export const metadata: Metadata = {
   title: "SENAE - Control Financiero Previo al Pago",
@@ -19,14 +18,8 @@ export default function RootLayout({
 }) {
   return (
     <html lang="es">
-      <body className="min-h-screen bg-slate-50 flex flex-col text-slate-900">
-        <Navbar />
-        <div className="flex flex-1">
-          <Sidebar />
-          <main className="flex-1 p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto w-full overflow-y-auto">
-            {children}
-          </main>
-        </div>
+      <body className="min-h-screen bg-slate-900 text-slate-900 antialiased">
+        <AppLayout>{children}</AppLayout>
       </body>
     </html>
   );

@@ -26,10 +26,11 @@ export async function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
-  // 2. Permitir endpoints de autenticación pública (Captcha y Login)
+  // 2. Permitir endpoints de autenticación pública (Captcha, Login, y verificación de Sesión)
   if (
     pathname === "/api/auth/captcha" ||
-    pathname === "/api/auth/login"
+    pathname === "/api/auth/login" ||
+    pathname === "/api/auth/session"
   ) {
     return NextResponse.next();
   }
