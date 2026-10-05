@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { TramiteService } from "@/services/tramiteService";
+import { getAuthenticatedUser } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 
@@ -13,8 +14,11 @@ export async function POST(
       return NextResponse.json({ error: "ID de trámite inválido" }, { status: 400 });
     }
 
-    const userIdCookie = request.cookies.get("senae_simulated_user_id")?.value;
-    const currentUserId = userIdCookie ? parseInt(userIdCookie, 10) : 1;
+    const currentUser = await getAuthenticatedUser(request);
+    if (!currentUser) {
+      return NextResponse.json({ error: "No autorizado. Sesión inválida o expirada." }, { status: 401 });
+    }
+    const currentUserId = currentUser.id_usuario;
 
     const body = await request.json();
     const { accion, datosFactura } = body;

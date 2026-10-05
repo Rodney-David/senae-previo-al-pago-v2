@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { TramiteService } from "@/services/tramiteService";
 import { calculateTramiteSLA } from "@/lib/slaCalculator";
+import { getAuthenticatedUser } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 
@@ -10,13 +11,12 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const tipo = searchParams.get("tipo") || "todos";
     const search = searchParams.get("search") || "";
-    const userIdCookie = request.cookies.get("senae_simulated_user_id")?.value;
-    const currentUserId = userIdCookie ? parseInt(userIdCookie, 10) : 1;
 
-    // Obtener datos del usuario activo
-    const currentUser = await prisma.usuarios.findUnique({
-      where: { id_usuario: currentUserId },
-    });
+    // Obtener datos del usuario real autenticado
+    const currentUser = await getAuthenticatedUser(request);
+    if (!currentUser) {
+      return NextResponse.json({ error: "No autorizado. Sesión requerida." }, { status: 401 });
+    }
 
     const whereClause: Record<string, unknown> = {};
 
@@ -86,9 +86,13 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
+    const currentUser = await getAuthenticatedUser(request);
+    if (!currentUser) {
+      return NextResponse.json({ error: "No autorizado. Sesión requerida para registrar trámites." }, { status: 401 });
+    }
+    const currentUserId = currentUser.id_usuario;
+
     const body = await request.json();
-    const userIdCookie = request.cookies.get("senae_simulated_user_id")?.value;
-    const currentUserId = userIdCookie ? parseInt(userIdCookie, 10) : 1;
 
     const {
       tipo_gestion,

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { registrarBitacora } from "@/services/bitacoraService";
+import { getAuthenticatedUser } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 
@@ -39,15 +40,11 @@ export async function POST(
       return NextResponse.json({ error: "ID de trámite inválido" }, { status: 400 });
     }
 
-    const userIdCookie = request.cookies.get("senae_simulated_user_id")?.value;
-    const currentUserId = userIdCookie ? parseInt(userIdCookie, 10) : 1;
-
-    const currentUser = await prisma.usuarios.findUnique({
-      where: { id_usuario: currentUserId },
-    });
+    const currentUser = await getAuthenticatedUser(request);
     if (!currentUser) {
-      return NextResponse.json({ error: "Usuario activo no válido" }, { status: 401 });
+      return NextResponse.json({ error: "No autorizado. Sesión inválida o expirada." }, { status: 401 });
     }
+    const currentUserId = currentUser.id_usuario;
 
     const tramite = await prisma.tramites.findUnique({
       where: { id_tramite: idTramite },

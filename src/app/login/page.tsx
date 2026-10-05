@@ -36,7 +36,6 @@ export default function LoginPage() {
   const [twoFactorToken, setTwoFactorToken] = useState("");
   const [twoFactorCode, setTwoFactorCode] = useState("");
   const [maskedEmail, setMaskedEmail] = useState("");
-  const [previewCode, setPreviewCode] = useState("");
 
   // Feedback y loading
   const [loading, setLoading] = useState(false);
@@ -104,9 +103,8 @@ export default function LoginPage() {
       if (data.require2FA) {
         setTwoFactorToken(data.twoFactorToken);
         setMaskedEmail(data.maskedEmail);
-        setPreviewCode(data.previewCode);
         setStep("2FA");
-        setTwoFactorCode(data.previewCode); // Prellenado de cortesía para pruebas ágiles
+        setTwoFactorCode("");
       } else {
         router.push("/escritorio");
       }
@@ -153,21 +151,6 @@ export default function LoginPage() {
     } finally {
       setLoading(false);
     }
-  };
-
-  // Cuentas demo para pruebas rápidas del usuario y sus directivos
-  const demoUsers = [
-    { label: "Directora DFI", user: "directora.dfi@aduana.gob.ec" },
-    { label: "Secretaria DFI", user: "secretaria.dfi@aduana.gob.ec" },
-    { label: "Jefe Presupuesto", user: "jefe.presupuesto@aduana.gob.ec" },
-    { label: "Analista Presupuesto", user: "analista.presupuesto1@aduana.gob.ec" },
-    { label: "Contador General", user: "contador.general@aduana.gob.ec" },
-    { label: "Administrador", user: "admin@aduana.gob.ec" },
-  ];
-
-  const handleSelectDemo = (u: string) => {
-    setEmailOrUser(u);
-    setPassword("senae2026");
   };
 
   return (
@@ -335,17 +318,8 @@ export default function LoginPage() {
                 </div>
                 <p className="text-xs text-blue-800 leading-relaxed">
                   Por política institucional de seguridad, se ha generado un código de 6 dígitos
-                  asociado a la cuenta <strong>{maskedEmail}</strong>.
+                  asociado a la cuenta <strong>{maskedEmail}</strong>. Ingréselo a continuación.
                 </p>
-
-                {previewCode && (
-                  <div className="mt-2 p-2 bg-white rounded border border-blue-300 flex items-center justify-between text-xs">
-                    <span className="text-slate-500 text-[11px]">Código generado (demo):</span>
-                    <span className="font-mono font-bold text-blue-800 tracking-widest text-sm">
-                      {previewCode}
-                    </span>
-                  </div>
-                )}
               </div>
 
               <div>
@@ -396,27 +370,6 @@ export default function LoginPage() {
                 </button>
               </div>
             </form>
-          )}
-
-          {/* Selector de cuentas demo */}
-          {step === "CREDENTIALS" && (
-            <div className="pt-4 border-t border-slate-100 space-y-2">
-              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">
-                Acceso Rápido para Pruebas Institucionales (Clave: senae2026):
-              </span>
-              <div className="flex flex-wrap gap-1.5">
-                {demoUsers.map((d) => (
-                  <button
-                    key={d.user}
-                    type="button"
-                    onClick={() => handleSelectDemo(d.user)}
-                    className="px-2 py-1 bg-slate-100 hover:bg-blue-50 hover:text-blue-700 text-slate-600 rounded text-[10px] font-medium transition-colors"
-                  >
-                    {d.label}
-                  </button>
-                ))}
-              </div>
-            </div>
           )}
         </div>
 
