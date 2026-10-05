@@ -51,6 +51,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isMobileOpen, onCloseMobile })
       href: "/recepcion",
       icon: FilePlus2,
       description: "Ingreso de expedientes físicos",
+      recepcionOnly: true,
     },
     {
       label: "Trámites",
@@ -108,6 +109,10 @@ export const Sidebar: React.FC<SidebarProps> = ({ isMobileOpen, onCloseMobile })
               (item.href !== "/escritorio" && pathname.startsWith(item.href));
 
             if (item.adminOnly && currentUser?.rol !== "ADMIN") {
+              return null;
+            }
+
+            if (item.recepcionOnly && currentUser && !["DIRECTORA", "SECRETARIA", "ADMIN"].includes(currentUser.rol)) {
               return null;
             }
 

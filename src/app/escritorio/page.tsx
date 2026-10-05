@@ -85,12 +85,14 @@ export default function EscritorioPage() {
           >
             <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin text-blue-600" : ""}`} />
           </button>
-          <Link
-            href="/recepcion"
-            className="px-3.5 py-2 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors shadow-xs"
-          >
-            + Nuevo Trámite (DFI)
-          </Link>
+          {currentUser && ["DIRECTORA", "SECRETARIA", "ADMIN"].includes(currentUser.rol) && (
+            <Link
+              href="/recepcion"
+              className="px-3.5 py-2 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors shadow-xs"
+            >
+              + Nuevo Trámite (DFI)
+            </Link>
+          )}
         </div>
       </div>
 

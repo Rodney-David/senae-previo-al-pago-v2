@@ -306,8 +306,15 @@ export async function POST(
         break;
       }
 
-      // 4. TESORERIA Y COBRANZAS
+      // 4. TESORERIA Y COBRANZAS (OPERACIÓN UNIFICADA)
       case "PROGRAMAR_Y_PAGAR_MEF_BCE": {
+        if (currentUser.id_area !== 4 && currentUser.id_area !== 5 && currentUser.rol !== "ADMIN") {
+          return NextResponse.json(
+            { error: "Solo el personal facultado de Tesorería o Cobranzas puede registrar la confirmación de pago" },
+            { status: 403 }
+          );
+        }
+
         const { lote_mef, spi_bce_referencia, comprobante_pago } = datos || {};
         if (!spi_bce_referencia && !comprobante_pago) {
           return NextResponse.json(

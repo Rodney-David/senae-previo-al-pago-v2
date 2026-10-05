@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { TramiteService } from "@/services/tramiteService";
-import { calculateTramiteSLA } from "@/lib/slaCalculator";
+import { calculateTramiteSLA, getFeriadosSet } from "@/lib/slaCalculator";
 import { getAuthenticatedUser } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
@@ -63,10 +63,13 @@ export async function GET(request: NextRequest) {
       },
     });
 
+    // Precargar catálogo de feriados desde memoria una sola vez para toda la lista (0ms de I/O en bucle)
+    const feriadosSet = await getFeriadosSet();
+
     // Calcular SLA para cada trámite
     const tramitesConSLA = await Promise.all(
       tramites.map(async (t) => {
-        const sla = await calculateTramiteSLA(t);
+        const sla = await calculateTramiteSLA(t, feriadosSet);
         return {
           ...t,
           sla,
@@ -89,6 +92,18 @@ export async function POST(request: NextRequest) {
     const currentUser = await getAuthenticatedUser(request);
     if (!currentUser) {
       return NextResponse.json({ error: "No autorizado. Sesión requerida para registrar trámites." }, { status: 401 });
+    }
+
+    // RBAC Institucional: Solo Directora Financiera y Secretaría DFI (o Admin) pueden ingresar nuevos expedientes
+    const rolesAutorizados = ["DIRECTORA", "SECRETARIA", "ADMIN"];
+    if (!rolesAutorizados.includes(currentUser.rol)) {
+      return NextResponse.json(
+        {
+          error:
+            "Acceso denegado: El ingreso y creación de nuevos expedientes en Recepción DFI está reservado exclusivamente a la Directora Financiera y Secretaría DFI.",
+        },
+        { status: 403 }
+      );
     }
     const currentUserId = currentUser.id_usuario;
 

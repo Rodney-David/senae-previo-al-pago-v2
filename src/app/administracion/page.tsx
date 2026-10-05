@@ -23,7 +23,7 @@ import {
 
 export default function AdministracionPage() {
   const [activeTab, setActiveTab] = useState<
-    "procesos" | "usuarios" | "feriados" | "campos" | "auditoria"
+    "procesos" | "usuarios" | "feriados" | "campos" | "auditoria" | "configuracion"
   >("procesos");
 
   // States
@@ -33,6 +33,7 @@ export default function AdministracionPage() {
   const [reglas, setReglas] = useState<any[]>([]);
   const [procesos, setProcesos] = useState<any[]>([]);
   const [auditoria, setAuditoria] = useState<any[]>([]);
+  const [unificacionTesoreriaCobranzas, setUnificacionTesoreriaCobranzas] = useState(true);
   const [loading, setLoading] = useState(true);
 
   // Modales
@@ -76,19 +77,21 @@ export default function AdministracionPage() {
   const fetchData = async () => {
     setLoading(true);
     try {
-      const [uRes, fRes, cRes, pRes, aRes] = await Promise.all([
+      const [uRes, fRes, cRes, pRes, aRes, cfgRes] = await Promise.all([
         fetch("/api/admin/usuarios"),
         fetch("/api/admin/feriados"),
         fetch("/api/admin/campos"),
         fetch("/api/admin/procesos"),
         fetch("/api/admin/auditoria"),
+        fetch("/api/admin/configuracion"),
       ]);
-      const [uData, fData, cData, pData, aData] = await Promise.all([
+      const [uData, fData, cData, pData, aData, cfgData] = await Promise.all([
         uRes.json(),
         fRes.json(),
         cRes.json(),
         pRes.json(),
         aRes.json(),
+        cfgRes.ok ? cfgRes.json() : Promise.resolve({}),
       ]);
       if (uData.usuarios) setUsuarios(uData.usuarios);
       if (fData.feriados) setFeriados(fData.feriados);
@@ -96,10 +99,35 @@ export default function AdministracionPage() {
       if (cData.reglas) setReglas(cData.reglas);
       if (pData.tipos) setProcesos(pData.tipos);
       if (aData.movimientos) setAuditoria(aData.movimientos);
+      if (cfgData.unificacionTesoreriaCobranzas !== undefined) {
+        setUnificacionTesoreriaCobranzas(cfgData.unificacionTesoreriaCobranzas);
+      }
     } catch (err) {
       console.error("Error loading admin data:", err);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleToggleUnificacion = async () => {
+    const nuevoValor = !unificacionTesoreriaCobranzas;
+    setUnificacionTesoreriaCobranzas(nuevoValor);
+    try {
+      const res = await fetch("/api/admin/configuracion", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ unificacionTesoreriaCobranzas: nuevoValor }),
+      });
+      if (!res.ok) throw new Error("Error al guardar parámetro institucional");
+      setFeedback({
+        type: "success",
+        text: nuevoValor
+          ? "Unificación de Tesorería y Cobranzas activada: El Tesorero General gestiona ambas etapas de forma integrada."
+          : "Operación dividida de Tesorería y Cobranzas activada: Cada área requiere custodios independientes.",
+      });
+    } catch (err: any) {
+      setUnificacionTesoreriaCobranzas(!nuevoValor);
+      setFeedback({ type: "error", text: err.message });
     }
   };
 
@@ -424,6 +452,17 @@ export default function AdministracionPage() {
         >
           <History className="w-3.5 h-3.5" />
           5. Auditoría Forense
+        </button>
+        <button
+          onClick={() => setActiveTab("configuracion")}
+          className={`px-3.5 py-1.5 rounded-md transition-all flex items-center gap-1.5 ${
+            activeTab === "configuracion"
+              ? "bg-white text-slate-900 shadow-xs font-bold"
+              : "text-slate-600 hover:text-slate-900"
+          }`}
+        >
+          <Sliders className="w-3.5 h-3.5" />
+          6. Configuración Operativa
         </button>
       </div>
 
@@ -1014,6 +1053,57 @@ export default function AdministracionPage() {
                 ))}
               </tbody>
             </table>
+          </div>
+        </div>
+      )}
+
+      {/* TAB 6: CONFIGURACIÓN OPERATIVA Y ESTRUCTURA ORGANIZACIONAL */}
+      {activeTab === "configuracion" && (
+        <div className="bg-white border border-slate-200 rounded-xl p-6 shadow-xs space-y-6">
+          <div className="border-b border-slate-200 pb-4">
+            <h2 className="text-sm font-bold text-slate-900 uppercase tracking-wide">
+              Configuración de Organización y Dependencias Financieras
+            </h2>
+            <p className="text-xs text-slate-500 mt-1 uppercase">
+              Ajuste de parámetros operacionales para la asignación y custodia de expedientes en las fases finales del control previo.
+            </p>
+          </div>
+
+          {/* Switch de Unificación Tesorería - Cobranzas */}
+          <div className="p-5 rounded-xl border border-slate-200 bg-slate-50/70 space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div className="space-y-1">
+                <div className="flex items-center gap-2">
+                  <h3 className="text-xs font-bold text-slate-900 uppercase">
+                    Unificación Operativa: Tesorería y Cobranzas
+                  </h3>
+                  <span
+                    className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${
+                      unificacionTesoreriaCobranzas
+                        ? "bg-emerald-100 text-emerald-800 border border-emerald-300"
+                        : "bg-slate-200 text-slate-800 border border-slate-300"
+                    }`}
+                  >
+                    {unificacionTesoreriaCobranzas ? "ACTIVO (Áreas Unificadas)" : "SEPARADO (Áreas Independientes)"}
+                  </span>
+                </div>
+                <p className="text-xs text-slate-600 max-w-2xl leading-relaxed">
+                  Por acuerdo operativo institucional, el <strong>Tesorero General</strong> gestiona de forma unificada tanto la ejecución de transferencias bancarias (eSIGEF / SPI-BCE) como el control de garantías y cobranzas. Puede alternar esta configuración para exigir usuarios custodios diferenciados por departamento cuando se asigne personal dedicado.
+                </p>
+              </div>
+
+              <button
+                type="button"
+                onClick={handleToggleUnificacion}
+                className={`px-4 py-2 text-xs font-bold uppercase rounded-lg transition-all shadow-xs shrink-0 ${
+                  unificacionTesoreriaCobranzas
+                    ? "bg-emerald-600 hover:bg-emerald-700 text-white"
+                    : "bg-slate-800 hover:bg-slate-900 text-white"
+                }`}
+              >
+                {unificacionTesoreriaCobranzas ? "Dividir Tesorería y Cobranzas" : "Unificar en Tesorería General"}
+              </button>
+            </div>
           </div>
         </div>
       )}

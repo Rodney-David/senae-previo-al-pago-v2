@@ -152,7 +152,11 @@ export default function TramiteDetallePage() {
       <TarjetaChecklist
         idTramite={tramite.id_tramite}
         currentUserId={currentUser?.id_usuario}
-        readOnly={tramite.estado_general === "ANULADO" || tramite.estado_general === "ARCHIVADO"}
+        readOnly={
+          (currentUser?.id_area !== 2 && currentUser?.rol !== "ADMIN") ||
+          tramite.estado_general === "ANULADO" ||
+          tramite.estado_general === "ARCHIVADO"
+        }
       />
 
       {/* Card 4: Fase Presupuesto */}

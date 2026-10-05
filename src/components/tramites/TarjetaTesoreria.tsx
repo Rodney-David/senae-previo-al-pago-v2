@@ -26,7 +26,7 @@ export const TarjetaTesoreria: React.FC<TarjetaTesoreriaProps> = ({
   const [error, setError] = useState<string | null>(null);
 
   const canEdit =
-    (currentUser?.id_area === 4 || currentUser?.rol === "ADMIN") &&
+    (currentUser?.id_area === 4 || currentUser?.id_area === 5 || currentUser?.rol === "ADMIN") &&
     tramite.estado_general !== "FINALIZADO_ARCHIVADO";
 
   const handleSave = async (e: React.FormEvent) => {
@@ -68,7 +68,7 @@ export const TarjetaTesoreria: React.FC<TarjetaTesoreriaProps> = ({
         <div className="flex items-center gap-2">
           <CreditCard className="w-4 h-4 text-blue-400" />
           <h3 className="text-xs font-semibold uppercase tracking-wider">
-            5. Tesorería, Programación MEF y Transferencia SPI-BCE
+            5. Tesorería y Cobranzas (Operación Unificada) · Programación MEF y Transferencia SPI-BCE
           </h3>
         </div>
         <div className="flex items-center gap-3">

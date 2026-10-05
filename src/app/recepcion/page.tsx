@@ -34,10 +34,20 @@ export default function RecepcionPage() {
   const [isAutoCalculating, setIsAutoCalculating] = useState(true);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [authorized, setAuthorized] = useState<boolean | null>(null);
 
   useEffect(() => {
-    async function loadTipos() {
+    async function checkAuthAndLoad() {
       try {
+        const sessionRes = await fetch("/api/auth/session");
+        const sessionData = await sessionRes.json();
+        const user = sessionData?.user;
+        if (!user || !["DIRECTORA", "SECRETARIA", "ADMIN"].includes(user.rol)) {
+          setAuthorized(false);
+          return;
+        }
+        setAuthorized(true);
+
         const res = await fetch("/api/admin/procesos");
         const data = await res.json();
         if (data.tipos) {
@@ -52,7 +62,7 @@ export default function RecepcionPage() {
         setLoadingTipos(false);
       }
     }
-    loadTipos();
+    checkAuthAndLoad();
   }, []);
 
   // Recalcular monto total automáticamente
@@ -112,6 +122,26 @@ export default function RecepcionPage() {
       setLoading(false);
     }
   };
+
+  if (authorized === false) {
+    return (
+      <div className="max-w-xl mx-auto mt-12 bg-white p-8 rounded-xl border border-rose-200 shadow-xs text-center space-y-4">
+        <div className="w-12 h-12 rounded-full bg-rose-100 text-rose-600 flex items-center justify-center mx-auto">
+          <AlertCircle className="w-6 h-6" />
+        </div>
+        <h2 className="text-base font-bold text-slate-900">Acceso Restringido a Recepción DFI</h2>
+        <p className="text-xs text-slate-600 leading-relaxed">
+          De acuerdo con el flujo normativo de Control Previo (SENAE-ME-3-6-001), el ingreso y recepción de expedientes físicos está reservado exclusivamente a la <strong>Directora Financiera</strong> y <strong>Secretaría DFI</strong>.
+        </p>
+        <button
+          onClick={() => router.push("/escritorio")}
+          className="px-4 py-2 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors"
+        >
+          Volver a Mi Escritorio
+        </button>
+      </div>
+    );
+  }
 
   return (
     <div className="max-w-4xl mx-auto space-y-6">

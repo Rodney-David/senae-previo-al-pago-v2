@@ -99,13 +99,14 @@ export const BarraAcciones: React.FC<BarraAccionesProps> = ({
   const isInPresupuesto = tramite.id_area_actual === 2;
   const isInContabilidad = tramite.id_area_actual === 3;
   const isInDFIPago = tramite.id_area_actual === 1 && tramite.estado_general === "EN_AUTORIZACION_DFI";
-  const isInTesoreria = tramite.id_area_actual === 4;
+  const isInTesoreria = tramite.id_area_actual === 4 || tramite.id_area_actual === 5;
   const isInArchivo = tramite.id_area_actual === 6;
 
   const isJefePresupuesto = currentUser.id_area === 2 && currentUser.rol === "JEFE";
   const isAnalistaPresupuesto = currentUser.id_area === 2 && currentUser.rol === "ANALISTA";
   const isContadorGeneral = currentUser.id_area === 3 && currentUser.rol === "JEFE";
   const isAnalistaContable = currentUser.id_area === 3 && currentUser.rol === "ANALISTA";
+  const isTesoreroCobranzas = currentUser.id_area === 4 || currentUser.id_area === 5;
   const isDirectora = currentUser.rol === "DIRECTORA";
   const isAdmin = currentUser.rol === "ADMIN";
 
@@ -246,8 +247,8 @@ export const BarraAcciones: React.FC<BarraAccionesProps> = ({
             </button>
           )}
 
-          {/* TESORERIA Y PAGOS */}
-          {isInTesoreria && (
+          {/* TESORERIA Y COBRANZAS (UNIFICADAS) */}
+          {isInTesoreria && (isTesoreroCobranzas || isAdmin) && (
             <>
               {onOpenEditTesoreria && (
                 <button

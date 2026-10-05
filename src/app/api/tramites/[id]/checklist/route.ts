@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { getAuthenticatedUser } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 
@@ -66,11 +67,11 @@ export async function GET(
       respuestasMap.set(r.id_requisito, r);
     }
 
-    const items = requisitos.map((req) => {
+    const items = requisitos.map((req, idx) => {
       const resp = respuestasMap.get(req.id_requisito);
       return {
         id_requisito: req.id_requisito,
-        orden: req.orden,
+        orden: idx + 1,
         descripcion: req.descripcion,
         es_obligatorio: req.es_obligatorio,
         fase: req.fase,
@@ -125,8 +126,24 @@ export async function POST(
       return NextResponse.json({ error: "ID inválido" }, { status: 400 });
     }
 
+    const currentUser = await getAuthenticatedUser(request);
+    if (!currentUser) {
+      return NextResponse.json({ error: "No autorizado. Sesión requerida." }, { status: 401 });
+    }
+
+    // El diligenciamiento del checklist es exclusivo del Área de Presupuesto (id_area === 2) o Administrador
+    if (currentUser.id_area !== 2 && currentUser.rol !== "ADMIN") {
+      return NextResponse.json(
+        {
+          error:
+            "Acceso denegado: El control y verificación del checklist normativo institucional es de competencia exclusiva del Área de Presupuesto.",
+        },
+        { status: 403 }
+      );
+    }
+
     const body = await request.json();
-    const { id_requisito, estado_cumplimiento, observacion_especifica, id_usuario } = body;
+    const { id_requisito, estado_cumplimiento, observacion_especifica } = body;
 
     if (!id_requisito || !estado_cumplimiento) {
       return NextResponse.json(
@@ -135,7 +152,7 @@ export async function POST(
       );
     }
 
-    const evaluadorId = id_usuario ? Number(id_usuario) : 1;
+    const evaluadorId = currentUser.id_usuario;
 
     // Upsert respuesta de checklist
     const respuesta = await prisma.respuestas_checklist.upsert({
@@ -160,27 +177,20 @@ export async function POST(
       },
     });
 
-    // Registrar en auditoría
-    try {
-      const tramite = await prisma.tramites.findUnique({
-        where: { id_tramite: idTramite },
-        select: { id_area_actual: true },
-      });
-
-      await prisma.historial_movimientos.create({
-        data: {
-          id_tramite: idTramite,
-          id_usuario_entrega: evaluadorId,
-          id_usuario_recibe: evaluadorId,
-          id_area_origen: tramite?.id_area_actual || 2,
-          id_area_destino: tramite?.id_area_actual || 2,
-          tipo_accion: "CHECKLIST_ACTUALIZADO",
-          comentarios: `Requisito #${id_requisito} marcado como ${estado_cumplimiento}. ${observacion_especifica ? `Obs: ${observacion_especifica}` : ""}`,
-        },
-      });
-    } catch (auditErr) {
-      console.error("Error registrando auditoría de checklist:", auditErr);
-    }
+    // Registrar en auditoría de forma asíncrona sin bloquear respuesta
+    prisma.historial_movimientos.create({
+      data: {
+        id_tramite: idTramite,
+        id_usuario_entrega: evaluadorId,
+        id_usuario_recibe: evaluadorId,
+        id_area_origen: 2,
+        id_area_destino: 2,
+        tipo_accion: "CHECKLIST_ACTUALIZADO",
+        comentarios: `Requisito #${id_requisito} marcado como ${estado_cumplimiento}. ${
+          observacion_especifica ? `Obs: ${observacion_especifica}` : ""
+        }`,
+      },
+    }).catch((err) => console.error("Error auditoría checklist:", err));
 
     return NextResponse.json({ success: true, respuesta });
   } catch (error: any) {

@@ -1,19 +1,52 @@
 import { prisma } from "@/lib/prisma";
 import { SLAResult } from "@/types";
 
+let cachedFeriadosSet: Set<string> | null = null;
+let lastFeriadosFetch = 0;
+const CACHE_TTL_MS = 10 * 60 * 1000; // 10 minutos de caché
+
+export async function getFeriadosSet(): Promise<Set<string>> {
+  const now = Date.now();
+  if (cachedFeriadosSet && now - lastFeriadosFetch < CACHE_TTL_MS) {
+    return cachedFeriadosSet;
+  }
+  try {
+    const feriadosList = await prisma.feriados.findMany({
+      where: { activo: true },
+      select: { fecha: true },
+    });
+    cachedFeriadosSet = new Set(
+      feriadosList.map((f) => {
+        const d = new Date(f.fecha);
+        return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(
+          d.getDate()
+        ).padStart(2, "0")}`;
+      })
+    );
+    lastFeriadosFetch = now;
+  } catch (error) {
+    console.error("Error fetching feriados for SLA:", error);
+    if (!cachedFeriadosSet) cachedFeriadosSet = new Set();
+  }
+  return cachedFeriadosSet;
+}
+
 /**
  * Motor de cálculo de SLA institucional (6 días hábiles normativos).
  * Descuenta fines de semana y días feriados registrados en la base de datos.
  * Descuenta días de pausa acumulados cuando el trámite estuvo en espera de factura.
  */
-export async function calculateTramiteSLA(tramite: {
-  fecha_ingreso: Date | string | null;
-  fecha_recepcion_fisica?: Date | string | null;
-  esta_pausado?: boolean | null;
-  motivo_pausa?: string | null;
-  fecha_pausa?: Date | string | null;
-  dias_pausa_acumulados?: number | null;
-}): Promise<SLAResult> {
+export async function calculateTramiteSLA(
+  tramite: {
+    fecha_ingreso: Date | string | null;
+    fecha_recepcion_fisica?: Date | string | null;
+    esta_pausado?: boolean | null;
+    motivo_pausa?: string | null;
+    fecha_pausa?: Date | string | null;
+    dias_pausa_acumulados?: number | null;
+  },
+  preloadedFeriados?: Set<string>
+): Promise<SLAResult> {
   const TERM_DAYS = 6;
   const startDate = tramite.fecha_recepcion_fisica
     ? new Date(tramite.fecha_recepcion_fisica)
@@ -26,24 +59,8 @@ export async function calculateTramiteSLA(tramite: {
   // Si está pausado actualmente
   const isCurrentlyPaused = Boolean(tramite.esta_pausado);
 
-  // Obtener feriados activos de la base de datos
-  let feriadosFechas: Set<string> = new Set();
-  try {
-    const feriadosList = await prisma.feriados.findMany({
-      where: { activo: true },
-      select: { fecha: true },
-    });
-    feriadosFechas = new Set(
-      feriadosList.map((f) => {
-        const d = new Date(f.fecha);
-        return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(
-          d.getDate()
-        ).padStart(2, "0")}`;
-      })
-    );
-  } catch (error) {
-    console.error("Error fetching feriados for SLA:", error);
-  }
+  // Obtener feriados activos (desde memoria o precargados)
+  const feriadosFechas = preloadedFeriados || (await getFeriadosSet());
 
   // Contar días hábiles desde startDate hasta now (o hasta fecha_pausa si está pausado)
   const endDate = isCurrentlyPaused && tramite.fecha_pausa ? new Date(tramite.fecha_pausa) : now;
