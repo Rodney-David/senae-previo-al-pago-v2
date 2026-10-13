@@ -5,22 +5,25 @@ import {
   CheckCircle2,
   AlertCircle,
   ArrowLeftRight,
-  Undo2,
   Send,
   PauseCircle,
   PlayCircle,
   Archive,
   CreditCard,
   FileCheck,
-  RotateCcw,
+  FileSpreadsheet,
+  Ban,
+  AlertTriangle,
+  UserCheck,
+  Trash2,
 } from "lucide-react";
 import { TramiteCompletoDTO, UsuarioInstitucional } from "@/types";
-import { ModalObservacion72h } from "./ModalObservacion72h";
-import { ModalDevolucionFormal } from "./ModalDevolucionFormal";
-import { ModalSolicitarDevolucion } from "./ModalSolicitarDevolucion";
-import { ModalSubsanar } from "./ModalSubsanar";
+import { ModalObservarTransversal } from "./ModalObservarTransversal";
+import { ModalLevantarObservacion } from "./ModalLevantarObservacion";
+import { ModalDeclararInsubsistente } from "./ModalDeclararInsubsistente";
+import { ModalReanudarFactura } from "./ModalReanudarFactura";
+import { ModalReasignarInteligente } from "./ModalReasignarInteligente";
 import { ModalReasignarDerivar } from "./ModalReasignarDerivar";
-import { ModalReingresoAlcance } from "./ModalReingresoAlcance";
 
 interface BarraAccionesProps {
   tramite: TramiteCompletoDTO;
@@ -42,11 +45,15 @@ export const BarraAcciones: React.FC<BarraAccionesProps> = ({
   onOpenEditArchivo,
 }) => {
   const [modalObsOpen, setModalObsOpen] = useState(false);
-  const [modalDevOpen, setModalDevOpen] = useState(false);
-  const [modalSolicitarDevOpen, setModalSolicitarDevOpen] = useState(false);
-  const [modalSubsanarOpen, setModalSubsanarOpen] = useState(false);
-  const [modalDerivarOpen, setModalDerivarOpen] = useState(false);
-  const [modalAlcanceOpen, setModalAlcanceOpen] = useState(false);
+  const [modalLevantarObsOpen, setModalLevantarObsOpen] = useState(false);
+  const [modalInsubsistenteOpen, setModalInsubsistenteOpen] = useState(false);
+  const [modalReanudarFacturaOpen, setModalReanudarFacturaOpen] = useState(false);
+  const [modalReasignarInteligenteOpen, setModalReasignarInteligenteOpen] = useState(false);
+  const [modalReasignarOpen, setModalReasignarOpen] = useState(false);
+
+  const [reasignacionAlerta, setReasignacionAlerta] = useState<string | undefined>();
+  const [analistasDisponibles, setAnalistasDisponibles] = useState<any[]>([]);
+
   const [loadingAction, setLoadingAction] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
 
@@ -62,7 +69,19 @@ export const BarraAcciones: React.FC<BarraAccionesProps> = ({
         body: JSON.stringify({ accion, datos }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Error al ejecutar acción institucional");
+
+      if (!res.ok) {
+        throw new Error(data.error || "Error al ejecutar acción institucional");
+      }
+
+      // Si el endpoint solicita selección de analista por ausencia del titular
+      if (data.requiere_reasignacion) {
+        setReasignacionAlerta(data.mensaje);
+        setAnalistasDisponibles(data.analistas_disponibles || []);
+        setModalReasignarInteligenteOpen(true);
+        return;
+      }
+
       onRefresh();
     } catch (err: any) {
       setActionError(err.message);
@@ -71,18 +90,32 @@ export const BarraAcciones: React.FC<BarraAccionesProps> = ({
     }
   };
 
-  const handleTogglePausaFactura = async () => {
+  // Descarga del Acta Excel individual al entregar a Control Previo
+  const handleEntregarControlPrevioIndividual = async () => {
     setLoadingAction(true);
     setActionError(null);
     try {
-      const accion = tramite.esta_pausado ? "REANUDAR" : "PAUSAR";
-      const res = await fetch(`/api/tramites/${tramite.id_tramite}/pausa-factura`, {
+      const res = await fetch("/api/tramites/entregar-lote", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ accion }),
+        body: JSON.stringify({ ids: [tramite.id_tramite] }),
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Error al alternar pausa de factura");
+
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error || "Error al entregar a Control Previo");
+      }
+
+      const blob = await res.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `Acta_Entrega_${tramite.codigo_tramite}.xlsx`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(url);
+
       onRefresh();
     } catch (err: any) {
       setActionError(err.message);
@@ -91,95 +124,187 @@ export const BarraAcciones: React.FC<BarraAccionesProps> = ({
     }
   };
 
-  // Buscar si hay observación pendiente
-  const observacionPendiente = tramite.observaciones?.find(
-    (o) => o.estado_observacion === "PENDIENTE"
-  );
+  const estado = tramite.estado_general ? tramite.estado_general.toUpperCase() : "INGRESADO";
+  const isInsubsistente = estado === "INSUBSISTENTE";
+  const isObservado = estado === "OBSERVADO" || estado === "OBSERVADO_72H";
+  const isArchivado = estado === "ARCHIVO" || estado === "FINALIZADO_ARCHIVADO";
 
-  const isInPresupuesto = tramite.id_area_actual === 2;
-  const isInContabilidad = tramite.id_area_actual === 3;
-  const isInDFIPago = tramite.id_area_actual === 1 && tramite.estado_general === "EN_AUTORIZACION_DFI";
-  const isInTesoreria = tramite.id_area_actual === 4 || tramite.id_area_actual === 5;
-  const isInArchivo = tramite.id_area_actual === 6;
+  const isIngresado = estado === "INGRESADO";
+  const isRevision = estado === "REVISION";
+  const isRevisado = estado === "REVISADO";
+  const isFactura = estado === "FACTURA";
+  const isContabilidad = estado === "CONTABILIDAD";
+  const isDFI = estado === "DFI";
+  const isPagado = estado === "PAGADO";
 
   const isJefePresupuesto = currentUser.id_area === 2 && currentUser.rol === "JEFE";
   const isAnalistaPresupuesto = currentUser.id_area === 2 && currentUser.rol === "ANALISTA";
   const isContadorGeneral = currentUser.id_area === 3 && currentUser.rol === "JEFE";
   const isAnalistaContable = currentUser.id_area === 3 && currentUser.rol === "ANALISTA";
-  const isTesoreroCobranzas = currentUser.id_area === 4 || currentUser.id_area === 5;
   const isDirectora = currentUser.rol === "DIRECTORA";
-  const isAdmin = currentUser.rol === "ADMIN";
+  const isAdmin = currentUser.rol === "ADMIN" || currentUser.rol === "ADMINISTRADOR";
+  const isSecretaria = currentUser.id_area === 1 && (currentUser.rol === "SECRETARIA" || currentUser.rol === "SECRETARIA_DFI");
+  const isDFIUser = isDirectora || isSecretaria || currentUser.id_area === 1;
+  const canAnular = (isDFIUser || isAdmin) && !isArchivado && !isInsubsistente && estado !== "ANULADO";
+
+  const handleAnular = async () => {
+    if (!confirm(`¿ESTÁ SEGURO DE ANULAR EL TRÁMITE ${tramite.codigo_tramite}?\nEsta acción marcará el trámite como ANULADO en el flujo institucional.`)) {
+      return;
+    }
+    setLoadingAction(true);
+    setActionError(null);
+    try {
+      const res = await fetch(`/api/tramites/${tramite.id_tramite}?rol=${currentUser.rol}`, {
+        method: "DELETE",
+      });
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error || "Error al anular trámite");
+      }
+      onRefresh();
+    } catch (err: any) {
+      setActionError(err.message);
+    } finally {
+      setLoadingAction(false);
+    }
+  };
 
   return (
     <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-xs space-y-3">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex items-center gap-2">
-          <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
-            Acciones Autorizadas:
-          </span>
-          <span className="text-xs px-2 py-0.5 rounded bg-slate-100 text-slate-700 font-medium">
-            {currentUser.cargo}
-          </span>
+      {/* Alerta si el trámite es INSUBSISTENTE */}
+      {isInsubsistente && (
+        <div className="p-3 bg-rose-50 border border-rose-300 rounded-lg text-rose-800 text-xs flex items-start gap-2.5">
+          <Ban className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
+          <div>
+            <span className="font-bold block">EXPEDIENTE INSUBSISTENTE (NULIDAD DEFINITIVA)</span>
+            <p className="mt-0.5 text-rose-700">
+              {tramite.justificacion_insubsistencia || "Trámite declarado nulo por causal insubsanable. Flujo detenido permanentemente."}
+            </p>
+          </div>
         </div>
+      )}
 
-        {/* Acciones principales dinámicas */}
-        <div className="flex flex-wrap items-center gap-2">
-          {/* Si hay una observación pendiente dirigida a esta área */}
-          {observacionPendiente && (
-            <button
-              onClick={() => setModalSubsanarOpen(true)}
-              className="px-3.5 py-1.5 text-xs font-medium bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg transition-colors flex items-center gap-1.5 shadow-xs"
-            >
-              <CheckCircle2 className="w-3.5 h-3.5" />
-              Responder / Subsanar Observación (72h)
-            </button>
-          )}
+      {/* Alerta si el trámite está OBSERVADO */}
+      {isObservado && (
+        <div className="p-3 bg-amber-50 border border-amber-300 rounded-lg text-amber-900 text-xs flex items-start justify-between gap-3">
+          <div className="flex items-start gap-2.5">
+            <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+            <div>
+              <span className="font-bold block">
+                TRÁMITE OBSERVADO — Semáforo SLA Congelado (Fase previa: {tramite.estado_previo_observacion || "REVISION"})
+              </span>
+              <p className="mt-0.5 text-amber-800 italic">
+                {tramite.motivo_observacion || tramite.motivo_pausa || "Novedad pendiente de subsanación externa con terceros o administrador de contrato."}
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={() => setModalLevantarObsOpen(true)}
+            className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-bold text-xs shrink-0 shadow-xs flex items-center gap-1"
+          >
+            <CheckCircle2 className="w-3.5 h-3.5" />
+            Levantar Observación
+          </button>
+        </div>
+      )}
 
-          {/* PRESUPUESTO */}
-          {isInPresupuesto && (isJefePresupuesto || isAnalistaPresupuesto || isAdmin) && (
-            <>
-              {onOpenEditPresupuesto && (
-                <button
-                  onClick={onOpenEditPresupuesto}
-                  className="px-3 py-1.5 text-xs font-medium bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-lg transition-colors border border-slate-300"
-                >
-                  Registrar Datos / CUR Compromiso
-                </button>
-              )}
+      {/* Alerta si el trámite está en espera de Factura */}
+      {isFactura && (
+        <div className="p-3 bg-amber-50 border border-amber-300 rounded-lg text-amber-900 text-xs flex items-start justify-between gap-3">
+          <div className="flex items-start gap-2.5">
+            <PauseCircle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+            <div>
+              <span className="font-bold block">
+                TRÁMITE EN ESTADO FACTURA — Semáforo SLA Pausado
+              </span>
+              <p className="mt-0.5 text-amber-800">
+                El trámite fue revisado con visto bueno de Presupuesto y está en espera de factura tributaria SRI emitida por el proveedor.
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={() => setModalReanudarFacturaOpen(true)}
+            className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-bold text-xs shrink-0 shadow-xs flex items-center gap-1"
+          >
+            <PlayCircle className="w-3.5 h-3.5" />
+            Registrar Factura y Reanudar
+          </button>
+        </div>
+      )}
 
-              {/* Botón Pausa Factura */}
+      {actionError && (
+        <div className="p-3 bg-rose-50 border border-rose-200 text-rose-700 text-xs rounded-lg font-medium">
+          {actionError}
+        </div>
+      )}
+
+      {/* Fila principal de botones de acción */}
+      {!isInsubsistente && (
+        <div className="flex flex-wrap items-center justify-end gap-2">
+            {/* 1. ESTADO INGRESADO (Secretaría DFI) */}
+            {isIngresado && (isSecretaria || isDirectora || isAdmin) && (
               <button
-                onClick={handleTogglePausaFactura}
+                onClick={handleEntregarControlPrevioIndividual}
                 disabled={loadingAction}
-                className="px-3 py-1.5 text-xs font-medium bg-amber-50 hover:bg-amber-100 text-amber-800 rounded-lg transition-colors border border-amber-300 flex items-center gap-1"
+                className="px-3.5 py-1.5 text-xs font-bold bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors flex items-center gap-1.5 shadow-xs"
               >
-                {tramite.esta_pausado ? (
-                  <>
-                    <PlayCircle className="w-3.5 h-3.5 text-amber-600" />
-                    Reanudar Semáforo SLA
-                  </>
-                ) : (
-                  <>
-                    <PauseCircle className="w-3.5 h-3.5 text-amber-600" />
-                    Pausar Semáforo / Espera Factura
-                  </>
-                )}
+                <FileSpreadsheet className="w-3.5 h-3.5" />
+                Entregar a Control Previo (Descargar Acta)
               </button>
+            )}
 
-              {/* Visto bueno del Jefe */}
-              {(isJefePresupuesto || isAdmin) && !tramite.aprobado_presupuesto && (
+            {/* 2. ESTADO REVISION (Presupuesto) */}
+            {isRevision && (isJefePresupuesto || isAnalistaPresupuesto || isAdmin) && (
+              <>
+                {onOpenEditPresupuesto && (
+                  <button
+                    onClick={onOpenEditPresupuesto}
+                    className="px-3 py-1.5 text-xs font-medium bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-lg transition-colors border border-slate-300"
+                  >
+                    Registrar Datos / CUR Compromiso
+                  </button>
+                )}
+
+                {/* Si es analista, botón para enviar a visto bueno de la Jefa */}
+                {isAnalistaPresupuesto && (
+                  <button
+                    onClick={() => handleAction("ENVIAR_A_JEFATURA_PRESUPUESTO")}
+                    disabled={loadingAction}
+                    className="px-3 py-1.5 text-xs font-medium bg-indigo-50 hover:bg-indigo-100 text-indigo-800 rounded-lg transition-colors border border-indigo-300 flex items-center gap-1"
+                  >
+                    <Send className="w-3.5 h-3.5" />
+                    Enviar a Jefatura para Visto Bueno
+                  </button>
+                )}
+
+                {/* Visto bueno de la Jefa: "Revisado" */}
+                {(isJefePresupuesto || isAdmin) && (
+                  <button
+                    onClick={() => handleAction("APROBAR_JEFE_PRESUPUESTO")}
+                    disabled={loadingAction}
+                    className="px-3.5 py-1.5 text-xs font-bold bg-teal-600 hover:bg-teal-700 text-white rounded-lg transition-colors flex items-center gap-1.5 shadow-xs"
+                  >
+                    <FileCheck className="w-3.5 h-3.5" />
+                    Emitir Visto Bueno (Revisado)
+                  </button>
+                )}
+              </>
+            )}
+
+            {/* 3. ESTADO REVISADO (En manos de Presupuesto para Factura o Despacho) */}
+            {isRevisado && (isJefePresupuesto || isAnalistaPresupuesto || isAdmin) && (
+              <>
+                {/* Botón Pausa Factura */}
                 <button
-                  onClick={() => handleAction("APROBAR_JEFE_PRESUPUESTO")}
+                  onClick={() => handleAction("PAUSAR_ESPERA_FACTURA")}
                   disabled={loadingAction}
-                  className="px-3.5 py-1.5 text-xs font-medium bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg transition-colors flex items-center gap-1.5 shadow-xs"
+                  className="px-3 py-1.5 text-xs font-medium bg-amber-50 hover:bg-amber-100 text-amber-800 rounded-lg transition-colors border border-amber-300 flex items-center gap-1"
                 >
-                  <FileCheck className="w-3.5 h-3.5" />
-                  Emitir Aprobación Jefe Presupuesto
+                  <PauseCircle className="w-3.5 h-3.5 text-amber-600" />
+                  Espera Factura (Pausar SLA)
                 </button>
-              )}
 
-              {/* Derivar a Contabilidad */}
-              {tramite.aprobado_presupuesto && (
+                {/* Derivar a Contabilidad */}
                 <button
                   onClick={() => handleAction("DERIVAR_A_CONTABILIDAD")}
                   disabled={loadingAction || !tramite.numero_factura}
@@ -188,303 +313,189 @@ export const BarraAcciones: React.FC<BarraAccionesProps> = ({
                       ? "Se requiere registrar el número de factura para despachar a Contabilidad"
                       : ""
                   }
-                  className="px-3.5 py-1.5 text-xs font-medium bg-blue-600 hover:bg-blue-700 disabled:bg-slate-300 disabled:text-slate-500 text-white rounded-lg transition-colors flex items-center gap-1.5 shadow-xs"
+                  className="px-3.5 py-1.5 text-xs font-bold bg-purple-600 hover:bg-purple-700 disabled:bg-slate-300 disabled:text-slate-500 text-white rounded-lg transition-colors flex items-center gap-1.5 shadow-xs"
                 >
                   <Send className="w-3.5 h-3.5" />
                   Derivar a Contabilidad
                 </button>
-              )}
-            </>
-          )}
+              </>
+            )}
 
-          {/* CONTABILIDAD */}
-          {isInContabilidad && (isContadorGeneral || isAnalistaContable || isAdmin) && (
-            <>
-              {onOpenEditContabilidad && (
-                <button
-                  onClick={onOpenEditContabilidad}
-                  className="px-3 py-1.5 text-xs font-medium bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-lg transition-colors border border-slate-300"
-                >
-                  Registrar Devengado / Retenciones
-                </button>
-              )}
-
-              {/* Visto bueno del Contador General */}
-              {(isContadorGeneral || isAdmin) && !tramite.aprobado_contabilidad && (
-                <button
-                  onClick={() => handleAction("APROBAR_CONTADOR_GENERAL")}
-                  disabled={loadingAction}
-                  className="px-3.5 py-1.5 text-xs font-medium bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg transition-colors flex items-center gap-1.5 shadow-xs"
-                >
-                  <FileCheck className="w-3.5 h-3.5" />
-                  Emitir Aprobación Contador General
-                </button>
-              )}
-
-              {/* Derivar a DFI Pago */}
-              {tramite.aprobado_contabilidad && (
-                <button
-                  onClick={() => handleAction("DERIVAR_A_DFI_PAGO")}
-                  disabled={loadingAction}
-                  className="px-3.5 py-1.5 text-xs font-medium bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors flex items-center gap-1.5 shadow-xs"
-                >
-                  <Send className="w-3.5 h-3.5" />
-                  Derivar a Directora Financiera (Pago)
-                </button>
-              )}
-            </>
-          )}
-
-          {/* DFI PAGO */}
-          {isInDFIPago && (isDirectora || isAdmin) && (
-            <button
-              onClick={() => handleAction("AUTORIZAR_PAGO_DFI")}
-              disabled={loadingAction}
-              className="px-4 py-1.5 text-xs font-medium bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg transition-colors flex items-center gap-1.5 shadow-xs font-semibold"
-            >
-              <CreditCard className="w-4 h-4" />
-              Autorizar Pago y Derivar a Tesorería
-            </button>
-          )}
-
-          {/* TESORERIA Y COBRANZAS (UNIFICADAS) */}
-          {isInTesoreria && (isTesoreroCobranzas || isAdmin) && (
-            <>
-              {onOpenEditTesoreria && (
-                <button
-                  onClick={onOpenEditTesoreria}
-                  className="px-3.5 py-1.5 text-xs font-medium bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors flex items-center gap-1.5 shadow-xs"
-                >
-                  <CreditCard className="w-3.5 h-3.5" />
-                  Registrar Lote MEF y Transferencia SPI-BCE
-                </button>
-              )}
-            </>
-          )}
-
-          {/* ARCHIVO */}
-          {isInArchivo && tramite.estado_general !== "FINALIZADO_ARCHIVADO" && (
-            <>
-              {onOpenEditArchivo && (
-                <button
-                  onClick={onOpenEditArchivo}
-                  className="px-3.5 py-1.5 text-xs font-medium bg-slate-800 hover:bg-slate-900 text-white rounded-lg transition-colors flex items-center gap-1.5 shadow-xs"
-                >
-                  <Archive className="w-3.5 h-3.5" />
-                  Archivar Definitivo y Asignar Ubicación
-                </button>
-              )}
-            </>
-          )}
-
-          {/* ACCIONES GENERALES: OBSERVAR Y DEVOLVER */}
-          {tramite.estado_general !== "FINALIZADO_ARCHIVADO" && (
-            <>
+            {/* 4. ESTADO FACTURA */}
+            {isFactura && (isJefePresupuesto || isAnalistaPresupuesto || isAdmin) && (
               <button
-                onClick={() => setModalObsOpen(true)}
-                className="px-3 py-1.5 text-xs font-medium bg-amber-50 hover:bg-amber-100 text-amber-800 rounded-lg transition-colors border border-amber-200 flex items-center gap-1"
+                onClick={() => setModalReanudarFacturaOpen(true)}
+                disabled={loadingAction}
+                className="px-3.5 py-1.5 text-xs font-bold bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors flex items-center gap-1.5 shadow-xs"
               >
-                <AlertCircle className="w-3.5 h-3.5 text-amber-600" />
-                Observar (72h)
+                <PlayCircle className="w-3.5 h-3.5" />
+                Factura Recibida: Reanudar
               </button>
+            )}
 
+            {/* 5. ESTADO CONTABILIDAD */}
+            {isContabilidad && (isContadorGeneral || isAnalistaContable || isAdmin) && (
+              <>
+                {onOpenEditContabilidad && (
+                  <button
+                    onClick={onOpenEditContabilidad}
+                    className="px-3 py-1.5 text-xs font-medium bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-lg transition-colors border border-slate-300"
+                  >
+                    Registrar Devengado / Retenciones
+                  </button>
+                )}
+
+                {/* Contador General aprueba y deriva a DFI */}
+                {(isContadorGeneral || isAdmin) && (
+                  <button
+                    onClick={() => handleAction("APROBAR_Y_DERIVAR_A_DFI")}
+                    disabled={loadingAction}
+                    className="px-3.5 py-1.5 text-xs font-bold bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg transition-colors flex items-center gap-1.5 shadow-xs"
+                  >
+                    <Send className="w-3.5 h-3.5" />
+                    Aprobar y Derivar a Dirección Financiera (DFI)
+                  </button>
+                )}
+              </>
+            )}
+
+            {/* 6. ESTADO DFI (Dirección Financiera / Autorización de Pago) */}
+            {isDFI && (isDirectora || isAdmin) && (
               <button
-                onClick={() => setModalDevOpen(true)}
-                className="px-3 py-1.5 text-xs font-medium bg-rose-50 hover:bg-rose-100 text-rose-800 rounded-lg transition-colors border border-rose-200 flex items-center gap-1"
+                onClick={() => handleAction("AUTORIZAR_Y_DERIVAR_A_TESORERIA")}
+                disabled={loadingAction}
+                className="px-4 py-1.5 text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg transition-colors flex items-center gap-1.5 shadow-xs"
               >
-                <ArrowLeftRight className="w-3.5 h-3.5 text-rose-600" />
-                Devolver Formalmente
+                <CreditCard className="w-4 h-4" />
+                Autorizar Pago y Despachar a Tesorería
               </button>
-            </>
-          )}
+            )}
 
-          {/* REASIGNAR / DERIVAR */}
-          {tramite.estado_general !== "FINALIZADO_ARCHIVADO" && (
-            <button
-              onClick={() => setModalDerivarOpen(true)}
-              className="px-3 py-1.5 text-xs font-semibold uppercase bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-lg transition-colors border border-slate-300 flex items-center gap-1.5 shadow-2xs"
-              title="Reasignar a otro analista o derivar a otro departamento"
-            >
-              <ArrowLeftRight className="w-3.5 h-3.5 text-blue-600" />
-              Reasignar / Derivar
-            </button>
-          )}
+            {/* 7. EN TESORERIA (Se mantiene en DFI o pasa a PAGADO) */}
+            {tramite.id_area_actual === 4 && (
+              <>
+                {onOpenEditTesoreria && (
+                  <button
+                    onClick={onOpenEditTesoreria}
+                    className="px-3.5 py-1.5 text-xs font-medium bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors flex items-center gap-1.5 shadow-xs"
+                  >
+                    <CreditCard className="w-3.5 h-3.5" />
+                    Registrar Lote MEF y Transferencia SPI-BCE
+                  </button>
+                )}
+              </>
+            )}
 
-          {/* REINGRESO POR MEMORANDO DE ALCANCE */}
-          {(tramite.es_devuelto || tramite.estado_general === "DEVUELTO_FORMALMENTE") && (
-            <button
-              onClick={() => setModalAlcanceOpen(true)}
-              className="px-3.5 py-1.5 text-xs font-semibold bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg transition-colors flex items-center gap-1.5 shadow-xs"
-              title="Registrar Memorando de Alcance (Quipux) para reincorporar el expediente al flujo activo y reactivar el semáforo SLA"
-            >
-              <RotateCcw className="w-3.5 h-3.5" />
-              Reingresar por Alcance
-            </button>
-          )}
+            {/* 8. ESTADO PAGADO -> ARCHIVO */}
+            {(isPagado || tramite.id_area_actual === 6) && !isArchivado && (
+              <>
+                {onOpenEditArchivo && (
+                  <button
+                    onClick={onOpenEditArchivo}
+                    className="px-3.5 py-1.5 text-xs font-bold bg-slate-800 hover:bg-slate-900 text-white rounded-lg transition-colors flex items-center gap-1.5 shadow-xs"
+                  >
+                    <Archive className="w-3.5 h-3.5" />
+                    Archivar Trámite (Custodia Definitiva)
+                  </button>
+                )}
+              </>
+            )}
 
-          {/* SOLICITUD DE DEVOLUCIÓN (PARA QUIEN NO ES CUSTODIO ACTUAL) */}
-          {tramite.estado_general !== "FINALIZADO_ARCHIVADO" && tramite.id_custodio_actual !== currentUser.id_usuario && (
-            <button
-              onClick={() => setModalSolicitarDevOpen(true)}
-              className="px-3 py-1.5 text-xs font-semibold uppercase bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg transition-colors border border-slate-300 flex items-center gap-1 shadow-2xs"
-              title="Solicitar formalmente al custodio actual que devuelva el expediente a su despacho"
-            >
-              <Undo2 className="w-3.5 h-3.5 text-slate-600" />
-              Solicitar Devolución
-            </button>
-          )}
-        </div>
-      </div>
+            {/* ACCIONES TRANSVERSALES: OBSERVADO & INSUBSISTENTE */}
+            {!isArchivado && !isObservado && (
+              <>
+                <button
+                  onClick={() => setModalObsOpen(true)}
+                  className="px-3 py-1.5 text-xs font-medium bg-amber-50 hover:bg-amber-100 text-amber-800 rounded-lg transition-colors border border-amber-300 flex items-center gap-1"
+                >
+                  <AlertCircle className="w-3.5 h-3.5 text-amber-600" />
+                  Observar Trámite
+                </button>
 
-      {/* Banner de Trámite Devuelto Formalmente */}
-      {(tramite.es_devuelto || tramite.estado_general === "DEVUELTO_FORMALMENTE") && (
-        <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl flex flex-wrap items-center justify-between gap-2 text-xs text-rose-950">
-          <div className="flex items-center gap-2">
-            <ArrowLeftRight className="w-4 h-4 text-rose-600 shrink-0" />
-            <div>
-              <span className="font-semibold block text-rose-900">
-                Expediente Devuelto Formalmente (Semáforo SLA Congelado)
-              </span>
-              <span className="text-rose-700">
-                {tramite.motivo_devolucion || "El expediente fue devuelto a la unidad requirente para subsanación. En espera de Memorando de Alcance."}
-              </span>
-            </div>
+                <button
+                  onClick={() => setModalInsubsistenteOpen(true)}
+                  className="px-3 py-1.5 text-xs font-medium bg-rose-50 hover:bg-rose-100 text-rose-800 rounded-lg transition-colors border border-rose-300 flex items-center gap-1"
+                >
+                  <Ban className="w-3.5 h-3.5 text-rose-600" />
+                  Declarar Insubsistente
+                </button>
+
+                {canAnular && (
+                  <button
+                    onClick={handleAnular}
+                    disabled={loadingAction}
+                    className="px-3 py-1.5 text-xs font-medium bg-red-100 hover:bg-red-200 text-red-800 rounded-lg transition-colors border border-red-300 flex items-center gap-1"
+                    title="Anular formalmente el expediente (DFI / Administración)"
+                  >
+                    <Trash2 className="w-3.5 h-3.5 text-red-600" />
+                    Anular Trámite
+                  </button>
+                )}
+              </>
+            )}
+
+            {/* Reasignar Analista / Custodio Libre */}
+            {!isArchivado && (
+              <button
+                onClick={() => setModalReasignarOpen(true)}
+                className="px-3 py-1.5 text-xs font-medium bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg transition-colors border border-slate-300 flex items-center gap-1"
+              >
+                <ArrowLeftRight className="w-3.5 h-3.5 text-slate-500" />
+                Reasignar Custodio
+              </button>
+            )}
           </div>
-          <button
-            onClick={() => setModalAlcanceOpen(true)}
-            className="px-3 py-1.5 text-xs font-semibold bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg transition-colors flex items-center gap-1 shadow-xs"
-          >
-            <RotateCcw className="w-3.5 h-3.5" />
-            Registrar Memorando de Alcance
-          </button>
-        </div>
-      )}
-
-      {/* Banner si hay Solicitud de Devolución Pendiente */}
-      {tramite.sub_estado === "SOLICITUD_DEVOLUCION_PENDIENTE" && (
-        <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl flex flex-wrap items-center justify-between gap-2 text-xs text-amber-900">
-          <div className="flex items-center gap-2">
-            <AlertCircle className="w-4 h-4 text-amber-600 shrink-0" />
-            <span>
-              <strong>Solicitud de Devolución Pendiente:</strong> Un funcionario ha solicitado que este expediente retorne a su área.
-            </span>
-          </div>
-          {tramite.id_custodio_actual === currentUser.id_usuario && (
-            <div className="flex items-center gap-2">
-              <button
-                onClick={async () => {
-                  const mot = prompt("Ingrese nota de aceptación de devolución:") || "Aceptada";
-                  // Buscar la solicitud
-                  const res = await fetch(`/api/tramites/${tramite.id_tramite}/solicitud-devolucion`);
-                  const d = await res.json();
-                  const sol = d.solicitudes?.find((s: any) => s.estado_solicitud === "PENDIENTE");
-                  if (sol) {
-                    await fetch(`/api/tramites/${tramite.id_tramite}/solicitud-devolucion`, {
-                      method: "POST",
-                      headers: { "Content-Type": "application/json" },
-                      body: JSON.stringify({
-                        accion: "ACEPTAR_SOLICITUD",
-                        id_solicitud: sol.id_solicitud,
-                        respuesta: mot,
-                      }),
-                    });
-                    onRefresh();
-                  }
-                }}
-                className="px-3 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-bold uppercase transition-colors"
-              >
-                Aceptar y Devolver
-              </button>
-              <button
-                onClick={async () => {
-                  const mot = prompt("Ingrese justificación del rechazo:");
-                  if (!mot) return;
-                  const res = await fetch(`/api/tramites/${tramite.id_tramite}/solicitud-devolucion`);
-                  const d = await res.json();
-                  const sol = d.solicitudes?.find((s: any) => s.estado_solicitud === "PENDIENTE");
-                  if (sol) {
-                    await fetch(`/api/tramites/${tramite.id_tramite}/solicitud-devolucion`, {
-                      method: "POST",
-                      headers: { "Content-Type": "application/json" },
-                      body: JSON.stringify({
-                        accion: "RECHAZAR_SOLICITUD",
-                        id_solicitud: sol.id_solicitud,
-                        respuesta: mot,
-                      }),
-                    });
-                    onRefresh();
-                  }
-                }}
-                className="px-3 py-1 bg-slate-200 hover:bg-slate-300 text-slate-800 rounded-lg font-bold uppercase transition-colors"
-              >
-                Rechazar
-              </button>
-            </div>
-          )}
-        </div>
-      )}
-
-      {actionError && (
-        <div className="p-2.5 bg-rose-50 border border-rose-200 text-rose-700 text-xs rounded-lg font-medium flex items-center justify-between">
-          <span>{actionError}</span>
-          <button
-            onClick={() => setActionError(null)}
-            className="text-rose-500 hover:text-rose-700 text-xs"
-          >
-            Cerrar
-          </button>
-        </div>
       )}
 
       {/* Modales */}
-      <ModalObservacion72h
+      <ModalObservarTransversal
         isOpen={modalObsOpen}
         onClose={() => setModalObsOpen(false)}
         idTramite={tramite.id_tramite}
+        estadoActual={estado}
         onSuccess={onRefresh}
       />
 
-      <ModalDevolucionFormal
-        isOpen={modalDevOpen}
-        onClose={() => setModalDevOpen(false)}
+      <ModalLevantarObservacion
+        isOpen={modalLevantarObsOpen}
+        onClose={() => setModalLevantarObsOpen(false)}
         idTramite={tramite.id_tramite}
+        motivoOriginal={tramite.motivo_observacion}
+        estadoPrevio={tramite.estado_previo_observacion}
         onSuccess={onRefresh}
       />
 
-      <ModalReingresoAlcance
-        isOpen={modalAlcanceOpen}
-        onClose={() => setModalAlcanceOpen(false)}
+      <ModalDeclararInsubsistente
+        isOpen={modalInsubsistenteOpen}
+        onClose={() => setModalInsubsistenteOpen(false)}
         idTramite={tramite.id_tramite}
         codigoTramite={tramite.codigo_tramite}
         onSuccess={onRefresh}
       />
 
-      <ModalSolicitarDevolucion
-        isOpen={modalSolicitarDevOpen}
-        onClose={() => setModalSolicitarDevOpen(false)}
-        tramite={tramite}
-        currentUser={currentUser}
+      <ModalReanudarFactura
+        isOpen={modalReanudarFacturaOpen}
+        onClose={() => setModalReanudarFacturaOpen(false)}
+        idTramite={tramite.id_tramite}
+        onSuccess={onRefresh}
+      />
+
+      <ModalReasignarInteligente
+        isOpen={modalReasignarInteligenteOpen}
+        onClose={() => setModalReasignarInteligenteOpen(false)}
+        idTramite={tramite.id_tramite}
+        mensajeAlerta={reasignacionAlerta}
+        analistasDisponibles={analistasDisponibles}
         onSuccess={onRefresh}
       />
 
       <ModalReasignarDerivar
-        isOpen={modalDerivarOpen}
-        onClose={() => setModalDerivarOpen(false)}
+        isOpen={modalReasignarOpen}
+        onClose={() => setModalReasignarOpen(false)}
         tramite={tramite}
         currentUser={currentUser}
         onRefresh={onRefresh}
       />
-
-      {observacionPendiente && (
-        <ModalSubsanar
-          isOpen={modalSubsanarOpen}
-          onClose={() => setModalSubsanarOpen(false)}
-          idTramite={tramite.id_tramite}
-          idObservacion={observacionPendiente.id_observacion}
-          detalleObservacion={observacionPendiente.detalle_observacion}
-          onSuccess={onRefresh}
-        />
-      )}
     </div>
   );
 };

@@ -67,7 +67,12 @@ export async function middleware(request: NextRequest) {
     if (pathname !== "/") {
       loginUrl.searchParams.set("callbackUrl", pathname);
     }
-    return NextResponse.redirect(loginUrl);
+    const redirectResponse = NextResponse.redirect(loginUrl);
+    // Si la cookie existía pero ya expiró o no es válida, limpiarla del navegador
+    if (sessionCookie) {
+      redirectResponse.cookies.delete(SESSION_COOKIE_NAME);
+    }
+    return redirectResponse;
   }
 
   // 6. Si la ruta es la raíz "/" y está autenticado, llevar al escritorio

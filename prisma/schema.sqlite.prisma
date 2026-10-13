@@ -1,0 +1,310 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model areas {
+  id_area                                                            Int                     @id @default(autoincrement())
+  nombre                                                             String                  @unique
+  codigo                                                             String                  @unique
+  orden_flujo                                                        Int
+  activo                                                             Boolean?                @default(true)
+  created_at                                                         DateTime?               @default(now())
+  asignacion_turnos                                                  asignacion_turnos?
+  historial_movimientos_historial_movimientos_id_area_destinoToareas historial_movimientos[] @relation("historial_movimientos_id_area_destinoToareas")
+  historial_movimientos_historial_movimientos_id_area_origenToareas  historial_movimientos[] @relation("historial_movimientos_id_area_origenToareas")
+  observaciones                                                      observaciones[]
+  tramites                                                           tramites[]
+  usuarios                                                           usuarios[]
+}
+
+model asignacion_turnos {
+  id_turno                   Int       @id @default(autoincrement())
+  id_area                    Int       @unique
+  id_ultimo_usuario_asignado Int?
+  fecha_ultima_asignacion    DateTime? @default(now())
+  areas                      areas     @relation(fields: [id_area], references: [id_area], onUpdate: Restrict)
+  usuarios                   usuarios? @relation(fields: [id_ultimo_usuario_asignado], references: [id_usuario], onDelete: Restrict, onUpdate: Restrict)
+
+  @@index([id_ultimo_usuario_asignado])
+}
+
+model campos_tramite {
+  id_campo     Int       @id @default(autoincrement())
+  clave        String    @unique
+  etiqueta     String
+  tipo_dato    String    @default("TEXT")
+  departamento String    @default("GLOBAL")
+  orden        Int?      @default(0)
+  activo       Boolean?  @default(true)
+  created_at   DateTime? @default(now())
+}
+
+model documentos_tramite {
+  id_documento    Int       @id @default(autoincrement())
+  id_tramite      Int
+  tipo_documento  String?   @default("OTRO")
+  nombre_original String
+  nombre_guardado String
+  ruta_archivo    String
+  mimetype        String?   @default("application/pdf")
+  tamano_bytes    BigInt
+  id_usuario_sube Int
+  fecha_subida    DateTime? @default(now())
+  activo          Boolean?  @default(true)
+
+  @@index([id_tramite])
+}
+
+model feriados {
+  id_feriado  Int       @id @default(autoincrement())
+  fecha       DateTime  @unique
+  descripcion String
+  anio        Int
+  tipo        String?   @default("NACIONAL")
+  activo      Boolean?  @default(true)
+  created_at  DateTime? @default(now())
+
+  @@index([anio])
+  @@index([fecha])
+}
+
+model historial_movimientos {
+  id_movimiento                                               Int       @id @default(autoincrement())
+  id_tramite                                                  Int
+  id_usuario_entrega                                          Int
+  id_usuario_recibe                                           Int
+  id_area_origen                                              Int
+  id_area_destino                                             Int
+  tipo_accion                                                 String
+  comentarios                                                 String?
+  fecha_hora                                                  DateTime? @default(now())
+  areas_historial_movimientos_id_area_destinoToareas          areas     @relation("historial_movimientos_id_area_destinoToareas", fields: [id_area_destino], references: [id_area], onUpdate: Restrict)
+  areas_historial_movimientos_id_area_origenToareas           areas     @relation("historial_movimientos_id_area_origenToareas", fields: [id_area_origen], references: [id_area], onUpdate: Restrict)
+  usuarios_historial_movimientos_id_usuario_entregaTousuarios usuarios  @relation("historial_movimientos_id_usuario_entregaTousuarios", fields: [id_usuario_entrega], references: [id_usuario], onUpdate: Restrict)
+  usuarios_historial_movimientos_id_usuario_recibeTousuarios  usuarios  @relation("historial_movimientos_id_usuario_recibeTousuarios", fields: [id_usuario_recibe], references: [id_usuario], onUpdate: Restrict)
+  tramites                                                    tramites  @relation(fields: [id_tramite], references: [id_tramite], onUpdate: Restrict)
+
+  @@index([id_area_destino])
+  @@index([id_area_origen])
+  @@index([id_usuario_entrega])
+  @@index([id_usuario_recibe])
+  @@index([id_tramite])
+}
+
+model observaciones {
+  id_observacion                                                 Int       @id @default(autoincrement())
+  id_tramite                                                     Int
+  id_area_origen                                                 Int       @default(1)
+  id_usuario_origen                                              Int       @default(1)
+  id_area_destino                                                Int       @default(1)
+  id_area_reporta                                                Int
+  id_usuario_reporta                                             Int
+  detalle_observacion                                            String
+  fecha_reporte                                                  DateTime? @default(now())
+  estado_observacion                                             String?   @default("PENDIENTE")
+  respuesta_observacion                                          String?
+  id_usuario_responde                                            Int?
+  fecha_respuesta                                                DateTime?
+  respuesta_dfi                                                  String?
+  id_usuario_destino_devolucion                                  Int?
+  fecha_resolucion                                               DateTime?
+  areas                                                          areas     @relation(fields: [id_area_reporta], references: [id_area], onUpdate: Restrict)
+  usuarios_observaciones_id_usuario_destino_devolucionTousuarios usuarios? @relation("observaciones_id_usuario_destino_devolucionTousuarios", fields: [id_usuario_destino_devolucion], references: [id_usuario], onDelete: Restrict, onUpdate: Restrict)
+  usuarios_observaciones_id_usuario_reportaTousuarios            usuarios  @relation("observaciones_id_usuario_reportaTousuarios", fields: [id_usuario_reporta], references: [id_usuario], onUpdate: Restrict)
+  tramites                                                       tramites  @relation(fields: [id_tramite], references: [id_tramite], onUpdate: Restrict)
+
+  @@index([id_area_reporta])
+  @@index([id_usuario_destino_devolucion])
+  @@index([id_usuario_reporta])
+  @@index([id_tramite])
+}
+
+model parametros_sistema {
+  clave       String    @id
+  valor       String
+  descripcion String?
+  tipo_dato   String?   @default("STRING")
+  updated_at  DateTime? @default(now())
+}
+
+model reglas_campo_flujo {
+  id_regla        Int       @id @default(autoincrement())
+  clave_campo     String
+  tipo_flujo      String?   @default("TODOS")
+  id_tipo_tramite Int?
+  etapa_flujo     String
+  visibilidad     String?   @default("VISIBLE")
+  obligatoriedad  String?   @default("OPCIONAL")
+  updated_at      DateTime? @default(now())
+
+  @@index([clave_campo])
+  @@index([etapa_flujo])
+}
+
+
+
+model solicitudes_devolucion {
+  id_solicitud        Int       @id @default(autoincrement())
+  id_tramite          Int
+  id_area_solicita    Int
+  id_usuario_solicita Int
+  id_area_custodio    Int
+  id_usuario_custodio Int
+  motivo_solicitud    String
+  estado_solicitud    String?   @default("PENDIENTE")
+  respuesta_solicitud String?
+  fecha_solicitud     DateTime? @default(now())
+  fecha_respuesta     DateTime?
+
+  @@index([id_tramite])
+  @@index([id_usuario_custodio])
+}
+
+model tipos_gestion {
+  id_tipo_gestion Int       @id @default(autoincrement())
+  codigo          String    @unique
+  nombre          String
+  descripcion     String?
+  activo          Boolean?  @default(true)
+  created_at      DateTime? @default(now())
+}
+
+model tipos_tramite {
+  id_tipo_tramite              Int                    @id @default(autoincrement())
+  codigo                       String                 @unique
+  nombre                       String
+  descripcion                  String?
+  activo                       Boolean?               @default(true)
+  tipo_cur_permitido           String?                @default("DEVENGADO")
+  requiere_item_presupuestario Boolean?               @default(true)
+  requiere_factura             Boolean?               @default(true)
+  tramites                     tramites[]
+}
+
+model tramites {
+  id_tramite                        Int                     @id @default(autoincrement())
+  codigo_tramite                    String                  @unique
+  numero_quipux                     String                  @unique
+  fecha_memorando                   DateTime?
+  fecha_recepcion_fisica            DateTime?
+  id_tipo_tramite                   Int
+  tipo_flujo                        String                  @default("PAGO")
+  area_requirente                   String?
+  asunto                            String?
+  nro_tramite                       String?
+  periodo_pago                      String?
+  proveedor_beneficiario            String
+  ruc_proveedor                     String?
+  monto_total                       Decimal
+  es_alta_cuantia                   Boolean?                @default(false)
+  numero_cur_compromiso             String?
+  numero_cur_devengado              String?
+  numero_cur_contable               String?
+  numero_liquidacion                String?
+  numero_juicio                     String?
+  aprobado_presupuesto              Boolean?                @default(false)
+  fecha_aprobacion_presupuesto      DateTime?
+  id_usuario_aprobador_presupuesto  Int?
+  aprobado_contabilidad             Boolean?                @default(false)
+  fecha_aprobacion_contabilidad     DateTime?
+  id_usuario_aprobador_contabilidad Int?
+  autorizado_pago                   Boolean?                @default(false)
+  fecha_autorizacion_pago           DateTime?
+  id_usuario_autoriza_pago          Int?
+  comprobante_pago                  String?
+  fecha_pago                        DateTime?
+  ubicacion_archivo                 String?
+  certificacion_presupuestaria      String?
+  item_presupuestario               String?
+  numero_factura                    String?
+  anexos                            String?
+  fojas_fisicas                     Int?                    @default(1)
+  id_area_actual                    Int
+  id_custodio_actual                Int
+  estado_general                    String                  @default("EN_RECEPCION")
+  sub_estado                        String                  @default("RECEPCIONADO_DFI")
+  esta_pausado                      Boolean?                @default(false)
+  motivo_pausa                      String?
+  fecha_pausa                       DateTime?
+  dias_pausa_acumulados             Int?                    @default(0)
+  es_devuelto                       Boolean?                @default(false)
+  motivo_devolucion                 String?
+  fecha_ingreso                     DateTime?               @default(now())
+  fecha_ultimo_movimiento           DateTime?               @default(now())
+  fecha_ultima_modificacion         DateTime?               @default(now())
+  subtotal                          Decimal?
+  monto_iva                         Decimal?
+  monto_retenciones                 Decimal?
+  monto_multas                      Decimal?
+  fecha_factura                     DateTime?
+  lote_mef                          String?
+  spi_bce_referencia                String?
+  codigo_tomo_caja                  String?
+  estanteria                        String?
+  campos_personalizados             String?
+  historial_movimientos             historial_movimientos[]
+  observaciones                     observaciones[]
+  tramite_referencias               tramite_referencias[]
+  areas                             areas                   @relation(fields: [id_area_actual], references: [id_area], onUpdate: Restrict)
+  usuarios                          usuarios                @relation(fields: [id_custodio_actual], references: [id_usuario], onUpdate: Restrict)
+  tipos_tramite                     tipos_tramite           @relation(fields: [id_tipo_tramite], references: [id_tipo_tramite], onUpdate: Restrict)
+
+  @@index([id_area_actual])
+  @@index([id_custodio_actual])
+  @@index([id_tipo_tramite])
+}
+
+model usuarios {
+  id_usuario                                                               Int                             @id @default(autoincrement())
+  id_area                                                                  Int
+  nombre_completo                                                          String
+  correo_institucional                                                     String                          @unique
+  cargo                                                                    String
+  rol                                                                      String
+  password_hash                                                            String?
+  activo                                                                   Boolean?                        @default(true)
+  estado_disponibilidad                                                    String?                         @default("DISPONIBLE")
+  created_at                                                               DateTime?                       @default(now())
+  asignacion_turnos                                                        asignacion_turnos[]
+  historial_movimientos_historial_movimientos_id_usuario_entregaTousuarios historial_movimientos[]         @relation("historial_movimientos_id_usuario_entregaTousuarios")
+  historial_movimientos_historial_movimientos_id_usuario_recibeTousuarios  historial_movimientos[]         @relation("historial_movimientos_id_usuario_recibeTousuarios")
+  observaciones_observaciones_id_usuario_destino_devolucionTousuarios      observaciones[]                 @relation("observaciones_id_usuario_destino_devolucionTousuarios")
+  observaciones_observaciones_id_usuario_reportaTousuarios                 observaciones[]                 @relation("observaciones_id_usuario_reportaTousuarios")
+  tramites                                                                 tramites[]
+  tramite_referencias                                                      tramite_referencias[]
+  areas                                                                    areas                           @relation(fields: [id_area], references: [id_area], onUpdate: Restrict)
+
+  @@index([id_area])
+}
+
+model tramite_referencias {
+  id_referencia       Int       @id @default(autoincrement())
+  id_tramite          Int
+  tipo_documento      String
+  tipo_personalizado  String?
+  numero_documento    String
+  fecha_documento     DateTime
+  asunto_sumilla      String
+  id_usuario_registro Int
+  created_at          DateTime? @default(now())
+
+  tramites            tramites  @relation(fields: [id_tramite], references: [id_tramite], onDelete: Cascade)
+  usuarios            usuarios  @relation(fields: [id_usuario_registro], references: [id_usuario], onUpdate: Restrict)
+
+  @@index([id_tramite])
+  @@index([id_usuario_registro])
+}
+
+model catalogo_areas {
+  id_area     Int       @id @default(autoincrement())
+  nombre      String    @unique
+  codigo      String?
+  descripcion String?
+  activo      Boolean?  @default(true)
+  created_at  DateTime? @default(now())
+}

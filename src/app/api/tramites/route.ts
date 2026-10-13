@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { TramiteService } from "@/services/tramiteService";
-import { calculateTramiteSLA, getFeriadosSet } from "@/lib/slaCalculator";
+import { calculateTramiteSLA } from "@/lib/slaCalculator";
 import { getAuthenticatedUser } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
@@ -18,37 +18,76 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "No autorizado. Sesión requerida." }, { status: 401 });
     }
 
-    const whereClause: Record<string, unknown> = {};
+    const conditions: Record<string, any>[] = [];
 
     if (search.trim()) {
-      whereClause.OR = [
-        { codigo_tramite: { contains: search.trim() } },
-        { numero_quipux: { contains: search.trim() } },
-        { proveedor_beneficiario: { contains: search.trim() } },
-        { ruc_proveedor: { contains: search.trim() } },
-        { numero_factura: { contains: search.trim() } },
-      ];
+      conditions.push({
+        OR: [
+          { codigo_tramite: { contains: search.trim() } },
+          { numero_quipux: { contains: search.trim() } },
+          { proveedor_beneficiario: { contains: search.trim() } },
+          { ruc_proveedor: { contains: search.trim() } },
+          { numero_factura: { contains: search.trim() } },
+          { area_requirente: { contains: search.trim() } },
+          { asunto: { contains: search.trim() } },
+        ],
+      });
     }
 
-    if (tipo === "escritorio" && currentUser) {
-      // Trámites asignados directamente al usuario o a su departamento si es jefe
-      if (currentUser.rol === "ADMIN") {
-        // Admin ve todos
-      } else if (currentUser.rol === "JEFE" || currentUser.rol === "DIRECTORA") {
-        whereClause.OR = [
-          { id_custodio_actual: currentUser.id_usuario },
-          { id_area_actual: currentUser.id_area },
-        ];
-      } else {
-        whereClause.id_custodio_actual = currentUser.id_usuario;
+    // Filtros de Mi Escritorio (estrictamente limitados a lo que le corresponde al usuario en su bandeja)
+    if (tipo !== "todos" && currentUser) {
+      const userRole = (currentUser.rol || "").toUpperCase();
+
+      // Condición de pertenencia al escritorio/área del usuario (salvo ADMIN)
+      if (userRole !== "ADMIN" && userRole !== "ADMINISTRADOR") {
+        if (userRole === "JEFE" || userRole === "DIRECTORA") {
+          conditions.push({
+            OR: [
+              { id_custodio_actual: currentUser.id_usuario },
+              { id_area_actual: currentUser.id_area },
+            ],
+          });
+        } else {
+          // Analista / Secretaria
+          conditions.push({
+            id_custodio_actual: currentUser.id_usuario,
+          });
+        }
       }
-    } else if (tipo === "observados") {
-      whereClause.estado_general = "OBSERVADO_72H";
-    } else if (tipo === "pausados") {
-      whereClause.esta_pausado = true;
-    } else if (tipo === "finalizados") {
-      whereClause.estado_general = "FINALIZADO_ARCHIVADO";
+
+      if (tipo === "ingresados") {
+        // Exclusivo para DFI: trámites en estado INGRESADO para despacho por lote
+        conditions.push({ estado_general: "INGRESADO" });
+      } else if (tipo === "observados") {
+        // Trámites observados o pausados en la bandeja del usuario
+        conditions.push({
+          OR: [
+            { estado_general: "OBSERVADO" },
+            { estado_general: "OBSERVADO_72H" },
+            { esta_pausado: true },
+          ],
+        });
+      } else if (tipo === "caja") {
+        // Trámites en caja en la bandeja del usuario
+        conditions.push({
+          OR: [
+            { estado_general: "CAJA" },
+            { sub_estado: "EN_CAJA" },
+            { id_caja: { not: null } },
+          ],
+        });
+      } else {
+        // tipo === "escritorio" ("En Mi Gestión")
+        // Trámites activos en mi bandeja (no archivados ni anulados)
+        conditions.push({
+          NOT: {
+            estado_general: { in: ["ARCHIVO", "FINALIZADO_ARCHIVADO", "ANULADO"] },
+          },
+        });
+      }
     }
+
+    const whereClause: Record<string, any> = conditions.length > 0 ? { AND: conditions } : {};
 
     // Consulta ordenada estrictamente por fecha_ultimo_movimiento DESC (prioridad por Última Novedad)
     const tramites = await prisma.tramites.findMany({
@@ -57,19 +96,17 @@ export async function GET(request: NextRequest) {
         areas: true,
         usuarios: true,
         tipos_tramite: true,
+        caja: true,
       },
       orderBy: {
         fecha_ultimo_movimiento: "desc",
       },
     });
 
-    // Precargar catálogo de feriados desde memoria una sola vez para toda la lista (0ms de I/O en bucle)
-    const feriadosSet = await getFeriadosSet();
-
     // Calcular SLA para cada trámite
     const tramitesConSLA = await Promise.all(
       tramites.map(async (t) => {
-        const sla = await calculateTramiteSLA(t, feriadosSet);
+        const sla = await calculateTramiteSLA(t);
         return {
           ...t,
           sla,
@@ -93,64 +130,75 @@ export async function POST(request: NextRequest) {
     if (!currentUser) {
       return NextResponse.json({ error: "No autorizado. Sesión requerida para registrar trámites." }, { status: 401 });
     }
+    const currentUserId = currentUser.id_usuario;
+    const userRole = (currentUser.rol || "").toUpperCase();
+    const isDFIOrAdmin =
+      currentUser.id_area === 1 ||
+      ["DIRECTORA", "SECRETARIA", "DIRECTORA_FINANCIERA", "SECRETARIA_DFI"].includes(userRole) ||
+      ["ADMIN", "ADMINISTRADOR"].includes(userRole);
 
-    // RBAC Institucional: Solo Directora Financiera y Secretaría DFI (o Admin) pueden ingresar nuevos expedientes
-    const rolesAutorizados = ["DIRECTORA", "SECRETARIA", "ADMIN"];
-    if (!rolesAutorizados.includes(currentUser.rol)) {
+    if (!isDFIOrAdmin) {
       return NextResponse.json(
-        {
-          error:
-            "Acceso denegado: El ingreso y creación de nuevos expedientes en Recepción DFI está reservado exclusivamente a la Directora Financiera y Secretaría DFI.",
-        },
+        { error: "Permiso denegado. Solo personal de Dirección Financiera (DFI - Secretaría/Directora) o Administrador puede crear trámites." },
         { status: 403 }
       );
     }
-    const currentUserId = currentUser.id_usuario;
 
     const body = await request.json();
 
     const {
+      padre_gestion,
       tipo_gestion,
       numero_quipux,
+      area_requirente,
+      asunto,
       fecha_memorando,
       fecha_recepcion_fisica,
       id_tipo_tramite,
       proveedor_beneficiario,
       ruc_proveedor,
       subtotal,
-      monto_iva,
-      monto_retenciones,
-      monto_multas,
-      monto_total,
-      numero_factura,
-      fecha_factura,
       comentarios,
     } = body;
 
-    if (!numero_quipux || !id_tipo_tramite || !proveedor_beneficiario || monto_total === undefined) {
+    const padre = (padre_gestion || "PAGO").toUpperCase();
+    const tipo = tipo_gestion || "PAGO";
+
+    // Validaciones base obligatorias para todos
+    if (!numero_quipux?.trim() || !id_tipo_tramite || !area_requirente?.trim() || !asunto?.trim()) {
       return NextResponse.json(
-        { error: "Faltan campos obligatorios para el ingreso del trámite" },
+        { error: "Número Quipux, Área Requirente, Asunto y Tipo de Proceso son obligatorios." },
         { status: 400 }
       );
     }
 
+    // Si es TIPO PAGO - PAGO: Proveedor, RUC y Subtotal son OBLIGATORIOS
+    const esPagoPago = padre === "PAGO" && tipo === "PAGO";
+    if (esPagoPago) {
+      if (!proveedor_beneficiario?.trim() || !ruc_proveedor?.trim() || subtotal === undefined || subtotal === null || Number(subtotal) <= 0) {
+        return NextResponse.json(
+          { error: "Para trámites PAGO - PAGO es obligatorio registrar Razón Social/Proveedor, RUC y Subtotal mayor a 0." },
+          { status: 400 }
+        );
+      }
+    }
+
+    const sub = subtotal ? Number(subtotal) : 0;
+
     const nuevoTramite = await TramiteService.crearTramite({
-      tipo_gestion: tipo_gestion || "PAGO",
-      numero_quipux,
-      fecha_memorando,
-      fecha_recepcion_fisica,
+      padre_gestion: padre,
+      tipo_gestion: tipo,
+      numero_quipux: numero_quipux.trim(),
+      area_requirente: area_requirente.trim(),
+      asunto: asunto.trim(),
+      fecha_memorando: fecha_memorando || new Date(),
+      fecha_recepcion_fisica: fecha_recepcion_fisica || new Date(),
       id_tipo_tramite: Number(id_tipo_tramite),
-      proveedor_beneficiario,
-      ruc_proveedor,
-      subtotal: subtotal ? Number(subtotal) : undefined,
-      monto_iva: monto_iva ? Number(monto_iva) : undefined,
-      monto_retenciones: monto_retenciones ? Number(monto_retenciones) : undefined,
-      monto_multas: monto_multas ? Number(monto_multas) : undefined,
-      monto_total: Number(monto_total),
-      numero_factura,
-      fecha_factura,
+      proveedor_beneficiario: proveedor_beneficiario?.trim() || "N/A",
+      ruc_proveedor: ruc_proveedor?.trim() || null,
+      subtotal: sub,
       id_usuario_creador: currentUserId,
-      comentarios,
+      comentarios: comentarios?.trim() || "",
     });
 
     return NextResponse.json({ success: true, tramite: nuevoTramite }, { status: 201 });

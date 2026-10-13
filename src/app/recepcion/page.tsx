@@ -1,17 +1,31 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { formatCurrency } from "@/lib/utils";
-import { FilePlus2, DollarSign, Building, AlertCircle, CheckCircle2 } from "lucide-react";
+import { FilePlus2, DollarSign, AlertCircle, FileText, ShieldCheck } from "lucide-react";
+import { SearchableSelect } from "@/components/ui/SearchableSelect";
+
+const GESTIONES_PADRE = [
+  { codigo: "PAGO", nombre: "TIPO PAGO", descripcion: "Trámites con afectación presupuestaria o expedientes de pago" },
+  { codigo: "GARANTIA", nombre: "TIPO GARANTIA", descripcion: "Garantías aduaneras, cauciones, juicios y devoluciones" },
+];
 
 export default function RecepcionPage() {
   const router = useRouter();
   const [tiposProceso, setTiposProceso] = useState<any[]>([]);
   const [loadingTipos, setLoadingTipos] = useState(true);
+  const [areas, setAreas] = useState<any[]>([]);
+  const [loadingAreas, setLoadingAreas] = useState(true);
 
-  // Form State
-  const [tipoGestion, setTipoGestion] = useState("PAGO");
+  // Form State: Jerarquía Padre - Hijo
+  const [padreGestion, setPadreGestion] = useState<"PAGO" | "GARANTIA">("PAGO");
+  const [tipoGestion, setTipoGestion] = useState<string>("PAGO");
+  const [catalogoGestiones, setCatalogoGestiones] = useState<any[]>([]);
+
+  // Datos del Documento
+  const [areaRequirente, setAreaRequirente] = useState("");
+  const [asunto, setAsunto] = useState("");
   const [numeroQuipux, setNumeroQuipux] = useState("");
   const [fechaMemorando, setFechaMemorando] = useState(
     new Date().toISOString().split("T")[0]
@@ -20,90 +34,153 @@ export default function RecepcionPage() {
     new Date().toISOString().split("T")[0]
   );
   const [idTipoTramite, setIdTipoTramite] = useState<string>("");
+
+  // Datos Económicos (Solo Proveedor, RUC y Subtotal)
   const [proveedor, setProveedor] = useState("");
   const [ruc, setRuc] = useState("");
   const [subtotal, setSubtotal] = useState<string>("0");
-  const [iva, setIva] = useState<string>("0");
-  const [retenciones, setRetenciones] = useState<string>("0");
-  const [multas, setMultas] = useState<string>("0");
-  const [montoTotal, setMontoTotal] = useState<string>("0");
-  const [numeroFactura, setNumeroFactura] = useState("");
-  const [fechaFactura, setFechaFactura] = useState("");
   const [comentarios, setComentarios] = useState("");
 
-  const [isAutoCalculating, setIsAutoCalculating] = useState(true);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [authorized, setAuthorized] = useState<boolean | null>(null);
+  const [authChecking, setAuthChecking] = useState(true);
 
+  // Protección de acceso: solo DFI (Directora, Secretaria) y ADMIN
   useEffect(() => {
-    async function checkAuthAndLoad() {
+    async function checkAuth() {
       try {
-        const sessionRes = await fetch("/api/auth/session");
-        const sessionData = await sessionRes.json();
-        const user = sessionData?.user;
-        if (!user || !["DIRECTORA", "SECRETARIA", "ADMIN"].includes(user.rol)) {
-          setAuthorized(false);
+        const res = await fetch("/api/auth/session");
+        const data = await res.json();
+        const user = data.user || data.usuario;
+        if (!user) {
+          router.replace("/login");
           return;
         }
-        setAuthorized(true);
+        const userRole = (user.rol || "").toUpperCase();
+        const isDFIOrAdmin =
+          user.id_area === 1 ||
+          ["DIRECTORA", "SECRETARIA", "DIRECTORA_FINANCIERA", "SECRETARIA_DFI"].includes(userRole) ||
+          ["ADMIN", "ADMINISTRADOR"].includes(userRole);
 
-        const res = await fetch("/api/admin/procesos");
-        const data = await res.json();
-        if (data.tipos) {
-          setTiposProceso(data.tipos);
-          if (data.tipos.length > 0) {
-            setIdTipoTramite(String(data.tipos[0].id_tipo_tramite));
-          }
+        if (!isDFIOrAdmin) {
+          router.replace("/escritorio");
+          return;
         }
+        setAuthChecking(false);
       } catch (err) {
-        console.error(err);
-      } finally {
-        setLoadingTipos(false);
+        console.error("Error verificando permisos:", err);
+        router.replace("/escritorio");
       }
     }
-    checkAuthAndLoad();
+    checkAuth();
+  }, [router]);
+
+  // Cargar catálogos
+  useEffect(() => {
+    async function loadCatalogos() {
+      try {
+        const [resP, resA, resG] = await Promise.all([
+          fetch("/api/admin/procesos"),
+          fetch("/api/admin/catalogos?tipo=areas"),
+          fetch("/api/admin/catalogos?tipo=gestion"),
+        ]);
+        const [dataP, dataA, dataG] = await Promise.all([resP.json(), resA.json(), resG.json()]);
+        if (dataP.tipos) {
+          setTiposProceso(dataP.tipos);
+          if (dataP.tipos.length > 0) {
+            setIdTipoTramite(String(dataP.tipos[0].id_tipo_tramite));
+          }
+        }
+        if (dataA.items) {
+          setAreas(dataA.items);
+        }
+        if (dataG.items) {
+          setCatalogoGestiones(dataG.items.filter((item: any) => item.activo !== false));
+        }
+      } catch (err) {
+        console.error("Error cargando catálogos:", err);
+      } finally {
+        setLoadingTipos(false);
+        setLoadingAreas(false);
+      }
+    }
+    loadCatalogos();
   }, []);
 
-  // Recalcular monto total automáticamente
-  const sub = parseFloat(subtotal) || 0;
-  const iv = parseFloat(iva) || 0;
-  const ret = parseFloat(retenciones) || 0;
-  const mul = parseFloat(multas) || 0;
-  const totalCalculado = Math.max(0, sub + iv - ret - mul);
+  // Opciones de subtipos dependientes del padre seleccionado
+  const subtiposDisponibles = useMemo(() => {
+    if (catalogoGestiones.length > 0) {
+      return catalogoGestiones.filter((g) => (g.padre || "PAGO").toUpperCase() === padreGestion);
+    }
+    // Fallback estándar oficial si no ha cargado la base
+    if (padreGestion === "PAGO") {
+      return [
+        { codigo: "PAGO", nombre: "PAGO" },
+        { codigo: "EXPEDIENTE", nombre: "EXPEDIENTE" },
+        { codigo: "JUSTIFICACION", nombre: "JUSTIFICACION" },
+      ];
+    } else {
+      return [
+        { codigo: "CAUCION", nombre: "Caución" },
+        { codigo: "DEV_CAUCION", nombre: "Devolución de caución" },
+        { codigo: "DEV_VALORES", nombre: "Devolución de valores" },
+        { codigo: "GARANTIA", nombre: "Garantia" },
+        { codigo: "JUICIO", nombre: "Juicio" },
+        { codigo: "PAGO_INDEBIDO", nombre: "Pago indebido" },
+        { codigo: "PROCESO_COACTIVO", nombre: "Proceso coactivo" },
+        { codigo: "REPARACION_ECONOMICA", nombre: "Reparación Económica" },
+        { codigo: "SENTENCIA", nombre: "Sentencia" },
+      ];
+    }
+  }, [padreGestion, catalogoGestiones]);
 
-  const finalTotal = isAutoCalculating ? totalCalculado : parseFloat(montoTotal) || 0;
-  const esAltaCuantia = finalTotal >= 10000;
+  // Sincronizar selección de subtipo cuando cambia el padre
+  useEffect(() => {
+    if (subtiposDisponibles.length > 0) {
+      setTipoGestion(subtiposDisponibles[0].nombre || subtiposDisponibles[0].codigo);
+    }
+  }, [padreGestion, subtiposDisponibles]);
+
+  // Reglas de negocio: Condicionamiento de obligatoriedad
+  const esPagoPrincipal = padreGestion === "PAGO" && (tipoGestion === "PAGO" || tipoGestion === "PAGO_PAGO");
+  const sub = parseFloat(subtotal) || 0;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!numeroQuipux.trim() || !proveedor.trim() || !idTipoTramite) {
-      setError("Por favor complete los campos obligatorios del ingreso.");
+    setError(null);
+
+    // Validaciones base
+    if (!numeroQuipux.trim() || !idTipoTramite || !areaRequirente.trim() || !asunto.trim()) {
+      setError("Por favor complete los campos obligatorios del ingreso (Quipux, Fechas, Área, Proceso y Asunto).");
       return;
     }
 
+    // Validación condicional para TIPO PAGO - PAGO
+    if (esPagoPrincipal) {
+      if (!proveedor.trim() || !ruc.trim() || sub <= 0) {
+        setError("Para el tipo PAGO - PAGO es OBLIGATORIO ingresar Razón Social / Proveedor, RUC y un Subtotal mayor a 0.");
+        return;
+      }
+    }
+
     setLoading(true);
-    setError(null);
 
     try {
       const res = await fetch("/api/tramites", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
+          padre_gestion: padreGestion,
           tipo_gestion: tipoGestion,
           numero_quipux: numeroQuipux.trim(),
+          area_requirente: areaRequirente.trim(),
+          asunto: asunto.trim(),
           fecha_memorando: fechaMemorando,
           fecha_recepcion_fisica: fechaRecepcion,
           id_tipo_tramite: parseInt(idTipoTramite, 10),
-          proveedor_beneficiario: proveedor.trim(),
-          ruc_proveedor: ruc.trim(),
+          proveedor_beneficiario: proveedor.trim() || "N/A",
+          ruc_proveedor: ruc.trim() || null,
           subtotal: sub,
-          monto_iva: iv,
-          monto_retenciones: ret,
-          monto_multas: mul,
-          monto_total: finalTotal,
-          numero_factura: numeroFactura.trim(),
-          fecha_factura: fechaFactura || null,
           comentarios: comentarios.trim(),
         }),
       });
@@ -111,11 +188,8 @@ export default function RecepcionPage() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Error al registrar trámite");
 
-      if (data.tramite) {
-        router.push(`/tramite/${data.tramite.id_tramite}`);
-      } else {
-        router.push("/escritorio");
-      }
+      // Redirigir a Mi Escritorio donde queda en estado INGRESADO
+      router.push("/escritorio");
     } catch (err: any) {
       setError(err.message);
     } finally {
@@ -123,22 +197,13 @@ export default function RecepcionPage() {
     }
   };
 
-  if (authorized === false) {
+  if (authChecking) {
     return (
-      <div className="max-w-xl mx-auto mt-12 bg-white p-8 rounded-xl border border-rose-200 shadow-xs text-center space-y-4">
-        <div className="w-12 h-12 rounded-full bg-rose-100 text-rose-600 flex items-center justify-center mx-auto">
-          <AlertCircle className="w-6 h-6" />
-        </div>
-        <h2 className="text-base font-bold text-slate-900">Acceso Restringido a Recepción DFI</h2>
-        <p className="text-xs text-slate-600 leading-relaxed">
-          De acuerdo con el flujo normativo de Control Previo (SENAE-ME-3-6-001), el ingreso y recepción de expedientes físicos está reservado exclusivamente a la <strong>Directora Financiera</strong> y <strong>Secretaría DFI</strong>.
-        </p>
-        <button
-          onClick={() => router.push("/escritorio")}
-          className="px-4 py-2 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors"
-        >
-          Volver a Mi Escritorio
-        </button>
+      <div className="p-16 text-center text-xs text-slate-500 flex flex-col items-center justify-center gap-3 min-h-[400px]">
+        <div className="w-6 h-6 border-2 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+        <span className="uppercase font-semibold tracking-wider text-slate-600">
+          Verificando autorizaciones de Recepción DFI...
+        </span>
       </div>
     );
   }
@@ -155,25 +220,48 @@ export default function RecepcionPage() {
             </h1>
           </div>
           <p className="text-xs text-slate-500 mt-1">
-            Registro inicial de expedientes físicos que ingresan a la Dirección Financiera.
+            Registro inicial de expedientes físicos por Secretaría. El trámite se registra en estado{" "}
+            <span className="font-semibold text-blue-700">INGRESADO</span> en su bandeja personal sin autoasignación.
           </p>
         </div>
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-6">
         {error && (
-          <div className="p-3 bg-rose-50 border border-rose-200 text-rose-700 text-xs rounded-lg font-medium">
-            {error}
+          <div className="p-3 bg-rose-50 border border-rose-200 text-rose-700 text-xs rounded-lg font-medium flex items-center gap-2">
+            <AlertCircle className="w-4 h-4 shrink-0 text-rose-600" />
+            <span>{error}</span>
           </div>
         )}
 
-        {/* Bloque 1: Datos de Recepción */}
+        {/* Bloque 1: Clasificación Jerárquica (Padre - Hijo) */}
         <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-xs space-y-4">
-          <h2 className="text-xs font-bold uppercase tracking-wider text-slate-800 border-b border-slate-100 pb-2">
-            1. Datos de Recepción y Radicación Quipux
-          </h2>
+          <div className="flex items-center justify-between border-b border-slate-100 pb-2">
+            <h2 className="text-xs font-bold uppercase tracking-wider text-slate-800 flex items-center gap-2">
+              <ShieldCheck className="w-4 h-4 text-blue-600" />
+              1. Clasificación de la Gestión (Jerarquía Oficial SENAE)
+            </h2>
+            <span className="text-[11px] font-semibold text-slate-500">Paso 1 de 3</span>
+          </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 mb-1">
+                Gestión *
+              </label>
+              <select
+                value={padreGestion}
+                onChange={(e) => setPadreGestion(e.target.value as "PAGO" | "GARANTIA")}
+                className="w-full text-xs bg-slate-50 border border-slate-300 rounded-lg p-2.5 font-bold text-slate-900 focus:ring-2 focus:ring-blue-500 focus:outline-none"
+              >
+                {GESTIONES_PADRE.map((gp) => (
+                  <option key={gp.codigo} value={gp.codigo}>
+                    {gp.nombre}
+                  </option>
+                ))}
+              </select>
+            </div>
+
             <div>
               <label className="block text-xs font-semibold text-slate-700 mb-1">
                 Tipo de Gestión *
@@ -181,13 +269,29 @@ export default function RecepcionPage() {
               <select
                 value={tipoGestion}
                 onChange={(e) => setTipoGestion(e.target.value)}
-                className="w-full text-xs bg-white border border-slate-300 rounded-lg p-2.5 focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                className="w-full text-xs bg-white border border-slate-300 rounded-lg p-2.5 font-semibold text-slate-800 focus:ring-2 focus:ring-blue-500 focus:outline-none"
               >
-                <option value="PAGO">PAGO</option>
-                <option value="EXPEDIENTE">EXPEDIENTE</option>
+                {subtiposDisponibles.map((st) => (
+                  <option key={st.codigo || st.nombre} value={st.nombre || st.codigo}>
+                    {st.nombre || st.codigo}
+                  </option>
+                ))}
               </select>
             </div>
+          </div>
+        </div>
 
+        {/* Bloque 2: Radicación Quipux y Datos del Documento */}
+        <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-xs space-y-4">
+          <div className="flex items-center justify-between border-b border-slate-100 pb-2">
+            <h2 className="text-xs font-bold uppercase tracking-wider text-slate-800 flex items-center gap-2">
+              <FileText className="w-4 h-4 text-blue-600" />
+              2. Datos del Documento y Radicación Quipux
+            </h2>
+            <span className="text-[11px] font-semibold text-slate-500">Paso 2 de 3</span>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <div>
               <label className="block text-xs font-semibold text-slate-700 mb-1">
                 Número Quipux Oficial *
@@ -228,36 +332,82 @@ export default function RecepcionPage() {
               />
             </div>
 
+            <div className="sm:col-span-1">
+              <label className="block text-xs font-semibold text-slate-700 mb-1">
+                Área Requirente / Solicitante *
+              </label>
+              <SearchableSelect
+                options={areas.map((a) => ({
+                  value: a.nombre,
+                  label: a.nombre,
+                  sublabel: a.codigo ? `Código: ${a.codigo}` : undefined,
+                }))}
+                value={areaRequirente}
+                onChange={setAreaRequirente}
+                placeholder="Seleccione o busque el área..."
+                searchPlaceholder="Escriba para filtrar áreas..."
+                disabled={loadingAreas}
+                required
+              />
+            </div>
+
             <div className="sm:col-span-2">
               <label className="block text-xs font-semibold text-slate-700 mb-1">
                 Tipo de Proceso Normativo (SENAE) *
               </label>
-              <select
+              <SearchableSelect
+                options={tiposProceso.map((t) => ({
+                  value: String(t.id_tipo_tramite),
+                  label: t.nombre,
+                  sublabel: t.descripcion || undefined,
+                }))}
                 value={idTipoTramite}
-                onChange={(e) => setIdTipoTramite(e.target.value)}
+                onChange={setIdTipoTramite}
+                placeholder="Seleccione o busque el proceso normativo..."
+                searchPlaceholder="Buscar proceso..."
                 disabled={loadingTipos}
-                className="w-full text-xs bg-white border border-slate-300 rounded-lg p-2.5 focus:ring-2 focus:ring-blue-500 focus:outline-none"
-              >
-                {tiposProceso.map((t) => (
-                  <option key={t.id_tipo_tramite} value={t.id_tipo_tramite}>
-                    {t.nombre} ({t.codigo})
-                  </option>
-                ))}
-              </select>
+                required
+              />
+            </div>
+
+            <div className="sm:col-span-3">
+              <div className="flex items-center justify-between mb-1">
+                <label className="block text-xs font-semibold text-slate-700">
+                  Asunto del Trámite *
+                </label>
+                <span className="text-[10px] text-slate-400">Cuadro de texto auto-expandible</span>
+              </div>
+              <textarea
+                value={asunto}
+                onChange={(e) => setAsunto(e.target.value)}
+                onInput={(e) => {
+                  const target = e.currentTarget;
+                  target.style.height = "auto";
+                  target.style.height = `${Math.max(68, target.scrollHeight)}px`;
+                }}
+                placeholder="Describa el objeto, motivo o requerimiento del trámite..."
+                rows={2}
+                className="w-full text-xs bg-white border border-slate-300 rounded-lg p-2.5 focus:ring-2 focus:ring-blue-500 focus:outline-none transition-all resize-none min-h-[68px]"
+                required
+              />
             </div>
           </div>
         </div>
 
-        {/* Bloque 2: Proveedor y Factura */}
+        {/* Bloque 3: Datos del Beneficiario y Subtotal */}
         <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-xs space-y-4">
-          <h2 className="text-xs font-bold uppercase tracking-wider text-slate-800 border-b border-slate-100 pb-2">
-            2. Beneficiario / Proveedor y Facturación SRI
-          </h2>
+          <div className="flex items-center justify-between border-b border-slate-100 pb-2">
+            <h2 className="text-xs font-bold uppercase tracking-wider text-slate-800 flex items-center gap-2">
+              <DollarSign className="w-4 h-4 text-emerald-600" />
+              3. Beneficiario y Valor Económico (Subtotal)
+            </h2>
+            <span className="text-[11px] font-semibold text-slate-500">Paso 3 de 3</span>
+          </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <div>
               <label className="block text-xs font-semibold text-slate-700 mb-1">
-                Razón Social / Proveedor Beneficiario *
+                Razón Social / Proveedor Beneficiario {esPagoPrincipal ? "*" : "(Opcional)"}
               </label>
               <input
                 type="text"
@@ -265,13 +415,13 @@ export default function RecepcionPage() {
                 onChange={(e) => setProveedor(e.target.value)}
                 placeholder="Nombre de la empresa o contratista..."
                 className="w-full text-xs bg-white border border-slate-300 rounded-lg p-2.5 focus:ring-2 focus:ring-blue-500 focus:outline-none"
-                required
+                required={esPagoPrincipal}
               />
             </div>
 
             <div>
               <label className="block text-xs font-semibold text-slate-700 mb-1">
-                RUC del Proveedor (13 dígitos)
+                RUC del Proveedor (13 dígitos) {esPagoPrincipal ? "*" : "(Opcional)"}
               </label>
               <input
                 type="text"
@@ -280,130 +430,28 @@ export default function RecepcionPage() {
                 placeholder="ej. 0992384729001"
                 maxLength={13}
                 className="w-full text-xs bg-white border border-slate-300 rounded-lg p-2.5 font-mono focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                required={esPagoPrincipal}
               />
             </div>
 
             <div>
               <label className="block text-xs font-semibold text-slate-700 mb-1">
-                Número de Factura Oficial (opcional en recepción)
-              </label>
-              <input
-                type="text"
-                value={numeroFactura}
-                onChange={(e) => setNumeroFactura(e.target.value)}
-                placeholder="001-002-000123456"
-                className="w-full text-xs bg-white border border-slate-300 rounded-lg p-2.5 font-mono focus:ring-2 focus:ring-blue-500 focus:outline-none"
-              />
-            </div>
-
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">
-                Fecha de Emisión de Factura
-              </label>
-              <input
-                type="date"
-                value={fechaFactura}
-                onChange={(e) => setFechaFactura(e.target.value)}
-                className="w-full text-xs bg-white border border-slate-300 rounded-lg p-2.5 focus:ring-2 focus:ring-blue-500 focus:outline-none"
-              />
-            </div>
-          </div>
-        </div>
-
-        {/* Bloque 3: Valores Económicos y Asignación Automática */}
-        <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-xs space-y-4">
-          <h2 className="text-xs font-bold uppercase tracking-wider text-slate-800 border-b border-slate-100 pb-2">
-            3. Liquidación Financiera y Asignación por Cuantía
-          </h2>
-
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">
-                Subtotal ($) *
+                Subtotal ($) {esPagoPrincipal ? "*" : "(Opcional)"}
               </label>
               <input
                 type="number"
                 step="0.01"
+                min="0"
                 value={subtotal}
                 onChange={(e) => setSubtotal(e.target.value)}
-                className="w-full text-xs bg-white border border-slate-300 rounded-lg p-2.5 font-mono focus:ring-2 focus:ring-blue-500 focus:outline-none"
-                required
+                className="w-full text-xs bg-white border border-slate-300 rounded-lg p-2.5 font-mono font-bold focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                required={esPagoPrincipal}
               />
-            </div>
-
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">
-                IVA ($)
-              </label>
-              <input
-                type="number"
-                step="0.01"
-                value={iva}
-                onChange={(e) => setIva(e.target.value)}
-                className="w-full text-xs bg-white border border-slate-300 rounded-lg p-2.5 font-mono focus:ring-2 focus:ring-blue-500 focus:outline-none"
-              />
-            </div>
-
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">
-                Retenciones ($)
-              </label>
-              <input
-                type="number"
-                step="0.01"
-                value={retenciones}
-                onChange={(e) => setRetenciones(e.target.value)}
-                className="w-full text-xs bg-white border border-slate-300 rounded-lg p-2.5 font-mono focus:ring-2 focus:ring-blue-500 focus:outline-none"
-              />
-            </div>
-
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">
-                Multas ($)
-              </label>
-              <input
-                type="number"
-                step="0.01"
-                value={multas}
-                onChange={(e) => setMultas(e.target.value)}
-                className="w-full text-xs bg-white border border-slate-300 rounded-lg p-2.5 font-mono focus:ring-2 focus:ring-blue-500 focus:outline-none"
-              />
-            </div>
-          </div>
-
-          {/* Caja de Regla de Asignación por Cuantía */}
-          <div
-            className={`p-4 rounded-xl border flex items-start gap-3 transition-colors ${
-              esAltaCuantia
-                ? "bg-amber-50/80 border-amber-300 text-amber-900"
-                : "bg-blue-50/80 border-blue-200 text-blue-900"
-            }`}
-          >
-            <AlertCircle className={`w-5 h-5 shrink-0 mt-0.5 ${esAltaCuantia ? "text-amber-600" : "text-blue-600"}`} />
-            <div className="space-y-1 text-xs">
-              <div className="flex items-center gap-2">
-                <span className="font-bold">Monto Total a Pagar Calculado:</span>
-                <span className="font-mono text-sm font-bold">{formatCurrency(finalTotal)}</span>
-              </div>
-              <div>
-                <span className="font-semibold">Regla de Asignación Automática: </span>
-                {esAltaCuantia ? (
-                  <span className="font-semibold text-amber-800">
-                    Monto ≥ $10.000 (Alta Cuantía) → Asignación automática obligatoria al{" "}
-                    <strong>Jefe de Presupuesto</strong>.
-                  </span>
-                ) : (
-                  <span className="text-blue-800">
-                    Monto &lt; $10.000 → Asignación rotativa automática (<strong>Round-Robin</strong>)
-                    entre los Analistas de Presupuesto con estado Activo.
-                  </span>
-                )}
-              </div>
             </div>
           </div>
         </div>
 
-        {/* Botones */}
+        {/* Botones de Acción */}
         <div className="flex justify-end gap-3">
           <button
             type="button"
@@ -416,9 +464,9 @@ export default function RecepcionPage() {
           <button
             type="submit"
             disabled={loading}
-            className="px-6 py-2.5 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors shadow-xs"
+            className="px-6 py-2.5 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors shadow-xs flex items-center gap-2"
           >
-            {loading ? "Radicando Trámite..." : "Radicar e Ingresar Trámite a Presupuesto"}
+            {loading ? "Registrando Trámite..." : "Registrar Trámite en Mi Escritorio"}
           </button>
         </div>
       </form>

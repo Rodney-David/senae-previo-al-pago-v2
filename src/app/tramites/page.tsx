@@ -1,7 +1,6 @@
 "use client";
 
-import React, { useEffect, useState, useCallback } from "react";
-import Link from "next/link";
+import React, { useEffect, useState, useCallback, useMemo } from "react";
 import { TramiteCompletoDTO, UsuarioInstitucional } from "@/types";
 import { formatCurrency, formatDate } from "@/lib/utils";
 import { BadgeEstado } from "@/components/ui/BadgeEstado";
@@ -25,6 +24,16 @@ export default function TramitesCatalogoPage() {
       .then((d) => setCurrentUser(d.user || d.usuario || null))
       .catch((err) => console.error("Error loading session:", err));
   }, []);
+
+  const canAnular = useMemo(() => {
+    if (!currentUser) return false;
+    const rol = (currentUser.rol || "").toUpperCase();
+    return (
+      currentUser.id_area === 1 ||
+      ["DIRECTORA", "SECRETARIA", "DIRECTORA_FINANCIERA", "SECRETARIA_DFI"].includes(rol) ||
+      ["ADMIN", "ADMINISTRADOR"].includes(rol)
+    );
+  }, [currentUser]);
 
   const fetchTramites = useCallback(async () => {
     setLoading(true);
@@ -143,7 +152,7 @@ export default function TramitesCatalogoPage() {
       </div>
 
       {/* Responsive Table Container with Horizontal Scroll */}
-      <div className="bg-white border border-slate-200 rounded-xl overflow-x-auto shadow-xs table-scroll">
+      <div className="bg-white border border-slate-200 rounded-xl overflow-x-auto shadow-xs">
         {loading ? (
           <div className="p-12 text-center text-xs text-slate-500 flex flex-col items-center gap-2">
             <RefreshCw className="w-5 h-5 animate-spin text-blue-600" />
@@ -154,107 +163,113 @@ export default function TramitesCatalogoPage() {
             No se encontraron trámites que coincidan con los filtros de búsqueda.
           </div>
         ) : (
-          <table className="min-w-[880px] w-full border-collapse text-xs">
+          <table className="min-w-[1000px] w-full border-collapse">
             <thead>
-              <tr className="border-b border-slate-200 bg-slate-50/90 text-[10px] font-bold text-slate-700 uppercase tracking-wider">
-                <th className="py-2.5 px-3 text-left w-32 min-w-[115px]">CÓDIGO / QUIPUX</th>
-                <th className="py-2.5 px-3 text-left min-w-[140px] max-w-[200px]">BENEFICIARIO / RUC</th>
-                <th className="py-2.5 px-3 text-left w-32 min-w-[110px] max-w-[145px]">TIPO PROCESO</th>
-                <th className="py-2.5 px-2 text-center w-24 min-w-[85px]">MONTO TOTAL</th>
-                <th className="py-2.5 px-2 text-center w-32 min-w-[110px] max-w-[140px]">ÁREA / CUSTODIO</th>
-                <th className="py-2.5 px-1.5 text-center w-20 min-w-[70px]">SLA (6D)</th>
-                <th className="py-2.5 px-2 text-center w-36 min-w-[115px] max-w-[140px]">ESTADO</th>
-                <th className="py-2.5 px-2.5 text-center w-24 min-w-[80px] sticky right-0 bg-slate-50 border-l border-slate-200/80 z-10 shadow-xs">ACCIONES</th>
+              <tr className="border-b border-slate-200 bg-slate-50 text-[11px] font-bold text-slate-700 uppercase tracking-wider">
+                <th className="py-3 px-4 text-center w-40 min-w-[150px]">CÓDIGO / QUIPUX</th>
+                <th className="py-3 px-4 text-left w-52 min-w-[180px]">GESTIÓN</th>
+                <th className="py-3 px-4 text-left w-64 min-w-[210px]">BENEFICIARIO / RUC</th>
+                <th className="py-3 px-4 text-left w-56 min-w-[190px]">TIPO DE PROCESO</th>
+                <th className="py-3 px-4 text-center w-32 min-w-[120px]">MONTO TOTAL</th>
+                <th className="py-3 px-3 text-center w-28 min-w-[100px]">SLA (6D)</th>
+                <th className="py-3 px-4 text-center w-48 min-w-[160px]">ESTADO</th>
+                {canAnular && (
+                  <th className="py-3 px-3 text-center w-20 min-w-[70px]">ACCIONES</th>
+                )}
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 text-xs">
               {filteredTramites.map((t) => (
                 <tr
                   key={t.id_tramite}
-                  onClick={() => router.push(`/tramite/${t.id_tramite}`)}
-                  className="hover:bg-blue-50/70 transition-colors cursor-pointer group"
+                  onDoubleClick={() => router.push(`/tramite/${t.id_tramite}`)}
+                  title="Doble clic para revisar el trámite"
+                  className="hover:bg-blue-50/70 transition-colors cursor-pointer select-none group"
                 >
-                  <td className="py-2.5 px-3 align-middle text-left whitespace-nowrap">
-                    <div className="font-mono font-bold text-slate-900 group-hover:text-blue-700 transition-colors text-xs">
+                  <td className="py-3.5 px-4 align-middle text-center whitespace-nowrap">
+                    <div className="font-mono font-bold text-slate-900 group-hover:text-blue-700 transition-colors">
                       {t.codigo_tramite}
                     </div>
-                    <div className="text-[10px] font-mono text-blue-700 truncate max-w-[125px]" title={t.numero_quipux}>
+                    <div className="text-[11px] font-mono text-blue-700 truncate" title={t.numero_quipux}>
                       {t.numero_quipux}
                     </div>
                   </td>
 
-                  <td className="py-2.5 px-3 align-middle">
+                  {/* Gestión */}
+                  <td className="py-3.5 px-4 align-middle">
+                    <div className="flex flex-col gap-0.5">
+                      <span className="text-[10px] uppercase font-bold text-slate-500">
+                        {t.padre_gestion || t.tipo_flujo || "PAGO"}
+                      </span>
+                      <span className="font-semibold text-slate-800 text-[11px] truncate">
+                        {t.tipo_gestion || "PAGO"}
+                      </span>
+                    </div>
+                  </td>
+
+                  <td className="py-3.5 px-4 align-middle">
                     <div
-                      className="font-semibold text-slate-800 uppercase line-clamp-1 text-xs"
+                      className="font-semibold text-slate-800 uppercase line-clamp-2 leading-tight"
                       title={t.proveedor_beneficiario}
                     >
                       {t.proveedor_beneficiario}
                     </div>
-                    <div className="text-[10px] font-mono text-slate-500 mt-0.5">
+                    <div className="text-[11px] font-mono text-slate-500 mt-0.5">
                       RUC: {t.ruc_proveedor || "SIN RUC"}
                     </div>
                   </td>
 
-                  <td className="py-2.5 px-3 align-middle">
+                  <td className="py-3.5 px-4 align-middle">
                     <div
-                      className="text-slate-700 uppercase line-clamp-1 text-[10px] font-medium"
+                      className="text-slate-800 uppercase line-clamp-2 leading-snug text-[11px] font-semibold"
                       title={t.tipos_tramite?.nombre || "CONTRATACIÓN"}
                     >
                       {t.tipos_tramite?.nombre || "CONTRATACIÓN"}
                     </div>
-                  </td>
-
-                  <td className="py-2.5 px-2 align-middle text-center whitespace-nowrap">
-                    <div className="font-mono font-bold text-slate-900 text-xs">
-                      {formatCurrency(t.monto_total)}
-                    </div>
-                    {t.es_alta_cuantia && (
-                      <span className="inline-block mt-0.5 px-1 py-0.2 text-[8px] font-bold uppercase bg-amber-100 text-amber-900 rounded border border-amber-300">
-                        ≥ $10K
-                      </span>
+                    {t.area_requirente && (
+                      <div className="mt-1 flex items-center gap-1 text-[10px] text-blue-700 font-medium truncate" title={`Área Requirente: ${t.area_requirente}`}>
+                        <span className="px-1.5 py-0.5 rounded bg-blue-50 border border-blue-200 text-[9px] uppercase font-bold tracking-tight">
+                          {t.area_requirente}
+                        </span>
+                      </div>
+                    )}
+                    {t.asunto && (
+                      <p className="text-[10px] text-slate-500 line-clamp-1 italic mt-0.5" title={t.asunto}>
+                        {t.asunto}
+                      </p>
                     )}
                   </td>
 
-                  <td className="py-2.5 px-2 align-middle text-center">
-                    <div className="uppercase text-[10px] font-semibold text-slate-800 line-clamp-1" title={t.areas?.nombre || "ÁREA"}>
-                      {t.areas?.nombre || "ÁREA"}
-                    </div>
-                    <div className="text-[9px] text-slate-500 uppercase truncate mt-0.5 max-w-[120px]" title={t.usuarios?.nombre_completo}>
-                      {t.usuarios?.nombre_completo || ""}
+                  <td className="py-3.5 px-4 align-middle text-center whitespace-nowrap">
+                    <div className="font-mono font-bold text-slate-900 text-xs">
+                      {formatCurrency(t.monto_total)}
                     </div>
                   </td>
 
-                  <td className="py-2.5 px-1.5 align-middle text-center whitespace-nowrap">
+                  <td className="py-3.5 px-3 align-middle text-center whitespace-nowrap">
                     <SemaforoSLA sla={t.sla} />
                   </td>
 
-                  <td className="py-2.5 px-2 align-middle text-center">
+                  <td className="py-3.5 px-4 align-middle text-center whitespace-nowrap">
                     <BadgeEstado estado={t.estado_general} subEstado={t.sub_estado} />
                   </td>
 
-                  <td className="py-2.5 px-2.5 align-middle text-center whitespace-nowrap sticky right-0 bg-white group-hover:bg-blue-50/70 border-l border-slate-100/90 shadow-xs" onClick={(e) => e.stopPropagation()}>
-                    <div className="flex items-center justify-center gap-1">
-                      <Link
-                        href={`/tramite/${t.id_tramite}`}
-                        className="inline-flex items-center justify-center px-2 py-1 text-[11px] font-bold uppercase text-white bg-slate-900 hover:bg-blue-700 rounded-md transition-colors shadow-2xs"
-                      >
-                        Ver
-                      </Link>
-                      {["ADMINISTRADOR", "DIRECTORA_FINANCIERA", "SECRETARIA_DFI"].includes(
-                        currentUser?.rol || ""
-                      ) &&
-                        t.estado_general !== "ANULADO" &&
-                        t.estado_general !== "ARCHIVADO" && (
-                          <button
-                            onClick={(e) => handleAnular(e, t.id_tramite)}
-                            title="Anular trámite"
-                            className="p-1 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded transition-colors"
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </button>
-                        )}
-                    </div>
-                  </td>
+                  {canAnular && (
+                    <td className="py-3.5 px-3 align-middle text-center whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
+                      <div className="flex items-center justify-center gap-1.5">
+                        {t.estado_general !== "ANULADO" &&
+                          t.estado_general !== "ARCHIVADO" && (
+                            <button
+                              onClick={(e) => handleAnular(e, t.id_tramite)}
+                              title="Anular trámite"
+                              className="p-1 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded transition-colors"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          )}
+                      </div>
+                    </td>
+                  )}
                 </tr>
               ))}
             </tbody>

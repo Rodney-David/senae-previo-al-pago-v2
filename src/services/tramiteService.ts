@@ -2,96 +2,35 @@ import { prisma } from "@/lib/prisma";
 import { registrarBitacora } from "@/services/bitacoraService";
 
 export interface CrearTramiteInput {
-  tipo_gestion: string; // PAGO, EXPEDIENTE
+  padre_gestion?: string; // PAGO, GARANTIA
+  tipo_gestion?: string; // PAGO, EXPEDIENTE, JUSTIFICACION, etc.
+  tipo_flujo?: string;
   numero_quipux: string;
+  area_requirente?: string;
+  asunto?: string;
   fecha_memorando?: string | Date | null;
   fecha_recepcion_fisica?: string | Date | null;
   id_tipo_tramite: number;
-  proveedor_beneficiario: string;
+  proveedor_beneficiario?: string;
   ruc_proveedor?: string;
   subtotal?: number;
-  monto_iva?: number;
-  monto_retenciones?: number;
-  monto_multas?: number;
-  monto_total: number;
-  numero_factura?: string;
-  fecha_factura?: string | Date | null;
   id_usuario_creador: number;
   comentarios?: string;
 }
 
 /**
  * Servicio central para la gestión del ciclo de vida, transiciones de estado,
- * asignaciones por cuantía, round-robin y flujo bidireccional de trámites SENAE.
+ * asignaciones inteligentes y flujo institucional de control previo SENAE.
  */
 export class TramiteService {
   /**
-   * Obtiene el próximo analista de presupuesto activo según Round-Robin
-   */
-  private static async obtenerAnalistaPresupuestoRoundRobin(): Promise<number> {
-    // Buscar analistas de presupuesto (Area 2, Rol ANALISTA) activos y disponibles
-    const analistas = await prisma.usuarios.findMany({
-      where: {
-        id_area: 2, // PRESUPUESTO
-        rol: "ANALISTA",
-        activo: true,
-        estado_disponibilidad: "DISPONIBLE",
-      },
-      orderBy: { id_usuario: "asc" },
-    });
-
-    if (analistas.length === 0) {
-      // Fallback al jefe de presupuesto (id 3)
-      return 3;
-    }
-
-    // Buscar último analista asignado en asignacion_turnos para el área 2
-    const turno = await prisma.asignacion_turnos.findUnique({
-      where: { id_area: 2 },
-    });
-
-    let proximoIndex = 0;
-    if (turno && turno.id_ultimo_usuario_asignado) {
-      const currentIndex = analistas.findIndex(
-        (a) => a.id_usuario === turno.id_ultimo_usuario_asignado
-      );
-      if (currentIndex !== -1) {
-        proximoIndex = (currentIndex + 1) % analistas.length;
-      }
-    }
-
-    const elegido = analistas[proximoIndex];
-
-    // Actualizar registro de turno
-    await prisma.asignacion_turnos.upsert({
-      where: { id_area: 2 },
-      update: {
-        id_ultimo_usuario_asignado: elegido.id_usuario,
-        fecha_ultima_asignacion: new Date(),
-      },
-      create: {
-        id_area: 2,
-        id_ultimo_usuario_asignado: elegido.id_usuario,
-        fecha_ultima_asignacion: new Date(),
-      },
-    });
-
-    return elegido.id_usuario;
-  }
-
-  /**
-   * Recepción inicial del trámite físico en Dirección Financiera (Secretaria o Directora).
-   * Aplica la regla de bifurcación por cuantía:
-   *  - Monto >= $10.000 -> Asignación directa a Jefe de Presupuesto (id: 3)
-   *  - Monto < $10.000  -> Asignación Round-Robin entre Analistas de Presupuesto activos
+   * Paso 1: Ingreso en Secretaría (DFI).
+   * El trámite queda en estado INGRESADO en su propia bandeja de "Mi Escritorio".
+   * CERO autoasignación. Custodio: la secretaria creadora. Área: 1 (DFI).
    */
   public static async crearTramite(input: CrearTramiteInput) {
-    const esAltaCuantia = Number(input.monto_total) >= 10000;
-    let idUsuarioAsignado = 3; // Jefe de Presupuesto por defecto
-
-    if (!esAltaCuantia) {
-      idUsuarioAsignado = await this.obtenerAnalistaPresupuestoRoundRobin();
-    }
+    const sub = input.subtotal ? Number(input.subtotal) : 0;
+    const esAltaCuantia = sub >= 10000;
 
     // Generar código de trámite correlativo anual: TRM-2026-XXXX
     const count = await prisma.tramites.count();
@@ -106,21 +45,20 @@ export class TramiteService {
           ? new Date(input.fecha_recepcion_fisica)
           : new Date(),
         id_tipo_tramite: input.id_tipo_tramite,
-        tipo_flujo: input.tipo_gestion || "PAGO",
-        proveedor_beneficiario: input.proveedor_beneficiario,
+        tipo_flujo: input.padre_gestion || "PAGO",
+        padre_gestion: input.padre_gestion || "PAGO",
+        tipo_gestion: input.tipo_gestion || "PAGO",
+        area_requirente: input.area_requirente || null,
+        asunto: input.asunto || null,
+        proveedor_beneficiario: input.proveedor_beneficiario || "N/A",
         ruc_proveedor: input.ruc_proveedor || null,
-        subtotal: input.subtotal ? Number(input.subtotal) : null,
-        monto_iva: input.monto_iva ? Number(input.monto_iva) : null,
-        monto_retenciones: input.monto_retenciones ? Number(input.monto_retenciones) : null,
-        monto_multas: input.monto_multas ? Number(input.monto_multas) : null,
-        monto_total: Number(input.monto_total),
+        subtotal: sub,
+        monto_total: sub,
         es_alta_cuantia: esAltaCuantia,
-        numero_factura: input.numero_factura || null,
-        fecha_factura: input.fecha_factura ? new Date(input.fecha_factura) : null,
-        id_area_actual: 2, // Se deriva inmediatamente a PRESUPUESTO
-        id_custodio_actual: idUsuarioAsignado,
-        estado_general: "EN_PRESUPUESTO",
-        sub_estado: esAltaCuantia ? "ASIGNADO_ALTA_CUANTIA_JEFE" : "ASIGNADO_ROUND_ROBIN",
+        id_area_actual: 1, // DFI
+        id_custodio_actual: input.id_usuario_creador, // Secretaría creadora en Mi Escritorio
+        estado_general: "INGRESADO",
+        sub_estado: "RECEPCIONADO_DFI",
         fecha_ingreso: new Date(),
         fecha_ultimo_movimiento: new Date(),
         fecha_ultima_modificacion: new Date(),
@@ -131,16 +69,78 @@ export class TramiteService {
     await registrarBitacora({
       id_tramite: nuevoTramite.id_tramite,
       id_usuario_entrega: input.id_usuario_creador,
-      id_usuario_recibe: idUsuarioAsignado,
+      id_usuario_recibe: input.id_usuario_creador,
       id_area_origen: 1, // DFI
-      id_area_destino: 2, // PRESUPUESTO
-      tipo_accion: "RECEPCION_Y_ASIGNACION",
-      comentarios: `Trámite ingresado en DFI. Asignado a Presupuesto por ${
-        esAltaCuantia ? "Alta Cuantía (Jefe)" : "Round-Robin (Analista)"
-      }. ${input.comentarios || ""}`,
+      id_area_destino: 1, // DFI
+      tipo_accion: "INGRESO_SECRETARIA",
+      comentarios: `Trámite ingresado en DFI por Secretaría en Mi Escritorio. Estado INGRESADO. Gestión: ${
+        input.padre_gestion || "PAGO"
+      } - ${input.tipo_gestion || "PAGO"}. ${input.comentarios || ""}`,
     });
 
     return nuevoTramite;
+  }
+
+  /**
+   * Paso 2: Despacho por Lote a Presupuesto (Control Previo).
+   * Los trámites seleccionados cambian en bloque: INGRESADO -> REVISION.
+   * Custodio pasa a la Jefa de Presupuesto (id_area: 2, id_custodio: 3).
+   */
+  public static async entregarControlPrevioLote(
+    idsTramites: number[],
+    idUsuarioEntrega: number
+  ) {
+    if (!idsTramites || idsTramites.length === 0) {
+      throw new Error("Debe seleccionar al menos un trámite para entregar");
+    }
+
+    const jefePresupuesto = await prisma.usuarios.findFirst({
+      where: { id_area: 2, rol: "JEFE", activo: true },
+    });
+    const idJefePresupuesto = jefePresupuesto?.id_usuario || 3;
+
+    const now = new Date();
+    const tramitesActualizados = [];
+
+    for (const id of idsTramites) {
+      const tramite = await prisma.tramites.findUnique({
+        where: { id_tramite: id },
+      });
+
+      if (!tramite) continue;
+
+      if (tramite.estado_general !== "INGRESADO") {
+        throw new Error(
+          `El trámite ${tramite.codigo_tramite} no está en estado INGRESADO (actual: ${tramite.estado_general}).`
+        );
+      }
+
+      const updated = await prisma.tramites.update({
+        where: { id_tramite: id },
+        data: {
+          estado_general: "REVISION",
+          sub_estado: "EN_REVISION_PRESUPUESTO",
+          id_area_actual: 2, // PRESUPUESTO
+          id_custodio_actual: idJefePresupuesto,
+          fecha_ultimo_movimiento: now,
+          fecha_ultima_modificacion: now,
+        },
+      });
+
+      tramitesActualizados.push(updated);
+
+      await registrarBitacora({
+        id_tramite: id,
+        id_usuario_entrega: idUsuarioEntrega,
+        id_usuario_recibe: idJefePresupuesto,
+        id_area_origen: 1, // DFI
+        id_area_destino: 2, // PRESUPUESTO
+        tipo_accion: "ENTREGA_CONTROL_PREVIO_LOTE",
+        comentarios: "Expediente entregado formalmente a Control Previo (Presupuesto) mediante acta de entrega.",
+      });
+    }
+
+    return tramitesActualizados;
   }
 
   /**

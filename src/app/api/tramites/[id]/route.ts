@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { calculateTramiteSLA } from "@/lib/slaCalculator";
+import { getAuthenticatedUser } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 
@@ -20,6 +21,7 @@ export async function GET(
         tipos_tramite: true,
         areas: true,
         usuarios: true,
+        caja: true,
         tramite_referencias: {
           include: {
             usuarios: true,
@@ -83,6 +85,8 @@ export async function PUT(
       rol,
       tipo_flujo,
       numero_quipux,
+      area_requirente,
+      asunto,
       fecha_memorando,
       fecha_recepcion_fisica,
       id_tipo_tramite,
@@ -93,15 +97,16 @@ export async function PUT(
       numero_juicio,
     } = body;
 
-    // RBAC: Solo DFI (roles 1, 2), Presupuesto (roles 3, 4) y Admin (rol 10) pueden modificar datos generales
-    const rolesPermitidos = [
-      "ADMINISTRADOR",
-      "DIRECTORA_FINANCIERA",
-      "SECRETARIA_DFI",
-      "JEFE_PRESUPUESTO",
-      "ANALISTA_PRESUPUESTO",
-    ];
-    if (rol && !rolesPermitidos.includes(rol)) {
+    // RBAC: Solo DFI (Directora, Secretaria), Presupuesto (Jefe, Analista) y Admin pueden modificar datos generales
+    const authenticatedUser = await getAuthenticatedUser(request);
+    const userRole = (authenticatedUser?.rol || rol || "").toUpperCase();
+    const userAreaId = authenticatedUser?.id_area || (body.id_area ? Number(body.id_area) : undefined);
+
+    const isDFI = userAreaId === 1 || ["DIRECTORA", "SECRETARIA", "DIRECTORA_FINANCIERA", "SECRETARIA_DFI"].includes(userRole);
+    const isPresupuesto = (userAreaId === 2 && (["JEFE", "ANALISTA"].includes(userRole) || userRole.includes("PRESUPUESTO"))) || ["JEFE_PRESUPUESTO", "ANALISTA_PRESUPUESTO"].includes(userRole);
+    const isAdmin = ["ADMIN", "ADMINISTRADOR"].includes(userRole);
+
+    if (!isDFI && !isPresupuesto && !isAdmin) {
       return NextResponse.json(
         { error: "Su rol no tiene autorización para modificar los datos generales del trámite (Solo Lectura)." },
         { status: 403 }
@@ -115,12 +120,15 @@ export async function PUT(
       return NextResponse.json({ error: "Trámite no encontrado" }, { status: 404 });
     }
 
-    const montoNum = monto_total !== undefined ? Number(monto_total) : undefined;
+    const subtotalNum = body.subtotal !== undefined ? Number(body.subtotal) : undefined;
+    const montoNum = monto_total !== undefined ? Number(monto_total) : (subtotalNum !== undefined ? subtotalNum : undefined);
     const esAlta = montoNum !== undefined ? montoNum >= 10000 : undefined;
 
     const datosNuevos: Record<string, any> = {
       ...(tipo_flujo && { tipo_flujo }),
       ...(numero_quipux && { numero_quipux }),
+      ...(area_requirente !== undefined && { area_requirente }),
+      ...(asunto !== undefined && { asunto }),
       ...(fecha_memorando && { fecha_memorando: new Date(fecha_memorando) }),
       ...(fecha_recepcion_fisica && {
         fecha_recepcion_fisica: new Date(fecha_recepcion_fisica),
@@ -128,10 +136,16 @@ export async function PUT(
       ...(id_tipo_tramite && { id_tipo_tramite: Number(id_tipo_tramite) }),
       ...(proveedor_beneficiario && { proveedor_beneficiario }),
       ...(ruc_proveedor !== undefined && { ruc_proveedor }),
+      ...(subtotalNum !== undefined && { subtotal: subtotalNum }),
       ...(montoNum !== undefined && { monto_total: montoNum }),
       ...(esAlta !== undefined && { es_alta_cuantia: esAlta }),
       ...(numero_liquidacion !== undefined && { numero_liquidacion }),
       ...(numero_juicio !== undefined && { numero_juicio }),
+      ...(body.padre_gestion && { padre_gestion: body.padre_gestion }),
+      ...(body.tipo_gestion && { tipo_gestion: body.tipo_gestion }),
+      ...(body.nro_tramite !== undefined && { nro_tramite: body.nro_tramite ? String(body.nro_tramite).trim() : null }),
+      ...(body.periodo_pago !== undefined && { periodo_pago: body.periodo_pago ? String(body.periodo_pago).trim() : null }),
+      ...(body.numero_cur_compromiso !== undefined && { numero_cur_compromiso: body.numero_cur_compromiso ? String(body.numero_cur_compromiso).trim() : null }),
     };
 
     const tramiteActualizado = await prisma.tramites.update({
@@ -188,14 +202,19 @@ export async function DELETE(
       return NextResponse.json({ error: "ID inválido" }, { status: 400 });
     }
 
+    // RBAC: Solo DFI (Directora, Secretaria) y Admin pueden anular/eliminar un trámite
     const { searchParams } = new URL(request.url);
-    const rol = searchParams.get("rol");
+    const rolParam = searchParams.get("rol");
+    const authenticatedUser = await getAuthenticatedUser(request);
+    const userRole = (authenticatedUser?.rol || rolParam || "").toUpperCase();
+    const userAreaId = authenticatedUser?.id_area;
 
-    // RBAC: Solo DFI (Director/Secretaria) y Admin pueden anular/eliminar un trámite
-    const rolesPermitidos = ["ADMINISTRADOR", "DIRECTORA_FINANCIERA", "SECRETARIA_DFI"];
-    if (rol && !rolesPermitidos.includes(rol)) {
+    const isDFI = userAreaId === 1 || ["DIRECTORA", "SECRETARIA", "DIRECTORA_FINANCIERA", "SECRETARIA_DFI"].includes(userRole);
+    const isAdmin = ["ADMIN", "ADMINISTRADOR"].includes(userRole);
+
+    if (!isDFI && !isAdmin) {
       return NextResponse.json(
-        { error: "Solo Dirección Financiera o Administración pueden eliminar o anular trámites." },
+        { error: "Solo Dirección Financiera (DFI) o Administración pueden eliminar o anular trámites." },
         { status: 403 }
       );
     }

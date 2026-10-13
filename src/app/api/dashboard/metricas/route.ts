@@ -27,9 +27,13 @@ export async function GET() {
         altaCuantia++;
       }
 
-      if (t.estado_general === "FINALIZADO_ARCHIVADO") {
+      if (t.estado_general === "ARCHIVO" || t.estado_general === "FINALIZADO_ARCHIVADO") {
         finalizadosArchivados++;
         continue; // No cuenta para SLA activo
+      }
+
+      if (t.estado_general === "INSUBSISTENTE") {
+        continue; // Trámite anulado definitivamente, congelado
       }
 
       if (t.esta_pausado) {

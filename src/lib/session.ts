@@ -44,13 +44,15 @@ export interface SessionPayload {
   expiresAt: number;
 }
 
+export const DEFAULT_SESSION_DURATION_MS = 2 * 60 * 60 * 1000; // 2 horas máximo de sesión activa
+
 /**
  * Genera un token de sesión firmado criptográficamente
- * Duración por defecto: 7 días
+ * Duración por defecto: 2 horas de vigencia estricta
  */
 export async function createSessionToken(
   user: { id_usuario: number; correo_institucional: string; rol: string },
-  durationMs: number = 7 * 24 * 60 * 60 * 1000
+  durationMs: number = DEFAULT_SESSION_DURATION_MS
 ): Promise<string> {
   const now = Date.now();
   const payload: SessionPayload = {

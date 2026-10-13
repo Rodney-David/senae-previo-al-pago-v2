@@ -23,7 +23,16 @@ export interface UsuarioInstitucional {
   area_codigo?: string;
 }
 
-export type SemaforoSLA = "EN_PLAZO" | "POR_VENCER" | "VENCIDO" | "PAUSADO";
+export interface CatalogoAreaDTO {
+  id_area: number;
+  nombre: string;
+  codigo?: string | null;
+  descripcion?: string | null;
+  activo?: boolean | null;
+  created_at?: string | Date | null;
+}
+
+export type SemaforoSLA = "EN_PLAZO" | "POR_VENCER" | "VENCIDO" | "PAUSADO" | "FINALIZADO";
 
 export interface SLAResult {
   diasHabilesTranscurridos: number;
@@ -103,6 +112,20 @@ export interface ObservacionDTO {
   };
 }
 
+export type EstadoTramiteOficial =
+  | "INGRESADO"
+  | "REVISION"
+  | "REVISADO"
+  | "FACTURA"
+  | "CONTABILIDAD"
+  | "DFI"
+  | "PAGADO"
+  | "ARCHIVO"
+  | "OBSERVADO"
+  | "INSUBSISTENTE"
+  | "PRESUPUESTO"
+  | "JUSTIFICACION_CONTABILIDAD";
+
 export interface TramiteCompletoDTO {
   id_tramite: number;
   codigo_tramite: string;
@@ -127,6 +150,10 @@ export interface TramiteCompletoDTO {
     requiere_factura?: boolean | null;
   } | null;
   tipo_flujo: string;
+  padre_gestion?: string | null;
+  tipo_gestion?: string | null;
+  area_requirente?: string | null;
+  asunto?: string | null;
   proveedor_beneficiario: string;
   ruc_proveedor?: string | null;
   subtotal?: number | string | null;
@@ -140,9 +167,12 @@ export interface TramiteCompletoDTO {
   certificacion_presupuestaria?: string | null;
   item_presupuestario?: string | null;
   numero_cur_compromiso?: string | null;
+  nro_tramite?: string | null;
+  periodo_pago?: string | null;
   aprobado_presupuesto?: boolean | null;
   fecha_aprobacion_presupuesto?: string | Date | null;
   id_usuario_aprobador_presupuesto?: number | null;
+  id_analista_presupuesto_previo?: number | null;
   usuario_aprobador_presupuesto?: UsuarioInstitucional | null;
   
   // Factura y SLA
@@ -152,6 +182,12 @@ export interface TramiteCompletoDTO {
   motivo_pausa?: string | null;
   fecha_pausa?: string | Date | null;
   dias_pausa_acumulados?: number | null;
+  
+  // Estados transversales y auditoría
+  estado_previo_observacion?: string | null;
+  motivo_observacion?: string | null;
+  detalle_subsanacion?: string | null;
+  justificacion_insubsistencia?: string | null;
 
   // Contabilidad
   numero_cur_devengado?: string | null;
@@ -173,8 +209,11 @@ export interface TramiteCompletoDTO {
   comprobante_pago?: string | null;
   fecha_pago?: string | Date | null;
 
-  // Archivo
+  // Archivo y Cajas
   fojas_fisicas?: number | null;
+  numero_hojas?: number | null;
+  id_caja?: number | null;
+  caja?: CajaDTO | null;
   codigo_tomo_caja?: string | null;
   estanteria?: string | null;
   ubicacion_archivo?: string | null;
@@ -220,4 +259,22 @@ export interface TramiteCompletoDTO {
   historial_movimientos?: HistorialMovimientoDTO[];
   observaciones?: ObservacionDTO[];
   sla?: SLAResult;
+}
+
+export interface CajaDTO {
+  id_caja: number;
+  codigo_caja: string;
+  nombre?: string | null;
+  estado: string; // "ABIERTA" | "ARCHIVADA"
+  fecha_creacion: string | Date | null;
+  fecha_cierre?: string | Date | null;
+  id_usuario_creacion?: number | null;
+  observaciones?: string | null;
+  tramites?: TramiteCompletoDTO[];
+  _count?: {
+    tramites: number;
+  };
+  total_tramites?: number;
+  total_hojas?: number;
+  total_monto?: number;
 }

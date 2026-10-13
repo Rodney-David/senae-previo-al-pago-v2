@@ -19,11 +19,33 @@ export const SemaforoSLA: React.FC<SemaforoSLAProps> = ({
   if (sla.estaPausado) {
     return (
       <div
-        className={cn("inline-flex items-center gap-1.5 text-xs text-amber-700 bg-amber-50 px-2 py-0.5 rounded border border-amber-200", className)}
-        title={sla.motivoPausa || "Semáforo pausado por espera de factura"}
+        className={cn(
+          "inline-flex items-center gap-1.5 text-xs font-medium text-amber-700 bg-amber-50 px-2 py-0.5 rounded border border-amber-200",
+          className
+        )}
+        title={sla.motivoPausa || "Semáforo pausado"}
       >
         <PauseCircle className="w-3.5 h-3.5 text-amber-600" />
-        <span>Pausado (Factura)</span>
+        <span>Pausado</span>
+      </div>
+    );
+  }
+
+  if (sla.estado === "FINALIZADO") {
+    return (
+      <div
+        className={cn(
+          "inline-flex items-center gap-1.5 text-xs font-semibold text-slate-700 bg-slate-100 px-2 py-0.5 rounded border border-slate-300",
+          className
+        )}
+        title={`SLA Finalizado (En Caja / Archivo): ${sla.diasHabilesTranscurridos} días hábiles`}
+      >
+        <span className="text-xs select-none" aria-hidden="true">📦</span>
+        {showText && (
+          <span className="flex items-center gap-1 font-mono text-[11px] text-slate-600">
+            <span>{sla.diasHabilesTranscurridos}d</span>
+          </span>
+        )}
       </div>
     );
   }
@@ -45,15 +67,15 @@ export const SemaforoSLA: React.FC<SemaforoSLAProps> = ({
   return (
     <div
       className={cn("inline-flex items-center gap-1.5 text-xs font-medium text-slate-700", className)}
-      title={`${labelText}: ${sla.diasHabilesTranscurridos} de 6 días hábiles transcurridos (${sla.diasRestantes} días restantes)`}
+      title={`${labelText}: ${sla.diasHabilesTranscurridos} días hábiles transcurridos`}
     >
       <span className="text-sm select-none" aria-hidden="true">
         {circleSymbol}
       </span>
       {showText && (
-        <span className="flex items-center gap-1">
+        <span className="flex items-center gap-1 font-mono">
           <Clock className="w-3 h-3 text-slate-400" />
-          <span>{sla.diasHabilesTranscurridos}/6d</span>
+          <span>{sla.diasHabilesTranscurridos}d</span>
         </span>
       )}
     </div>

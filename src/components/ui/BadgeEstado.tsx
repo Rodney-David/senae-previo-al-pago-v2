@@ -13,45 +13,79 @@ export const BadgeEstado: React.FC<BadgeEstadoProps> = ({
   className,
 }) => {
   let style = "bg-slate-100 text-slate-700 border-slate-300";
-  let label = estado.replace(/_/g, " ").toUpperCase();
+  const est = estado ? estado.toUpperCase() : "DESCONOCIDO";
 
-  if (
-    estado.includes("APROBADO") ||
-    estado.includes("DEVENGADO") ||
-    estado.includes("PAGADO") ||
-    estado.includes("AUTORIZADO")
-  ) {
-    style = "bg-emerald-50 text-emerald-800 border-emerald-300";
-  } else if (
-    estado.includes("OBSERVADO") ||
-    estado.includes("72H") ||
-    estado.includes("PAUSADO") ||
-    estado.includes("RECALL")
-  ) {
-    style = "bg-amber-50 text-amber-800 border-amber-300";
-  } else if (estado.includes("DEVUELTO") || estado.includes("RECHAZADO") || estado.includes("ANULADO")) {
-    style = "bg-rose-50 text-rose-800 border-rose-300";
-  } else if (estado.includes("EN_") || estado.includes("RECEPCION")) {
-    style = "bg-blue-50 text-blue-800 border-blue-300";
-  } else if (estado.includes("FINALIZADO") || estado.includes("ARCHIVADO")) {
-    style = "bg-slate-100 text-slate-700 border-slate-300";
+  // Mapeo exhaustivo para la Matriz Oficial de los 12 Estados
+  switch (est) {
+    case "INGRESADO":
+      style = "bg-sky-50 text-sky-800 border-sky-300";
+      break;
+    case "REVISION":
+      style = "bg-blue-50 text-blue-800 border-blue-300";
+      break;
+    case "REVISADO":
+      style = "bg-teal-50 text-teal-800 border-teal-300";
+      break;
+    case "FACTURA":
+      style = "bg-amber-50 text-amber-800 border-amber-300";
+      break;
+    case "CONTABILIDAD":
+      style = "bg-purple-50 text-purple-800 border-purple-300";
+      break;
+    case "DFI":
+      style = "bg-indigo-50 text-indigo-800 border-indigo-300";
+      break;
+    case "PAGADO":
+      style = "bg-emerald-50 text-emerald-800 border-emerald-300";
+      break;
+    case "CAJA":
+    case "EN_CAJA":
+      style = "bg-cyan-50 text-cyan-800 border-cyan-300";
+      break;
+    case "ARCHIVO":
+    case "FINALIZADO_ARCHIVADO":
+      style = "bg-slate-100 text-slate-700 border-slate-300";
+      break;
+    case "OBSERVADO":
+    case "OBSERVADO_72H":
+      style = "bg-orange-50 text-orange-800 border-orange-300";
+      break;
+    case "INSUBSISTENTE":
+      style = "bg-rose-50 text-rose-800 border-rose-300";
+      break;
+    case "PRESUPUESTO":
+      style = "bg-blue-50 text-blue-800 border-blue-300";
+      break;
+    case "JUSTIFICACION_CONTABILIDAD":
+      style = "bg-purple-50 text-purple-800 border-purple-300";
+      break;
+    default:
+      if (est.includes("PAGADO") || est.includes("APROBADO")) {
+        style = "bg-emerald-50 text-emerald-800 border-emerald-300";
+      } else if (est.includes("OBSERVADO") || est.includes("PAUSA")) {
+        style = "bg-amber-50 text-amber-800 border-amber-300";
+      } else if (est.includes("RECHAZ") || est.includes("ANULAD") || est.includes("INSUBSIST")) {
+        style = "bg-rose-50 text-rose-800 border-rose-300";
+      } else {
+        style = "bg-slate-100 text-slate-700 border-slate-300";
+      }
+      break;
   }
 
-  // Display clean short label
-  const displayLabel = subEstado ? subEstado.replace(/_/g, " ").toUpperCase() : label;
+  // Etiqueta legible
+  const displayLabel = est.replace(/_/g, " ");
 
   return (
     <span
       className={cn(
-        "inline-flex items-center justify-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold uppercase border text-center shrink-0 shadow-2xs max-w-[145px]",
+        "inline-flex items-center justify-center gap-1.5 px-2.5 py-1 rounded text-[11px] font-bold uppercase tracking-wider border text-center whitespace-nowrap shrink-0 shadow-2xs",
         style,
         className
       )}
-      title={`${label}${subEstado ? ` - ${displayLabel}` : ""}`}
+      title={subEstado ? `${displayLabel} - ${subEstado}` : displayLabel}
     >
       <span className="w-1.5 h-1.5 rounded-full bg-current opacity-75 shrink-0" />
-      <span className="truncate">{displayLabel}</span>
+      <span className="whitespace-nowrap">{displayLabel}</span>
     </span>
   );
 };
-

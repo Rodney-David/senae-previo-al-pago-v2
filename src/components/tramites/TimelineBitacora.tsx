@@ -1,30 +1,63 @@
-import React from "react";
-import { HistorialMovimientoDTO } from "@/types";
+"use client";
+
+import React, { useState, useMemo, useEffect } from "react";
+import { HistorialMovimientoDTO, UsuarioInstitucional } from "@/types";
 import { formatDateTime } from "@/lib/utils";
-import { History, Clock, ArrowRight } from "lucide-react";
+import { History, Clock, ArrowRight, ChevronDown } from "lucide-react";
 
 interface TimelineBitacoraProps {
   movimientos?: HistorialMovimientoDTO[];
+  currentUser?: UsuarioInstitucional | null;
 }
 
 export const TimelineBitacora: React.FC<TimelineBitacoraProps> = ({
   movimientos = [],
+  currentUser = null,
 }) => {
+  const isDefaultOpen = useMemo(() => {
+    if (!currentUser) return true;
+    const rol = (currentUser.rol || "").toUpperCase();
+    return rol === "DIRECTORA" || rol === "SECRETARIA" || rol === "ADMIN";
+  }, [currentUser]);
+
+  const [isOpen, setIsOpen] = useState(isDefaultOpen);
+
+  useEffect(() => {
+    setIsOpen(isDefaultOpen);
+  }, [isDefaultOpen]);
+
   return (
     <div className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-xs">
-      <div className="px-5 py-3.5 bg-slate-900 text-white flex items-center justify-between">
+      <div 
+        onClick={() => setIsOpen(!isOpen)}
+        className="px-5 py-3.5 bg-slate-900 text-white flex items-center justify-between cursor-pointer select-none hover:bg-slate-800 transition-colors"
+      >
         <div className="flex items-center gap-2">
           <History className="w-4 h-4 text-blue-400" />
           <h3 className="text-xs font-semibold uppercase tracking-wider">
-            7. Bitácora Histórica e Inmutable de Auditoría
+            BITACORA HISTORICA - AUDITORIA
           </h3>
         </div>
-        <span className="text-xs text-slate-400">
-          {movimientos.length} eventos registrados
-        </span>
+        <div className="flex items-center gap-3">
+          <span className="text-xs text-slate-400">
+            {movimientos.length} eventos registrados
+          </span>
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              setIsOpen(!isOpen);
+            }}
+            className="p-1 text-slate-400 hover:text-white transition-colors"
+            title={isOpen ? "Plegar sección" : "Desplegar sección"}
+          >
+            <ChevronDown className={`w-4 h-4 transition-transform duration-200 ${isOpen ? "rotate-180" : ""}`} />
+          </button>
+        </div>
       </div>
 
-      <div className="p-5">
+      {isOpen && (
+        <div className="p-5">
         {movimientos.length === 0 ? (
           <div className="text-center py-6 text-xs text-slate-500">
             No se registran movimientos históricos para este expediente.
@@ -77,6 +110,7 @@ export const TimelineBitacora: React.FC<TimelineBitacoraProps> = ({
           </div>
         )}
       </div>
+      )}
     </div>
   );
 };

@@ -25,6 +25,128 @@ async function main() {
   }
   console.log("Áreas institucionales verificadas.");
 
+  // 1.1. Catálogo oficial de Áreas Requirentes / Solicitantes SENAE
+  const catalogoAreasData = [
+    "Administrativo Financiero BLVM",
+    "Administrativo Financiero CCAT",
+    "Administrativo Financiero ESMM",
+    "Administrativo Financiero HQLT",
+    "Administrativo Financiero LTC",
+    "Administrativo Financiero MCRT",
+    "Administrativo Financiero MTAM",
+    "Administrativo Financiero TCNT",
+    "Adquisiciones Aduaneras GYEM",
+    "Adquisiciones Aduaneras UIO",
+    "Aforo BLVM",
+    "Aforo CCAT",
+    "Aforo ESMM",
+    "Aforo HQLT",
+    "Aforo LTC",
+    "Aforo MCRT",
+    "Aforo MTAM",
+    "Aforo TCNT",
+    "Agencia de Inteligencia Azuay",
+    "Agencia de Inteligencia Carchi",
+    "Agencia de Inteligencia Esmeraldas",
+    "Agencia de Inteligencia Guayas",
+  ];
+
+  for (const nombre of catalogoAreasData) {
+    await (prisma as any).catalogo_areas.upsert({
+      where: { nombre },
+      update: {},
+      create: { nombre, activo: true },
+    });
+  }
+  console.log("Catálogo de áreas requirentes verificado.");
+
+  // 1.2. Catálogo oficial de Jerarquía Padre - Hijo de Gestiones
+  const tiposGestionData = [
+    // PADRE: PAGO
+    {
+      padre: "PAGO",
+      codigo: "PAGO_PAGO",
+      nombre: "PAGO",
+      descripcion: "Trámite principal con afectación económica",
+    },
+    {
+      padre: "PAGO",
+      codigo: "PAGO_EXPEDIENTE",
+      nombre: "EXPEDIENTE",
+      descripcion: "Expediente documental sin devengado directo",
+    },
+    {
+      padre: "PAGO",
+      codigo: "PAGO_JUSTIFICACION",
+      nombre: "JUSTIFICACION",
+      descripcion: "Trámite de justificación de gasto o fondos",
+    },
+    // PADRE: GARANTIA
+    {
+      padre: "GARANTIA",
+      codigo: "GARANTIA_CAUCION",
+      nombre: "Caución",
+      descripcion: "Gestión de caución aduanera",
+    },
+    {
+      padre: "GARANTIA",
+      codigo: "GARANTIA_DEV_CAUCION",
+      nombre: "Devolución de caución",
+      descripcion: "Devolución formal de caución aduanera",
+    },
+    {
+      padre: "GARANTIA",
+      codigo: "GARANTIA_DEV_VALORES",
+      nombre: "Devolución de valores",
+      descripcion: "Devolución de valores o pagos",
+    },
+    {
+      padre: "GARANTIA",
+      codigo: "GARANTIA_GARANTIA",
+      nombre: "Garantia",
+      descripcion: "Gestión de garantía técnica o bancaria",
+    },
+    {
+      padre: "GARANTIA",
+      codigo: "GARANTIA_JUICIO",
+      nombre: "Juicio",
+      descripcion: "Proceso contencioso o judicial",
+    },
+    {
+      padre: "GARANTIA",
+      codigo: "GARANTIA_PAGO_INDEBIDO",
+      nombre: "Pago indebido",
+      descripcion: "Reclamo de pago indebido o en exceso",
+    },
+    {
+      padre: "GARANTIA",
+      codigo: "GARANTIA_PROCESO_COACTIVO",
+      nombre: "Proceso coactivo",
+      descripcion: "Cobro por vía de ejecución coactiva",
+    },
+    {
+      padre: "GARANTIA",
+      codigo: "GARANTIA_REPARACION_ECONOMICA",
+      nombre: "Reparación Económica",
+      descripcion: "Reparación económica judicial o administrativa",
+    },
+    {
+      padre: "GARANTIA",
+      codigo: "GARANTIA_SENTENCIA",
+      nombre: "Sentencia",
+      descripcion: "Cumplimiento de sentencia ejecutoriada",
+    },
+  ];
+
+  for (const g of tiposGestionData) {
+    await prisma.tipos_gestion.upsert({
+      where: { codigo: g.codigo },
+      update: { padre: g.padre, nombre: g.nombre, descripcion: g.descripcion, activo: true },
+      create: { ...g, activo: true },
+    });
+  }
+  console.log("Tipos de gestión verificados (Padre PAGO y GARANTIA con hijos).");
+
   // 2. Usuarios con 10 roles y estados
   const usuariosData = [
     {
@@ -230,7 +352,7 @@ async function main() {
   }
   console.log("Catálogo de 17 Procesos Normativos SENAE verificado.");
 
-  // 4. Seis trámites de demostración representativos
+  // 4. Ocho trámites de demostración representativos de la nueva matriz de 12 estados
   const demoTramites = [
     {
       id_tramite: 101,
@@ -240,21 +362,22 @@ async function main() {
       fecha_recepcion_fisica: new Date("2026-09-12"),
       id_tipo_tramite: 1, // Ínfima Cuantía
       tipo_flujo: "PAGO",
+      padre_gestion: "PAGO",
+      tipo_gestion: "PAGO",
+      area_requirente: "Administrativo Financiero GYEM",
+      asunto: "Adquisición de suministros de oficina para oficinas distritales",
       proveedor_beneficiario: "IMPORTADORA ECUATORIANA DE SUMINISTROS S.A.",
       ruc_proveedor: "0992384729001",
       subtotal: 4500.0,
-      monto_iva: 675.0,
-      monto_retenciones: 90.0,
+      monto_iva: 0.0,
+      monto_retenciones: 0.0,
       monto_multas: 0.0,
-      monto_total: 5085.0,
+      monto_total: 4500.0,
       es_alta_cuantia: false,
-      id_area_actual: 2, // PRESUPUESTO
-      id_custodio_actual: 4, // Analista Belén Gómez (Round Robin)
-      estado_general: "EN_PRESUPUESTO",
-      sub_estado: "ASIGNADO_ROUND_ROBIN",
-      numero_cur_compromiso: "CUR-COM-2026-1041",
-      certificacion_presupuestaria: "CERT-2026-088",
-      item_presupuestario: "530804 - Materiales de Oficina",
+      id_area_actual: 1, // DFI
+      id_custodio_actual: 2, // Secretaria Lorena Zambrano
+      estado_general: "INGRESADO",
+      sub_estado: "RECEPCIONADO_DFI",
       fecha_ingreso: new Date("2026-09-12"),
       fecha_ultimo_movimiento: new Date("2026-09-12T14:30:00"),
     },
@@ -266,20 +389,25 @@ async function main() {
       fecha_recepcion_fisica: new Date("2026-09-11"),
       id_tipo_tramite: 3, // Procesos de Contratación
       tipo_flujo: "PAGO",
+      padre_gestion: "PAGO",
+      tipo_gestion: "PAGO",
+      area_requirente: "Adquisiciones Aduaneras GYEM",
+      asunto: "Mantenimiento y readecuación de infraestructura aduanera",
       proveedor_beneficiario: "CONSTRUCTORA NACIONAL DEL PACIFICO CIA. LTDA.",
       ruc_proveedor: "1791827364001",
       subtotal: 35000.0,
-      monto_iva: 5250.0,
-      monto_retenciones: 700.0,
-      monto_multas: 0.0,
-      monto_total: 39550.0,
+      monto_total: 35000.0,
       es_alta_cuantia: true,
       id_area_actual: 2, // PRESUPUESTO
-      id_custodio_actual: 3, // Jefe de Presupuesto (Alta Cuantía >= $10k)
-      estado_general: "EN_PRESUPUESTO",
-      sub_estado: "ASIGNADO_ALTA_CUANTIA_JEFE",
+      id_custodio_actual: 3, // Jefe de Presupuesto Carlos Mendoza
+      id_analista_presupuesto_previo: 4, // Ana Belén Gómez
+      estado_general: "REVISION",
+      sub_estado: "EN_REVISION_PRESUPUESTO",
       certificacion_presupuestaria: "CERT-2026-042",
       item_presupuestario: "730601 - Consultoría y Construcción",
+      numero_cur_compromiso: "1041",
+      nro_tramite: "TRM-PRE-2026-042",
+      periodo_pago: "SEPTIEMBRE 2026",
       fecha_ingreso: new Date("2026-09-11"),
       fecha_ultimo_movimiento: new Date("2026-09-11T09:15:00"),
     },
@@ -291,23 +419,27 @@ async function main() {
       fecha_recepcion_fisica: new Date("2026-09-08"),
       id_tipo_tramite: 3,
       tipo_flujo: "PAGO",
+      padre_gestion: "PAGO",
+      tipo_gestion: "PAGO",
+      area_requirente: "Tecnología de la Información",
+      asunto: "Servicios cloud y almacenamiento seguro de datos aduaneros",
       proveedor_beneficiario: "SOLUCIONES TECNOLOGICAS CLOUD ECUADOR",
       ruc_proveedor: "0993019284001",
       subtotal: 18000.0,
-      monto_iva: 2700.0,
-      monto_retenciones: 360.0,
-      monto_multas: 0.0,
-      monto_total: 20340.0,
+      monto_total: 18000.0,
       es_alta_cuantia: true,
       id_area_actual: 2, // PRESUPUESTO
-      id_custodio_actual: 3,
-      estado_general: "PAUSADO_ESPERA_FACTURA",
-      sub_estado: "SEMAFORO_CONGELADO",
+      id_custodio_actual: 4, // Analista Ana Belén Gómez
+      id_analista_presupuesto_previo: 4,
+      estado_general: "FACTURA",
+      sub_estado: "ESPERA_FACTURA_TRIBUTARIA",
       esta_pausado: true,
-      motivo_pausa: "En espera de emisión de factura electrónica por parte del contratista",
+      motivo_pausa: "En espera de emisión de factura electrónica SRI por parte del contratista",
       fecha_pausa: new Date("2026-09-09T10:00:00"),
-      dias_pausa_acumulados: 3,
-      numero_cur_compromiso: "CUR-COM-2026-0912",
+      dias_pausa_acumulados: 2,
+      numero_cur_compromiso: "912",
+      nro_tramite: "TRM-PRE-2026-019",
+      periodo_pago: "SEPTIEMBRE 2026",
       certificacion_presupuestaria: "CERT-2026-019",
       item_presupuestario: "530704 - Mantenimiento de Software",
       aprobado_presupuesto: true,
@@ -324,21 +456,22 @@ async function main() {
       fecha_recepcion_fisica: new Date("2026-09-07"),
       id_tipo_tramite: 2, // Servicios Básicos
       tipo_flujo: "PAGO",
+      padre_gestion: "PAGO",
+      tipo_gestion: "PAGO",
+      area_requirente: "Administrativo Financiero BLVM",
+      asunto: "Planilla de consumo de energía eléctrica Edificio Central",
       proveedor_beneficiario: "EMPRESA ELECTRICA PUBLICA DE GUAYAQUIL CNEL EP",
       ruc_proveedor: "0968599020001",
       subtotal: 8200.0,
-      monto_iva: 0.0,
-      monto_retenciones: 0.0,
-      monto_multas: 0.0,
       monto_total: 8200.0,
       es_alta_cuantia: false,
       id_area_actual: 3, // CONTABILIDAD
       id_custodio_actual: 6, // Contador General Sergio Lindao
-      estado_general: "EN_CONTABILIDAD",
+      estado_general: "CONTABILIDAD",
       sub_estado: "REVISION_CONTADOR_GENERAL",
       numero_factura: "001-002-009823412",
       fecha_factura: new Date("2026-09-05"),
-      numero_cur_compromiso: "CUR-COM-2026-0811",
+      numero_cur_compromiso: "811",
       numero_cur_devengado: "CUR-DEV-2026-0612",
       certificacion_presupuestaria: "CERT-2026-005",
       item_presupuestario: "530101 - Energía Eléctrica",
@@ -356,21 +489,24 @@ async function main() {
       fecha_recepcion_fisica: new Date("2026-09-05"),
       id_tipo_tramite: 1,
       tipo_flujo: "PAGO",
+      padre_gestion: "PAGO",
+      tipo_gestion: "PAGO",
+      area_requirente: "Seguridad y Vigilancia Aduanera",
+      asunto: "Servicio de vigilancia armada para recintos portuarios",
       proveedor_beneficiario: "SEGURIDAD Y VIGILANCIA INTEGRAL GUARDIANES S.A.",
       ruc_proveedor: "1790019283001",
       subtotal: 12500.0,
       monto_iva: 1875.0,
       monto_retenciones: 250.0,
-      monto_multas: 0.0,
       monto_total: 14125.0,
       es_alta_cuantia: true,
       id_area_actual: 1, // DFI PAGO
       id_custodio_actual: 1, // Directora Financiera Patricia Morales
-      estado_general: "EN_AUTORIZACION_DFI",
+      estado_general: "DFI",
       sub_estado: "PENDIENTE_AUTORIZACION_PAGO",
       numero_factura: "002-005-000123984",
       fecha_factura: new Date("2026-09-03"),
-      numero_cur_compromiso: "CUR-COM-2026-0744",
+      numero_cur_compromiso: "744",
       numero_cur_devengado: "CUR-DEV-2026-0599",
       certificacion_presupuestaria: "CERT-2026-012",
       item_presupuestario: "530208 - Servicio de Seguridad",
@@ -391,19 +527,20 @@ async function main() {
       fecha_recepcion_fisica: new Date("2026-08-20"),
       id_tipo_tramite: 4, // Viáticos al Interior
       tipo_flujo: "PAGO",
+      padre_gestion: "PAGO",
+      tipo_gestion: "EXPEDIENTE",
+      area_requirente: "Dirección de Inteligencia Aduanera",
+      asunto: "Viáticos comisión técnica de control posterior en frontera",
       proveedor_beneficiario: "ING. MARCELO ANDRADE PAZMIÑO",
       ruc_proveedor: "0918273645001",
       subtotal: 780.0,
-      monto_iva: 0.0,
-      monto_retenciones: 0.0,
-      monto_multas: 0.0,
       monto_total: 780.0,
       es_alta_cuantia: false,
       id_area_actual: 6, // ARCHIVO
       id_custodio_actual: 10, // Custodio Archivo Manuel Ramos
-      estado_general: "FINALIZADO_ARCHIVADO",
+      estado_general: "ARCHIVO",
       sub_estado: "ARCHIVADO_DEFINITIVO",
-      numero_cur_compromiso: "CUR-COM-2026-0312",
+      numero_cur_compromiso: "312",
       numero_cur_devengado: "CUR-DEV-2026-0240",
       certificacion_presupuestaria: "CERT-2026-001",
       item_presupuestario: "530303 - Viáticos y Subsistencias",
@@ -420,6 +557,62 @@ async function main() {
       ubicacion_archivo: "Archivo Central Bloque B - Estante A3",
       fecha_ingreso: new Date("2026-08-20"),
       fecha_ultimo_movimiento: new Date("2026-08-27T16:00:00"),
+    },
+    {
+      id_tramite: 107,
+      codigo_tramite: "TRM-2026-0107",
+      numero_quipux: "SENAE-DTH-2026-0912-M",
+      fecha_memorando: new Date("2026-09-10"),
+      fecha_recepcion_fisica: new Date("2026-09-10"),
+      id_tipo_tramite: 3,
+      tipo_flujo: "PAGO",
+      padre_gestion: "PAGO",
+      tipo_gestion: "PAGO",
+      area_requirente: "Talento Humano DTH",
+      asunto: "Servicio de capacitación y actualización aduanera",
+      proveedor_beneficiario: "INSTITUTO SUPERIOR DE CAPACITACION CONTINUA",
+      ruc_proveedor: "1792345678001",
+      subtotal: 6200.0,
+      monto_total: 6200.0,
+      es_alta_cuantia: false,
+      id_area_actual: 2, // PRESUPUESTO
+      id_custodio_actual: 4, // Analista Ana Belén Gómez
+      id_analista_presupuesto_previo: 4,
+      estado_general: "OBSERVADO",
+      sub_estado: "OBSERVACION_EXTERNA_72H",
+      estado_previo_observacion: "REVISION",
+      motivo_observacion: "Falta informe de cumplimiento a satisfacción suscrito por el Administrador de Contrato",
+      esta_pausado: true,
+      motivo_pausa: "Observación externa a Administrador de Contrato",
+      fecha_pausa: new Date("2026-09-11T11:00:00"),
+      dias_pausa_acumulados: 1,
+      fecha_ingreso: new Date("2026-09-10"),
+      fecha_ultimo_movimiento: new Date("2026-09-11T11:00:00"),
+    },
+    {
+      id_tramite: 108,
+      codigo_tramite: "TRM-2026-0108",
+      numero_quipux: "SENAE-DAF-2026-0319-M",
+      fecha_memorando: new Date("2026-09-01"),
+      fecha_recepcion_fisica: new Date("2026-09-01"),
+      id_tipo_tramite: 1,
+      tipo_flujo: "PAGO",
+      padre_gestion: "PAGO",
+      tipo_gestion: "PAGO",
+      area_requirente: "Administrativo Financiero MTAM",
+      asunto: "Adquisición de repuestos para patrullas aduaneras",
+      proveedor_beneficiario: "DISTRIBUIDORA AUTOMOTRIZ DEL LITORAL",
+      ruc_proveedor: "0991234567001",
+      subtotal: 3100.0,
+      monto_total: 3100.0,
+      es_alta_cuantia: false,
+      id_area_actual: 1,
+      id_custodio_actual: 2,
+      estado_general: "INSUBSISTENTE",
+      sub_estado: "ANULADO_POR_INSUBSISTENCIA",
+      justificacion_insubsistencia: "Nulidad insubsanable declarada por vicios de procedimiento en la orden de compra",
+      fecha_ingreso: new Date("2026-09-01"),
+      fecha_ultimo_movimiento: new Date("2026-09-04T15:00:00"),
     },
   ];
 

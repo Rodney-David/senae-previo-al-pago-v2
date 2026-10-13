@@ -20,7 +20,10 @@ export const ModalEditarDatosGenerales: React.FC<ModalEditarDatosGeneralesProps>
   currentUser,
   onRefresh,
 }) => {
-  const [tipoFlujo, setTipoFlujo] = useState(tramite.tipo_flujo || "PAGO");
+  const [padreGestion, setPadreGestion] = useState(
+    (tramite.padre_gestion || tramite.tipo_flujo || "PAGO").toUpperCase()
+  );
+  const [tipoGestion, setTipoGestion] = useState(tramite.tipo_gestion || "PAGO");
   const [numeroQuipux, setNumeroQuipux] = useState(tramite.numero_quipux || "");
   const [fechaMemorando, setFechaMemorando] = useState(
     tramite.fecha_memorando
@@ -37,11 +40,15 @@ export const ModalEditarDatosGenerales: React.FC<ModalEditarDatosGeneralesProps>
   );
   const [rucProveedor, setRucProveedor] = useState(tramite.ruc_proveedor || "");
   const [idTipoTramite, setIdTipoTramite] = useState(String(tramite.id_tipo_tramite || "1"));
-  const [montoTotal, setMontoTotal] = useState(String(tramite.monto_total || "0"));
+  const [subtotal, setSubtotal] = useState(String(tramite.subtotal || tramite.monto_total || "0"));
   const [numeroLiquidacion, setNumeroLiquidacion] = useState(tramite.numero_liquidacion || "");
   const [numeroJuicio, setNumeroJuicio] = useState(tramite.numero_juicio || "");
+  const [areaRequirente, setAreaRequirente] = useState(tramite.area_requirente || "");
+  const [asunto, setAsunto] = useState(tramite.asunto || "");
 
   const [procesos, setProcesos] = useState<any[]>([]);
+  const [areas, setAreas] = useState<any[]>([]);
+  const [catalogoGestiones, setCatalogoGestiones] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -52,32 +59,81 @@ export const ModalEditarDatosGenerales: React.FC<ModalEditarDatosGeneralesProps>
         if (d.tipos) setProcesos(d.tipos);
       })
       .catch((err) => console.error("Error loading procesos:", err));
+
+    fetch("/api/admin/catalogos?tipo=areas")
+      .then((r) => r.json())
+      .then((d) => {
+        if (d.items) setAreas(d.items);
+      })
+      .catch((err) => console.error("Error loading areas:", err));
+
+    fetch("/api/admin/catalogos?tipo=gestion")
+      .then((r) => r.json())
+      .then((d) => {
+        if (d.items && d.items.length > 0) {
+          setCatalogoGestiones(d.items.filter((item: any) => item.activo !== false));
+        }
+      })
+      .catch((err) => console.error("Error loading gestiones:", err));
   }, []);
+
+  // Subtipos dependientes según la categoría padre
+  const subtiposDisponibles = React.useMemo(() => {
+    if (catalogoGestiones.length > 0) {
+      return catalogoGestiones.filter((g) => (g.padre || "PAGO").toUpperCase() === padreGestion);
+    }
+    if (padreGestion === "PAGO") {
+      return [
+        { codigo: "PAGO", nombre: "PAGO" },
+        { codigo: "EXPEDIENTE", nombre: "EXPEDIENTE" },
+        { codigo: "JUSTIFICACION", nombre: "JUSTIFICACION" },
+      ];
+    } else {
+      return [
+        { codigo: "CAUCION", nombre: "Caución" },
+        { codigo: "DEV_CAUCION", nombre: "Devolución de caución" },
+        { codigo: "DEV_VALORES", nombre: "Devolución de valores" },
+        { codigo: "GARANTIA", nombre: "Garantia" },
+        { codigo: "JUICIO", nombre: "Juicio" },
+        { codigo: "PAGO_INDEBIDO", nombre: "Pago indebido" },
+        { codigo: "PROCESO_COACTIVO", nombre: "Proceso coactivo" },
+        { codigo: "REPARACION_ECONOMICA", nombre: "Reparación Económica" },
+        { codigo: "SENTENCIA", nombre: "Sentencia" },
+      ];
+    }
+  }, [padreGestion, catalogoGestiones]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!numeroQuipux.trim() || !proveedorBeneficiario.trim() || !montoTotal) {
-      setError("Por favor complete los campos obligatorios (Quipux, Beneficiario, Monto).");
+    if (!numeroQuipux.trim() || !proveedorBeneficiario.trim()) {
+      setError("Por favor complete los campos obligatorios (Quipux, Beneficiario).");
       return;
     }
 
     setLoading(true);
     setError(null);
     try {
+      const montoNum = parseFloat(subtotal) || 0;
       const res = await fetch(`/api/tramites/${tramite.id_tramite}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           id_usuario: currentUser?.id_usuario,
           rol: currentUser?.rol,
-          tipo_flujo: tipoFlujo,
+          id_area: currentUser?.id_area,
+          padre_gestion: padreGestion,
+          tipo_gestion: tipoGestion,
+          tipo_flujo: padreGestion,
           numero_quipux: numeroQuipux.trim(),
+          area_requirente: areaRequirente.trim() || null,
+          asunto: asunto.trim() || null,
           fecha_memorando: fechaMemorando || null,
           fecha_recepcion_fisica: fechaRecepcionFisica || null,
           proveedor_beneficiario: proveedorBeneficiario.trim(),
           ruc_proveedor: rucProveedor.trim() || null,
           id_tipo_tramite: parseInt(idTipoTramite, 10),
-          monto_total: parseFloat(montoTotal),
+          subtotal: montoNum,
+          monto_total: montoNum,
           numero_liquidacion: numeroLiquidacion.trim() || null,
           numero_juicio: numeroJuicio.trim() || null,
         }),
@@ -100,7 +156,7 @@ export const ModalEditarDatosGenerales: React.FC<ModalEditarDatosGeneralesProps>
       isOpen={isOpen}
       onClose={onClose}
       title="MODIFICAR DATOS GENERALES DEL TRÁMITE"
-      subtitle="Edición autorizada de parámetros institucionales y beneficiario (Registrado en Auditoría)."
+      subtitle="Edición autorizada de parámetros institucionales (DFI, Presupuesto y Administración)."
     >
       <form onSubmit={handleSubmit} className="space-y-4">
         {error && (
@@ -111,18 +167,44 @@ export const ModalEditarDatosGenerales: React.FC<ModalEditarDatosGeneralesProps>
         )}
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
-          {/* Tipo de Gestión */}
+          {/* Categoría Padre de Gestión */}
           <div>
             <label className="block font-bold text-slate-700 uppercase mb-1">
-              Tipo de Gestión *
+              Categoría de Gestión *
             </label>
             <select
-              value={tipoFlujo}
-              onChange={(e) => setTipoFlujo(e.target.value)}
-              className="w-full p-2 border border-slate-300 rounded-lg bg-slate-50 focus:ring-2 focus:ring-blue-500 font-semibold uppercase"
+              value={padreGestion}
+              onChange={(e) => {
+                const nuevoPadre = e.target.value;
+                setPadreGestion(nuevoPadre);
+                if (nuevoPadre === "PAGO") {
+                  setTipoGestion("PAGO");
+                } else {
+                  setTipoGestion("Garantia");
+                }
+              }}
+              className="w-full p-2 border border-slate-300 rounded-lg bg-slate-50 focus:ring-2 focus:ring-blue-500 font-bold uppercase"
             >
               <option value="PAGO">PAGO</option>
-              <option value="EXPEDIENTE">EXPEDIENTE</option>
+              <option value="GARANTIA">GARANTIA</option>
+            </select>
+          </div>
+
+          {/* Subtipo de Gestión */}
+          <div>
+            <label className="block font-bold text-slate-700 uppercase mb-1">
+              Tipo de Gestión Específica *
+            </label>
+            <select
+              value={tipoGestion}
+              onChange={(e) => setTipoGestion(e.target.value)}
+              className="w-full p-2 border border-slate-300 rounded-lg bg-slate-50 focus:ring-2 focus:ring-blue-500 font-semibold uppercase"
+            >
+              {subtiposDisponibles.map((g) => (
+                <option key={g.codigo || g.nombre} value={g.nombre || g.codigo}>
+                  {g.nombre || g.codigo}
+                </option>
+              ))}
             </select>
           </div>
 
@@ -167,6 +249,21 @@ export const ModalEditarDatosGenerales: React.FC<ModalEditarDatosGeneralesProps>
             />
           </div>
 
+          {/* Monto / Subtotal */}
+          <div>
+            <label className="block font-bold text-slate-700 uppercase mb-1">
+              Subtotal / Monto Total (USD) *
+            </label>
+            <input
+              type="number"
+              step="0.01"
+              value={subtotal}
+              onChange={(e) => setSubtotal(e.target.value)}
+              className="w-full p-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 font-mono font-bold"
+              required
+            />
+          </div>
+
           {/* Proveedor / Beneficiario */}
           <div className="sm:col-span-2">
             <label className="block font-bold text-slate-700 uppercase mb-1">
@@ -197,23 +294,8 @@ export const ModalEditarDatosGenerales: React.FC<ModalEditarDatosGeneralesProps>
             />
           </div>
 
-          {/* Monto Total */}
-          <div>
-            <label className="block font-bold text-slate-700 uppercase mb-1">
-              Monto Total (USD) *
-            </label>
-            <input
-              type="number"
-              step="0.01"
-              value={montoTotal}
-              onChange={(e) => setMontoTotal(e.target.value)}
-              className="w-full p-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 font-mono font-bold"
-              required
-            />
-          </div>
-
           {/* Tipo de Proceso */}
-          <div className="sm:col-span-2">
+          <div>
             <label className="block font-bold text-slate-700 uppercase mb-1">
               Tipo de Proceso Normativo *
             </label>
@@ -255,6 +337,40 @@ export const ModalEditarDatosGenerales: React.FC<ModalEditarDatosGeneralesProps>
               onChange={(e) => setNumeroJuicio(e.target.value)}
               className="w-full p-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 font-mono"
               placeholder="JUICIO-XXXX-2026"
+            />
+          </div>
+
+          {/* Área Requirente */}
+          <div className="sm:col-span-2">
+            <label className="block font-bold text-slate-700 uppercase mb-1">
+              Área Requirente / Solicitante
+            </label>
+            <input
+              list="modal-areas-list"
+              type="text"
+              value={areaRequirente}
+              onChange={(e) => setAreaRequirente(e.target.value)}
+              className="w-full p-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 uppercase text-xs"
+              placeholder="SELECCIONE O ESCRIBA EL ÁREA REQUIREnte"
+            />
+            <datalist id="modal-areas-list">
+              {areas.map((a) => (
+                <option key={a.id_area || a.nombre} value={a.nombre} />
+              ))}
+            </datalist>
+          </div>
+
+          {/* Asunto */}
+          <div className="sm:col-span-2">
+            <label className="block font-bold text-slate-700 uppercase mb-1">
+              Asunto del Trámite
+            </label>
+            <textarea
+              rows={3}
+              value={asunto}
+              onChange={(e) => setAsunto(e.target.value)}
+              className="w-full p-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-xs text-slate-800"
+              placeholder="Descripción o detalle del requerimiento institucional..."
             />
           </div>
         </div>

@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { feriados_tipo } from "@prisma/client";
 
 export const dynamic = "force-dynamic";
+
+type feriados_tipo = "NACIONAL" | "LOCAL" | "RECUPERABLE" | string;
 
 // Computus algorithm for Easter and movable holidays
 function getMovableHolidaysEcuador(year: number) {

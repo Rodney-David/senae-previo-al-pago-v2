@@ -1,13 +1,24 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getAuthenticatedUser } from "@/lib/auth";
+import { prisma } from "@/lib/prisma";
+import { verifySessionToken, createSessionToken, SESSION_COOKIE_NAME } from "@/lib/session";
 
 export const dynamic = "force-dynamic";
 
 export async function GET(request: NextRequest) {
   try {
-    const user = await getAuthenticatedUser(request);
+    const sessionCookie = request.cookies.get(SESSION_COOKIE_NAME)?.value;
+    const sessionPayload = await verifySessionToken(sessionCookie);
 
-    if (!user) {
+    if (!sessionPayload) {
+      return NextResponse.json({ user: null, authenticated: false }, { status: 401 });
+    }
+
+    const user = await prisma.usuarios.findUnique({
+      where: { id_usuario: sessionPayload.userId },
+      include: { areas: true },
+    });
+
+    if (!user || !user.activo) {
       return NextResponse.json({ user: null, authenticated: false }, { status: 401 });
     }
 

@@ -4,7 +4,6 @@ import React, { useEffect, useState, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { TramiteCompletoDTO, UsuarioInstitucional } from "@/types";
-import { formatCurrency, formatDate } from "@/lib/utils";
 import { BadgeEstado } from "@/components/ui/BadgeEstado";
 import { SemaforoSLA } from "@/components/ui/SemaforoSLA";
 import { BarraAcciones } from "@/components/tramites/BarraAcciones";
@@ -14,7 +13,6 @@ import { TarjetaPresupuesto } from "@/components/tramites/TarjetaPresupuesto";
 import { TarjetaContabilidad } from "@/components/tramites/TarjetaContabilidad";
 import { TarjetaTesoreria } from "@/components/tramites/TarjetaTesoreria";
 import { TarjetaArchivo } from "@/components/tramites/TarjetaArchivo";
-import { TarjetaChecklist } from "@/components/tramites/TarjetaChecklist";
 import { TimelineBitacora } from "@/components/tramites/TimelineBitacora";
 import { ArrowLeft, RefreshCw, FileText, AlertTriangle } from "lucide-react";
 
@@ -107,12 +105,8 @@ export default function TramiteDetallePage() {
               <BadgeEstado estado={tramite.estado_general} subEstado={tramite.sub_estado} />
               <SemaforoSLA sla={tramite.sla} />
             </div>
-            <div className="flex items-center gap-3 text-xs text-slate-500 mt-1 flex-wrap">
+            <div className="flex items-center gap-2 text-xs text-slate-500 mt-1">
               <span className="font-mono text-blue-700 font-semibold">{tramite.numero_quipux}</span>
-              <span>•</span>
-              <span>Beneficiario: <strong className="text-slate-700">{tramite.proveedor_beneficiario}</strong></span>
-              <span>•</span>
-              <span>Neto a Pagar: <strong className="font-mono text-emerald-700">{formatCurrency(tramite.monto_total)}</strong></span>
             </div>
           </div>
         </div>
@@ -145,18 +139,8 @@ export default function TramiteDetallePage() {
       <TablaReferencias
         idTramite={tramite.id_tramite}
         referencias={tramite.tramite_referencias}
+        currentUser={currentUser}
         onRefresh={fetchTramite}
-      />
-
-      {/* Card 3: Checklist Oficial de Control Previo al Pago */}
-      <TarjetaChecklist
-        idTramite={tramite.id_tramite}
-        currentUserId={currentUser?.id_usuario}
-        readOnly={
-          (currentUser?.id_area !== 2 && currentUser?.rol !== "ADMIN") ||
-          tramite.estado_general === "ANULADO" ||
-          tramite.estado_general === "ARCHIVADO"
-        }
       />
 
       {/* Card 4: Fase Presupuesto */}
@@ -188,7 +172,10 @@ export default function TramiteDetallePage() {
       />
 
       {/* Card 7: Bitácora Histórica (Timeline) */}
-      <TimelineBitacora movimientos={tramite.historial_movimientos} />
+      <TimelineBitacora
+        movimientos={tramite.historial_movimientos}
+        currentUser={currentUser}
+      />
     </div>
   );
 }

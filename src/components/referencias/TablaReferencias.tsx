@@ -1,56 +1,91 @@
 "use client";
 
-import React, { useState } from "react";
-import { TramiteReferenciaDTO } from "@/types";
+import React, { useState, useMemo, useEffect } from "react";
+import { TramiteReferenciaDTO, UsuarioInstitucional } from "@/types";
 import { formatDate } from "@/lib/utils";
-import { FileText, Plus, ExternalLink } from "lucide-react";
+import { FileText, Plus, ExternalLink, ChevronDown } from "lucide-react";
 import { ModalNuevaReferencia } from "./ModalNuevaReferencia";
 
 interface TablaReferenciasProps {
   idTramite: number;
   referencias?: TramiteReferenciaDTO[];
   onRefresh: () => void;
+  currentUser?: UsuarioInstitucional | null;
 }
 
 export const TablaReferencias: React.FC<TablaReferenciasProps> = ({
   idTramite,
   referencias = [],
   onRefresh,
+  currentUser,
 }) => {
   const [modalOpen, setModalOpen] = useState(false);
 
+  const isDefaultOpen = useMemo(() => {
+    if (!currentUser) return true;
+    const rol = (currentUser.rol || "").toUpperCase();
+    const cargo = (currentUser.cargo || "").toUpperCase();
+    return (
+      rol === "ADMIN" ||
+      rol === "DIRECTORA" ||
+      rol === "SECRETARIA" ||
+      cargo.includes("DIRECTORA") ||
+      cargo.includes("SECRETARIA")
+    );
+  }, [currentUser]);
+
+  const [isOpen, setIsOpen] = useState(isDefaultOpen);
+
+  useEffect(() => {
+    setIsOpen(isDefaultOpen);
+  }, [isDefaultOpen]);
+
   return (
     <div className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-xs space-y-0">
-      <div className="px-5 py-3.5 bg-slate-900 text-white flex items-center justify-between">
-        <div className="flex items-center gap-2">
+      <div
+        onClick={() => setIsOpen(!isOpen)}
+        className="px-5 py-3.5 bg-slate-900 text-white flex items-center justify-between cursor-pointer select-none hover:bg-slate-850 transition-colors"
+      >
+        <div className="flex items-center gap-2.5">
           <FileText className="w-4 h-4 text-blue-400" />
-          <h3 className="text-xs font-semibold uppercase tracking-wider">
-            2. Documentos y Referencias Institucionales Quipux
+          <h3 className="text-xs font-bold uppercase tracking-wider">
+            DOCUMENTOS Y REFERENCIAS
           </h3>
+          <ChevronDown
+            className={`w-4 h-4 text-slate-400 transition-transform duration-200 ${
+              isOpen ? "rotate-180 text-blue-400" : ""
+            }`}
+          />
         </div>
-        <button
-          onClick={() => setModalOpen(true)}
-          className="px-3 py-1 text-xs font-medium bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors flex items-center gap-1 shadow-xs"
-        >
-          <Plus className="w-3.5 h-3.5" />
-          Agregar Referencia
-        </button>
+        <div className="flex items-center gap-3" onClick={(e) => e.stopPropagation()}>
+          <span className="text-[11px] font-medium text-slate-400">
+            {referencias.length} {referencias.length === 1 ? "documento" : "documentos"}
+          </span>
+          <button
+            onClick={() => setModalOpen(true)}
+            className="px-3 py-1 text-xs font-medium bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors flex items-center gap-1 shadow-xs"
+          >
+            <Plus className="w-3.5 h-3.5" />
+            Agregar Referencia
+          </button>
+        </div>
       </div>
 
-      <div className="p-0 overflow-x-auto">
+      {isOpen && (
+        <div className="p-0 overflow-x-auto">
         {referencias.length === 0 ? (
           <div className="p-6 text-center text-xs text-slate-500">
             No se han registrado referencias documentales Quipux para este trámite.
           </div>
         ) : (
-          <table className="min-w-[580px] w-full text-left border-collapse text-xs">
+          <table className="min-w-[700px] w-full text-left border-collapse">
             <thead>
-              <tr className="border-b border-slate-200 bg-slate-50 text-[10px] font-bold text-slate-600 uppercase tracking-wider">
-                <th className="py-2 px-3">Tipo</th>
-                <th className="py-2 px-3">Número Oficial</th>
-                <th className="py-2 px-3">Fecha</th>
-                <th className="py-2 px-3">Asunto / Sumilla</th>
-                <th className="py-2 px-3">Registrado Por</th>
+              <tr className="border-b border-slate-200 bg-slate-50 text-[11px] font-semibold text-slate-600 uppercase tracking-wider">
+                <th className="py-2.5 px-4">Tipo</th>
+                <th className="py-2.5 px-4">Número Oficial</th>
+                <th className="py-2.5 px-4">Fecha</th>
+                <th className="py-2.5 px-4">Asunto / Sumilla</th>
+                <th className="py-2.5 px-4">Registrado Por</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 text-xs">
@@ -79,6 +114,7 @@ export const TablaReferencias: React.FC<TablaReferenciasProps> = ({
           </table>
         )}
       </div>
+      )}
 
       <ModalNuevaReferencia
         isOpen={modalOpen}

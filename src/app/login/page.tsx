@@ -34,6 +34,7 @@ export default function LoginPage() {
   // Feedback y loading
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [infoMessage, setInfoMessage] = useState<string | null>(null);
 
   // Cargar Captcha dinámico
   const fetchCaptcha = async () => {
@@ -55,6 +56,14 @@ export default function LoginPage() {
 
   useEffect(() => {
     fetchCaptcha();
+    if (typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search);
+      if (params.get("reason") === "inactivity") {
+        setInfoMessage("Su sesión se cerró automáticamente por 30 minutos de inactividad.");
+      } else if (params.get("expired") === "1") {
+        setInfoMessage("Su sesión anterior ha finalizado. Ingrese nuevamente sus credenciales.");
+      }
+    }
   }, []);
 
   // Manejo de Inicio de Sesión: Credenciales + Captcha
@@ -94,7 +103,12 @@ export default function LoginPage() {
         return;
       }
 
-      // Sesión iniciada con éxito -> Redirigir directamente al escritorio
+      // Sesión iniciada con éxito -> Guardar en caché y redirigir directamente al escritorio
+      if (data.user) {
+        try {
+          localStorage.setItem("senae_user_session", JSON.stringify(data.user));
+        } catch (e) {}
+      }
       window.location.href = "/escritorio";
     } catch (err: any) {
       setError(err.message || "Error al conectar con el servidor institucional.");
@@ -139,6 +153,13 @@ export default function LoginPage() {
               <span>TLS 256-bit</span>
             </div>
           </div>
+
+          {infoMessage && (
+            <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg flex items-start gap-2 text-xs text-amber-800 animate-in fade-in">
+              <ShieldAlert className="w-4 h-4 shrink-0 mt-0.5 text-amber-600" />
+              <span>{infoMessage}</span>
+            </div>
+          )}
 
           {error && (
             <div className="p-3 bg-rose-50 border border-rose-200 rounded-lg flex items-start gap-2 text-xs text-rose-700 animate-in fade-in">

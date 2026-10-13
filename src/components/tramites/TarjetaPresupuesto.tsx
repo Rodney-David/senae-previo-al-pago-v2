@@ -1,9 +1,9 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { TramiteCompletoDTO, UsuarioInstitucional } from "@/types";
 import { formatDate } from "@/lib/utils";
-import { PieChart, CheckCircle2, AlertCircle, Edit3, Plus, Trash2, Tag, FileText } from "lucide-react";
+import { PieChart, CheckCircle2, AlertCircle, Edit3, Plus, Trash2, Tag, FileText, ChevronDown } from "lucide-react";
 
 interface TarjetaPresupuestoProps {
   tramite: TramiteCompletoDTO;
@@ -22,6 +22,11 @@ export const TarjetaPresupuesto: React.FC<TarjetaPresupuestoProps> = ({
   );
   const [item, setItem] = useState(tramite.item_presupuestario || "");
   const [numeroFactura, setNumeroFactura] = useState(tramite.numero_factura || "");
+  const [nroTramite, setNroTramite] = useState(tramite.nro_tramite || "");
+  const [periodoPago, setPeriodoPago] = useState(tramite.periodo_pago || "");
+  const [curCompromiso, setCurCompromiso] = useState(
+    tramite.numero_cur_compromiso || ""
+  );
   
   // Lista de anexos con límite de 10
   const parseInitialAnexos = (): string[] => {
@@ -45,13 +50,40 @@ export const TarjetaPresupuesto: React.FC<TarjetaPresupuestoProps> = ({
     setCertificacion(tramite.certificacion_presupuestaria || "");
     setItem(tramite.item_presupuestario || "");
     setNumeroFactura(tramite.numero_factura || "");
+    setNroTramite(tramite.nro_tramite || "");
+    setPeriodoPago(tramite.periodo_pago || "");
+    setCurCompromiso(tramite.numero_cur_compromiso || "");
     setAnexosList(parseInitialAnexos());
   }, [tramite]);
 
   const canEdit =
     (currentUser?.id_area === 2 || currentUser?.rol === "ADMIN") &&
+    tramite.estado_general !== "ARCHIVO" &&
     tramite.estado_general !== "ARCHIVADO" &&
+    tramite.estado_general !== "INSUBSISTENTE" &&
     tramite.estado_general !== "ANULADO";
+
+  const isDefaultOpen = useMemo(() => {
+    if (!currentUser) return true;
+    const rol = (currentUser.rol || "").toUpperCase();
+    const cargo = (currentUser.cargo || "").toUpperCase();
+    if (
+      rol === "ADMIN" ||
+      rol === "DIRECTORA" ||
+      rol === "SECRETARIA" ||
+      cargo.includes("DIRECTORA") ||
+      cargo.includes("SECRETARIA")
+    ) {
+      return true;
+    }
+    return currentUser.id_area === 2 || rol.includes("PRESUPUESTO") || cargo.includes("PRESUPUESTO");
+  }, [currentUser]);
+
+  const [isOpen, setIsOpen] = useState(isDefaultOpen);
+
+  useEffect(() => {
+    setIsOpen(isDefaultOpen);
+  }, [isDefaultOpen]);
 
   // Comprobar si el proceso o tipo de gestión requiere item presupuestario
   const requiereItem =
@@ -78,6 +110,28 @@ export const TarjetaPresupuesto: React.FC<TarjetaPresupuestoProps> = ({
     e.preventDefault();
     setLoading(true);
     setError(null);
+
+    // Validación numérica para CUR Compromiso
+    if (curCompromiso.trim() && !/^\d{1,10}$/.test(curCompromiso.trim())) {
+      setError("El CUR Compromiso debe contener exclusivamente números (hasta 10 dígitos).");
+      setLoading(false);
+      return;
+    }
+
+    // Validación alfanumérica para Nro. de Trámite
+    if (nroTramite.trim() && !/^[A-Za-z0-9\-_./ ]{1,50}$/.test(nroTramite.trim())) {
+      setError("El Nro. de Trámite solo permite caracteres alfanuméricos, guiones y barras (máx. 50 caracteres).");
+      setLoading(false);
+      return;
+    }
+
+    // Validación para Período de Pago
+    if (periodoPago.trim() && !/^[A-Za-z0-9\-_./ ]{1,50}$/.test(periodoPago.trim())) {
+      setError("El Período de Pago solo permite caracteres alfanuméricos (máx. 50 caracteres).");
+      setLoading(false);
+      return;
+    }
+
     try {
       const res = await fetch(`/api/tramites/${tramite.id_tramite}/flujo`, {
         method: "POST",
@@ -88,6 +142,9 @@ export const TarjetaPresupuesto: React.FC<TarjetaPresupuestoProps> = ({
             certificacion_presupuestaria: certificacion.trim(),
             item_presupuestario: requiereItem ? item.trim() : null,
             numero_factura: numeroFactura.trim() || null,
+            nro_tramite: nroTramite.trim() || null,
+            periodo_pago: periodoPago.trim() || null,
+            numero_cur_compromiso: curCompromiso.trim() || null,
             anexos: JSON.stringify(anexosList),
           },
         }),
@@ -107,14 +164,22 @@ export const TarjetaPresupuesto: React.FC<TarjetaPresupuestoProps> = ({
 
   return (
     <div className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-xs">
-      <div className="px-5 py-3.5 bg-slate-900 text-white flex flex-wrap items-center justify-between gap-3">
-        <div className="flex items-center gap-2">
+      <div
+        onClick={() => setIsOpen(!isOpen)}
+        className="px-5 py-3.5 bg-slate-900 text-white flex flex-wrap items-center justify-between gap-3 cursor-pointer select-none hover:bg-slate-850 transition-colors"
+      >
+        <div className="flex items-center gap-2.5">
           <PieChart className="w-4 h-4 text-blue-400" />
           <h3 className="text-xs font-bold uppercase tracking-wider">
-            2. Control y Afectación Presupuestaria
+            CONTROL PREVIO - PRESUPUESTO
           </h3>
+          <ChevronDown
+            className={`w-4 h-4 text-slate-400 transition-transform duration-200 ${
+              isOpen ? "rotate-180 text-blue-400" : ""
+            }`}
+          />
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3" onClick={(e) => e.stopPropagation()}>
           {tramite.aprobado_presupuesto ? (
             <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded text-[11px] font-bold uppercase bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
               <CheckCircle2 className="w-3.5 h-3.5" /> Aprobado por Jefe de Presupuesto
@@ -127,7 +192,10 @@ export const TarjetaPresupuesto: React.FC<TarjetaPresupuestoProps> = ({
 
           {canEdit && !isEditing && (
             <button
-              onClick={() => setIsEditing(true)}
+              onClick={() => {
+                setIsOpen(true);
+                setIsEditing(true);
+              }}
               className="px-3 py-1 text-xs font-bold uppercase bg-blue-600 hover:bg-blue-700 text-white rounded-lg flex items-center gap-1 transition-colors shadow-2xs"
             >
               <Edit3 className="w-3.5 h-3.5" /> Editar Datos
@@ -136,7 +204,8 @@ export const TarjetaPresupuesto: React.FC<TarjetaPresupuestoProps> = ({
         </div>
       </div>
 
-      <div className="p-5">
+      {isOpen && (
+        <div className="p-5">
         {error && (
           <div className="mb-4 p-3 bg-rose-50 border border-rose-200 text-rose-700 text-xs rounded-lg font-medium">
             {error}
@@ -146,6 +215,23 @@ export const TarjetaPresupuesto: React.FC<TarjetaPresupuestoProps> = ({
         {isEditing ? (
           <form onSubmit={handleSave} className="space-y-4">
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+              <div>
+                <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
+                  Nro. Trámite
+                  <span className="text-[10px] text-slate-400 font-normal ml-1 lowercase">
+                    (alfanumérico)
+                  </span>
+                </label>
+                <input
+                  type="text"
+                  value={nroTramite}
+                  onChange={(e) => setNroTramite(e.target.value.toUpperCase())}
+                  placeholder="ej. SENAE-2026-0042"
+                  maxLength={50}
+                  className="w-full text-xs bg-white border border-slate-300 rounded-lg p-2.5 font-mono focus:ring-2 focus:ring-blue-500 focus:outline-none uppercase font-semibold"
+                />
+              </div>
+
               <div>
                 <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
                   Certificación Presupuestaria *
@@ -180,6 +266,43 @@ export const TarjetaPresupuesto: React.FC<TarjetaPresupuestoProps> = ({
                       : "bg-white border-slate-300 text-slate-800"
                   }`}
                   required={requiereItem}
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
+                  CUR Compromiso
+                  <span className="text-[10px] text-slate-400 font-normal ml-1 lowercase">
+                    (solo números)
+                  </span>
+                </label>
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  value={curCompromiso}
+                  onChange={(e) =>
+                    setCurCompromiso(e.target.value.replace(/\D/g, "").slice(0, 10))
+                  }
+                  placeholder="ej. 1042301"
+                  maxLength={10}
+                  className="w-full text-xs bg-white border border-slate-300 rounded-lg p-2.5 font-mono focus:ring-2 focus:ring-blue-500 focus:outline-none font-semibold text-slate-900"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
+                  Período de Pago
+                  <span className="text-[10px] text-slate-400 font-normal ml-1 lowercase">
+                    (alfanumérico)
+                  </span>
+                </label>
+                <input
+                  type="text"
+                  value={periodoPago}
+                  onChange={(e) => setPeriodoPago(e.target.value.toUpperCase())}
+                  placeholder="ej. ENERO 2026 / 2026-01"
+                  maxLength={50}
+                  className="w-full text-xs bg-white border border-slate-300 rounded-lg p-2.5 font-mono focus:ring-2 focus:ring-blue-500 focus:outline-none uppercase font-semibold"
                 />
               </div>
 
@@ -293,6 +416,15 @@ export const TarjetaPresupuesto: React.FC<TarjetaPresupuestoProps> = ({
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 text-xs">
               <div>
                 <span className="text-[11px] font-bold text-slate-500 uppercase block">
+                  Nro. Trámite:
+                </span>
+                <span className="text-xs font-mono font-bold text-slate-900 uppercase">
+                  {tramite.nro_tramite || "PENDIENTE"}
+                </span>
+              </div>
+
+              <div>
+                <span className="text-[11px] font-bold text-slate-500 uppercase block">
                   Certificación Presupuestaria:
                 </span>
                 <span className="text-xs font-mono font-bold text-slate-900 uppercase">
@@ -308,6 +440,24 @@ export const TarjetaPresupuesto: React.FC<TarjetaPresupuestoProps> = ({
                   {requiereItem
                     ? tramite.item_presupuestario || "PENDIENTE"
                     : "NO APLICA (EXPEDIENTE)"}
+                </span>
+              </div>
+
+              <div>
+                <span className="text-[11px] font-bold text-slate-500 uppercase block">
+                  CUR Compromiso:
+                </span>
+                <span className="text-xs font-mono font-bold text-emerald-700">
+                  {tramite.numero_cur_compromiso || "PENDIENTE"}
+                </span>
+              </div>
+
+              <div>
+                <span className="text-[11px] font-bold text-slate-500 uppercase block">
+                  Período de Pago:
+                </span>
+                <span className="text-xs font-mono font-bold text-slate-900 uppercase">
+                  {tramite.periodo_pago || "PENDIENTE"}
                 </span>
               </div>
 
@@ -347,6 +497,7 @@ export const TarjetaPresupuesto: React.FC<TarjetaPresupuestoProps> = ({
           </div>
         )}
       </div>
+      )}
     </div>
   );
 };

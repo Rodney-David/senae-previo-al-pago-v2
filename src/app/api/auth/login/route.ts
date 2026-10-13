@@ -94,7 +94,7 @@ export async function POST(request: NextRequest) {
 
     response.cookies.set(SESSION_COOKIE_NAME, sessionToken, {
       path: "/",
-      maxAge: 60 * 60 * 24 * 7, // 7 días
+      maxAge: 60 * 60 * 2, // 2 horas máximo (7200 s)
       sameSite: "lax",
       httpOnly: true,
     });

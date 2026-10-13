@@ -19,11 +19,13 @@ import {
   History,
   Lock,
   X,
+  Database,
 } from "lucide-react";
+import { SeccionCatalogos } from "@/components/admin/SeccionCatalogos";
 
 export default function AdministracionPage() {
   const [activeTab, setActiveTab] = useState<
-    "procesos" | "usuarios" | "feriados" | "campos" | "auditoria" | "configuracion"
+    "procesos" | "usuarios" | "feriados" | "campos" | "auditoria" | "catalogos"
   >("procesos");
 
   // States
@@ -33,7 +35,6 @@ export default function AdministracionPage() {
   const [reglas, setReglas] = useState<any[]>([]);
   const [procesos, setProcesos] = useState<any[]>([]);
   const [auditoria, setAuditoria] = useState<any[]>([]);
-  const [unificacionTesoreriaCobranzas, setUnificacionTesoreriaCobranzas] = useState(true);
   const [loading, setLoading] = useState(true);
 
   // Modales
@@ -77,21 +78,19 @@ export default function AdministracionPage() {
   const fetchData = async () => {
     setLoading(true);
     try {
-      const [uRes, fRes, cRes, pRes, aRes, cfgRes] = await Promise.all([
+      const [uRes, fRes, cRes, pRes, aRes] = await Promise.all([
         fetch("/api/admin/usuarios"),
         fetch("/api/admin/feriados"),
         fetch("/api/admin/campos"),
         fetch("/api/admin/procesos"),
         fetch("/api/admin/auditoria"),
-        fetch("/api/admin/configuracion"),
       ]);
-      const [uData, fData, cData, pData, aData, cfgData] = await Promise.all([
+      const [uData, fData, cData, pData, aData] = await Promise.all([
         uRes.json(),
         fRes.json(),
         cRes.json(),
         pRes.json(),
         aRes.json(),
-        cfgRes.ok ? cfgRes.json() : Promise.resolve({}),
       ]);
       if (uData.usuarios) setUsuarios(uData.usuarios);
       if (fData.feriados) setFeriados(fData.feriados);
@@ -99,35 +98,10 @@ export default function AdministracionPage() {
       if (cData.reglas) setReglas(cData.reglas);
       if (pData.tipos) setProcesos(pData.tipos);
       if (aData.movimientos) setAuditoria(aData.movimientos);
-      if (cfgData.unificacionTesoreriaCobranzas !== undefined) {
-        setUnificacionTesoreriaCobranzas(cfgData.unificacionTesoreriaCobranzas);
-      }
     } catch (err) {
       console.error("Error loading admin data:", err);
     } finally {
       setLoading(false);
-    }
-  };
-
-  const handleToggleUnificacion = async () => {
-    const nuevoValor = !unificacionTesoreriaCobranzas;
-    setUnificacionTesoreriaCobranzas(nuevoValor);
-    try {
-      const res = await fetch("/api/admin/configuracion", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ unificacionTesoreriaCobranzas: nuevoValor }),
-      });
-      if (!res.ok) throw new Error("Error al guardar parámetro institucional");
-      setFeedback({
-        type: "success",
-        text: nuevoValor
-          ? "Unificación de Tesorería y Cobranzas activada: El Tesorero General gestiona ambas etapas de forma integrada."
-          : "Operación dividida de Tesorería y Cobranzas activada: Cada área requiere custodios independientes.",
-      });
-    } catch (err: any) {
-      setUnificacionTesoreriaCobranzas(!nuevoValor);
-      setFeedback({ type: "error", text: err.message });
     }
   };
 
@@ -454,15 +428,15 @@ export default function AdministracionPage() {
           5. Auditoría Forense
         </button>
         <button
-          onClick={() => setActiveTab("configuracion")}
+          onClick={() => setActiveTab("catalogos")}
           className={`px-3.5 py-1.5 rounded-md transition-all flex items-center gap-1.5 ${
-            activeTab === "configuracion"
+            activeTab === "catalogos"
               ? "bg-white text-slate-900 shadow-xs font-bold"
               : "text-slate-600 hover:text-slate-900"
           }`}
         >
-          <Sliders className="w-3.5 h-3.5" />
-          6. Configuración Operativa
+          <Database className="w-3.5 h-3.5" />
+          6. Catálogos y Desplegables
         </button>
       </div>
 
@@ -479,14 +453,14 @@ export default function AdministracionPage() {
           </div>
 
           <div className="overflow-x-auto">
-            <table className="min-w-[650px] w-full text-left border-collapse text-xs">
+            <table className="min-w-[750px] w-full text-left border-collapse text-xs">
               <thead>
-                <tr className="border-b border-slate-200 bg-slate-50/70 text-[10px] font-bold text-slate-700 uppercase">
-                  <th className="py-2 px-3 w-10">#</th>
-                  <th className="py-2 px-3">Proceso Normativo (SENAE)</th>
-                  <th className="py-2 px-3 w-40">CUR Exigido en Contabilidad</th>
-                  <th className="py-2 px-3 w-36">Ítem Presupuestario</th>
-                  <th className="py-2 px-3 w-24 text-center">Estado</th>
+                <tr className="border-b border-slate-200 bg-slate-50/70 text-[11px] font-bold text-slate-700 uppercase">
+                  <th className="py-2.5 px-4 w-12">#</th>
+                  <th className="py-2.5 px-4">Proceso Normativo (SENAE)</th>
+                  <th className="py-2.5 px-4 w-44">CUR Exigido en Contabilidad</th>
+                  <th className="py-2.5 px-4 w-40">Ítem Presupuestario</th>
+                  <th className="py-2.5 px-4 w-28 text-center">Estado</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
@@ -560,15 +534,15 @@ export default function AdministracionPage() {
               </div>
 
               <div className="overflow-x-auto">
-                <table className="min-w-[650px] w-full text-left border-collapse text-xs">
+                <table className="min-w-[700px] w-full text-left border-collapse text-xs">
                   <thead>
-                    <tr className="border-b border-slate-200 bg-slate-50 text-[10px] font-bold text-slate-700 uppercase">
-                      <th className="py-2 px-3">Campo Clave</th>
-                      <th className="py-2 px-3">Tipo Gestión</th>
-                      <th className="py-2 px-3">Fase / Etapa</th>
-                      <th className="py-2 px-3">Visibilidad</th>
-                      <th className="py-2 px-3">Obligatoriedad</th>
-                      <th className="py-2 px-3 text-center">Acción</th>
+                    <tr className="border-b border-slate-200 bg-slate-50 text-[11px] font-bold text-slate-700 uppercase">
+                      <th className="py-2.5 px-4">Campo Clave</th>
+                      <th className="py-2.5 px-4">Tipo Gestión</th>
+                      <th className="py-2.5 px-4">Fase / Etapa</th>
+                      <th className="py-2.5 px-4">Visibilidad</th>
+                      <th className="py-2.5 px-4">Obligatoriedad</th>
+                      <th className="py-2.5 px-4 text-center">Acción</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
@@ -629,13 +603,13 @@ export default function AdministracionPage() {
                 Campos Globales Registrados en el Sistema
               </div>
               <div className="overflow-x-auto">
-                <table className="min-w-[560px] w-full text-left border-collapse text-xs">
+                <table className="min-w-[650px] w-full text-left border-collapse text-xs">
                   <thead>
-                    <tr className="border-b border-slate-200 bg-slate-50 text-[10px] font-bold text-slate-700 uppercase">
-                      <th className="py-2 px-3">Clave</th>
-                      <th className="py-2 px-3">Etiqueta</th>
-                      <th className="py-2 px-3">Tipo Dato</th>
-                      <th className="py-2 px-3">Departamento</th>
+                    <tr className="border-b border-slate-200 bg-slate-50 text-[11px] font-bold text-slate-700 uppercase">
+                      <th className="py-2.5 px-4">Clave</th>
+                      <th className="py-2.5 px-4">Etiqueta</th>
+                      <th className="py-2.5 px-4">Tipo Dato</th>
+                      <th className="py-2.5 px-4">Departamento</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
@@ -836,15 +810,15 @@ export default function AdministracionPage() {
           </div>
 
           <div className="overflow-x-auto">
-            <table className="min-w-[700px] w-full text-left border-collapse text-xs">
+            <table className="min-w-[850px] w-full text-left border-collapse text-xs">
               <thead>
-                <tr className="border-b border-slate-200 bg-slate-50/70 text-[10px] font-bold text-slate-700 uppercase">
-                  <th className="py-2 px-3">Funcionario</th>
-                  <th className="py-2 px-3">Correo Institucional</th>
-                  <th className="py-2 px-3">Departamento</th>
-                  <th className="py-2 px-3">Cargo / Rol</th>
-                  <th className="py-2 px-3">Disponibilidad</th>
-                  <th className="py-2 px-3 text-center">Acciones</th>
+                <tr className="border-b border-slate-200 bg-slate-50/70 text-[11px] font-bold text-slate-700 uppercase">
+                  <th className="py-2.5 px-4">Funcionario</th>
+                  <th className="py-2.5 px-4">Correo Institucional</th>
+                  <th className="py-2.5 px-4">Departamento</th>
+                  <th className="py-2.5 px-4">Cargo / Rol</th>
+                  <th className="py-2.5 px-4">Disponibilidad (Turno)</th>
+                  <th className="py-2.5 px-4 text-center">Acciones</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
@@ -896,13 +870,13 @@ export default function AdministracionPage() {
               Calendario de Días No Laborables Registrados
             </div>
             <div className="overflow-x-auto">
-              <table className="min-w-[500px] w-full text-left border-collapse text-xs">
+              <table className="min-w-[600px] w-full text-left border-collapse text-xs">
                 <thead>
-                  <tr className="border-b border-slate-200 bg-slate-50 text-[10px] font-bold text-slate-700 uppercase">
-                    <th className="py-2 px-3">Fecha</th>
-                    <th className="py-2 px-3">Descripción del Feriado</th>
-                    <th className="py-2 px-3">Tipo</th>
-                    <th className="py-2 px-3 text-center">Acción</th>
+                  <tr className="border-b border-slate-200 bg-slate-50 text-[11px] font-bold text-slate-700 uppercase">
+                    <th className="py-2.5 px-4">Fecha</th>
+                    <th className="py-2.5 px-4">Descripción del Feriado</th>
+                    <th className="py-2.5 px-4">Tipo</th>
+                    <th className="py-2.5 px-4 text-center">Acción</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
@@ -1011,14 +985,14 @@ export default function AdministracionPage() {
           </div>
 
           <div className="overflow-x-auto">
-            <table className="min-w-[720px] w-full text-left border-collapse text-xs">
+            <table className="min-w-[850px] w-full text-left border-collapse text-xs">
               <thead>
-                <tr className="border-b border-slate-200 bg-slate-50 text-[10px] font-bold text-slate-700 uppercase">
-                  <th className="py-2 px-3 w-32">Fecha / Hora</th>
-                  <th className="py-2 px-3 w-32">Trámite / Quipux</th>
-                  <th className="py-2 px-3 w-36">Acción Ejecutada</th>
-                  <th className="py-2 px-3 w-40">Servidor Responsable</th>
-                  <th className="py-2 px-3">Detalle / Comentarios</th>
+                <tr className="border-b border-slate-200 bg-slate-50 text-[11px] font-bold text-slate-700 uppercase">
+                  <th className="py-2.5 px-4 w-36">Fecha / Hora</th>
+                  <th className="py-2.5 px-4 w-36">Trámite / Quipux</th>
+                  <th className="py-2.5 px-4 w-44">Acción Ejecutada</th>
+                  <th className="py-2.5 px-4 w-48">Servidor Responsable</th>
+                  <th className="py-2.5 px-4">Detalle / Comentarios</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
@@ -1057,55 +1031,11 @@ export default function AdministracionPage() {
         </div>
       )}
 
-      {/* TAB 6: CONFIGURACIÓN OPERATIVA Y ESTRUCTURA ORGANIZACIONAL */}
-      {activeTab === "configuracion" && (
-        <div className="bg-white border border-slate-200 rounded-xl p-6 shadow-xs space-y-6">
-          <div className="border-b border-slate-200 pb-4">
-            <h2 className="text-sm font-bold text-slate-900 uppercase tracking-wide">
-              Configuración de Organización y Dependencias Financieras
-            </h2>
-            <p className="text-xs text-slate-500 mt-1 uppercase">
-              Ajuste de parámetros operacionales para la asignación y custodia de expedientes en las fases finales del control previo.
-            </p>
-          </div>
-
-          {/* Switch de Unificación Tesorería - Cobranzas */}
-          <div className="p-5 rounded-xl border border-slate-200 bg-slate-50/70 space-y-4">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-              <div className="space-y-1">
-                <div className="flex items-center gap-2">
-                  <h3 className="text-xs font-bold text-slate-900 uppercase">
-                    Unificación Operativa: Tesorería y Cobranzas
-                  </h3>
-                  <span
-                    className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${
-                      unificacionTesoreriaCobranzas
-                        ? "bg-emerald-100 text-emerald-800 border border-emerald-300"
-                        : "bg-slate-200 text-slate-800 border border-slate-300"
-                    }`}
-                  >
-                    {unificacionTesoreriaCobranzas ? "ACTIVO (Áreas Unificadas)" : "SEPARADO (Áreas Independientes)"}
-                  </span>
-                </div>
-                <p className="text-xs text-slate-600 max-w-2xl leading-relaxed">
-                  Por acuerdo operativo institucional, el <strong>Tesorero General</strong> gestiona de forma unificada tanto la ejecución de transferencias bancarias (eSIGEF / SPI-BCE) como el control de garantías y cobranzas. Puede alternar esta configuración para exigir usuarios custodios diferenciados por departamento cuando se asigne personal dedicado.
-                </p>
-              </div>
-
-              <button
-                type="button"
-                onClick={handleToggleUnificacion}
-                className={`px-4 py-2 text-xs font-bold uppercase rounded-lg transition-all shadow-xs shrink-0 ${
-                  unificacionTesoreriaCobranzas
-                    ? "bg-emerald-600 hover:bg-emerald-700 text-white"
-                    : "bg-slate-800 hover:bg-slate-900 text-white"
-                }`}
-              >
-                {unificacionTesoreriaCobranzas ? "Dividir Tesorería y Cobranzas" : "Unificar en Tesorería General"}
-              </button>
-            </div>
-          </div>
-        </div>
+      {/* TAB 6: CATÁLOGOS Y DESPLEGABLES */}
+      {activeTab === "catalogos" && (
+        <SeccionCatalogos
+          onNotify={(notif) => setFeedback({ type: notif.type, text: notif.text })}
+        />
       )}
 
       {/* Modal Crear / Editar Usuario */}
