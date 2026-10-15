@@ -28,6 +28,10 @@ export async function POST(
       return NextResponse.json({ error: "Trámite no encontrado" }, { status: 404 });
     }
 
+    const body = await request.json();
+    const { accion, datos, comentarios } = body;
+    const now = new Date();
+
     // Si el trámite está INSUBSISTENTE, solo se permite revertir
     if (tramite.estado_general === "INSUBSISTENTE" && accion !== "REVERTIR_INSUBSISTENCIA") {
       return NextResponse.json(
@@ -43,10 +47,6 @@ export async function POST(
         { status: 400 }
       );
     }
-
-    const body = await request.json();
-    const { accion, datos, comentarios } = body;
-    const now = new Date();
 
     let tramiteActualizado;
 
