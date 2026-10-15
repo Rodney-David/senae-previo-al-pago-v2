@@ -3,7 +3,8 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { TramiteCompletoDTO, UsuarioInstitucional } from "@/types";
 import { formatDate } from "@/lib/utils";
-import { PieChart, CheckCircle2, AlertCircle, Edit3, Plus, Trash2, Tag, FileText, ChevronDown } from "lucide-react";
+import { PieChart, CheckCircle2, AlertCircle, Edit3, Plus, Trash2, Tag, FileText, ChevronDown, Receipt } from "lucide-react";
+import { SearchableSelect, OptionItem } from "@/components/ui/SearchableSelect";
 
 interface TarjetaPresupuestoProps {
   tramite: TramiteCompletoDTO;
@@ -21,13 +22,31 @@ export const TarjetaPresupuesto: React.FC<TarjetaPresupuestoProps> = ({
     tramite.certificacion_presupuestaria || ""
   );
   const [item, setItem] = useState(tramite.item_presupuestario || "");
-  const [numeroFactura, setNumeroFactura] = useState(tramite.numero_factura || "");
   const [nroTramite, setNroTramite] = useState(tramite.nro_tramite || "");
   const [periodoPago, setPeriodoPago] = useState(tramite.periodo_pago || "");
   const [curCompromiso, setCurCompromiso] = useState(
     tramite.numero_cur_compromiso || ""
   );
   
+  // Lista de facturas
+  const parseInitialFacturas = (): string[] => {
+    if (!tramite.numero_factura) return [];
+    try {
+      const parsed = JSON.parse(tramite.numero_factura);
+      if (Array.isArray(parsed)) return parsed.map((s) => String(s).trim()).filter(Boolean);
+    } catch {
+      return tramite.numero_factura.split(",").map((s) => s.trim()).filter(Boolean);
+    }
+    return [tramite.numero_factura.trim()].filter(Boolean);
+  };
+
+  const [facturasList, setFacturasList] = useState<string[]>([]);
+  const [nuevaFacturaInput, setNuevaFacturaInput] = useState("");
+
+  // Catálogo de ítems presupuestarios
+  const [itemsCatalog, setItemsCatalog] = useState<any[]>([]);
+  const [loadingItems, setLoadingItems] = useState(false);
+
   // Lista de anexos con límite de 10
   const parseInitialAnexos = (): string[] => {
     if (!tramite.anexos) return [];
@@ -35,7 +54,6 @@ export const TarjetaPresupuesto: React.FC<TarjetaPresupuestoProps> = ({
       const parsed = JSON.parse(tramite.anexos);
       if (Array.isArray(parsed)) return parsed;
     } catch {
-      // Si fue guardado como texto plano separado por comas
       return tramite.anexos.split(",").map((s) => s.trim()).filter(Boolean);
     }
     return [];
@@ -49,12 +67,48 @@ export const TarjetaPresupuesto: React.FC<TarjetaPresupuestoProps> = ({
   useEffect(() => {
     setCertificacion(tramite.certificacion_presupuestaria || "");
     setItem(tramite.item_presupuestario || "");
-    setNumeroFactura(tramite.numero_factura || "");
     setNroTramite(tramite.nro_tramite || "");
     setPeriodoPago(tramite.periodo_pago || "");
     setCurCompromiso(tramite.numero_cur_compromiso || "");
+    setFacturasList(parseInitialFacturas());
     setAnexosList(parseInitialAnexos());
   }, [tramite]);
+
+  // Cargar catálogo de ítems presupuestarios oficiales
+  useEffect(() => {
+    const fetchItems = async () => {
+      try {
+        setLoadingItems(true);
+        const res = await fetch("/api/admin/catalogos?tipo=items");
+        const data = await res.json();
+        if (res.ok && data.items) {
+          setItemsCatalog(data.items);
+        }
+      } catch (err) {
+        console.error("Error al cargar catálogo de ítems:", err);
+      } finally {
+        setLoadingItems(false);
+      }
+    };
+    fetchItems();
+  }, []);
+
+  const itemOptions: OptionItem[] = useMemo(() => {
+    const opts = itemsCatalog.map((it) => ({
+      value: `${it.codigo} - ${it.nombre}`,
+      label: `${it.codigo} - ${it.nombre}`,
+      sublabel: it.descripcion || undefined,
+    }));
+    // Si el item asignado actualmente no está en el catálogo, agregarlo para preservarlo
+    if (item && !opts.some((o) => o.value === item)) {
+      opts.unshift({
+        value: item,
+        label: item,
+        sublabel: "Valor asignado al trámite",
+      });
+    }
+    return opts;
+  }, [itemsCatalog, item]);
 
   const canEdit =
     (currentUser?.id_area === 2 || currentUser?.rol === "ADMIN") &&
@@ -106,10 +160,35 @@ export const TarjetaPresupuesto: React.FC<TarjetaPresupuestoProps> = ({
     setAnexosList(anexosList.filter((_, i) => i !== index));
   };
 
+  const handleAddFactura = () => {
+    const trimmed = nuevaFacturaInput.trim().toUpperCase();
+    if (!trimmed) return;
+    if (facturasList.includes(trimmed)) {
+      setError("Este número de factura ya ha sido agregado.");
+      return;
+    }
+    setFacturasList([...facturasList, trimmed]);
+    setNuevaFacturaInput("");
+    setError(null);
+  };
+
+  const handleRemoveFactura = (index: number) => {
+    setFacturasList(facturasList.filter((_, i) => i !== index));
+  };
+
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     setError(null);
+
+    // Si había una factura escrita en el input pero no pulsó Añadir, incluirla
+    const finalFacturas = [...facturasList];
+    if (nuevaFacturaInput.trim()) {
+      const extra = nuevaFacturaInput.trim().toUpperCase();
+      if (!finalFacturas.includes(extra)) {
+        finalFacturas.push(extra);
+      }
+    }
 
     // Validación numérica para CUR Compromiso
     if (curCompromiso.trim() && !/^\d{1,10}$/.test(curCompromiso.trim())) {
@@ -118,9 +197,9 @@ export const TarjetaPresupuesto: React.FC<TarjetaPresupuestoProps> = ({
       return;
     }
 
-    // Validación alfanumérica para Nro. de Trámite
+    // Validación alfanumérica para Nro / Cod Proceso
     if (nroTramite.trim() && !/^[A-Za-z0-9\-_./ ]{1,50}$/.test(nroTramite.trim())) {
-      setError("El Nro. de Trámite solo permite caracteres alfanuméricos, guiones y barras (máx. 50 caracteres).");
+      setError("El Nro / Cod Proceso solo permite caracteres alfanuméricos, guiones y barras (máx. 50 caracteres).");
       setLoading(false);
       return;
     }
@@ -132,6 +211,13 @@ export const TarjetaPresupuesto: React.FC<TarjetaPresupuestoProps> = ({
       return;
     }
 
+    const facturaPayload =
+      finalFacturas.length === 0
+        ? null
+        : finalFacturas.length === 1
+        ? finalFacturas[0]
+        : JSON.stringify(finalFacturas);
+
     try {
       const res = await fetch(`/api/tramites/${tramite.id_tramite}/flujo`, {
         method: "POST",
@@ -141,7 +227,7 @@ export const TarjetaPresupuesto: React.FC<TarjetaPresupuestoProps> = ({
           datos: {
             certificacion_presupuestaria: certificacion.trim(),
             item_presupuestario: requiereItem ? item.trim() : null,
-            numero_factura: numeroFactura.trim() || null,
+            numero_factura: facturaPayload,
             nro_tramite: nroTramite.trim() || null,
             periodo_pago: periodoPago.trim() || null,
             numero_cur_compromiso: curCompromiso.trim() || null,
@@ -152,6 +238,7 @@ export const TarjetaPresupuesto: React.FC<TarjetaPresupuestoProps> = ({
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Error al guardar datos presupuestarios");
       setIsEditing(false);
+      setNuevaFacturaInput("");
       onRefresh();
     } catch (err: any) {
       setError(err.message);
@@ -161,6 +248,7 @@ export const TarjetaPresupuesto: React.FC<TarjetaPresupuestoProps> = ({
   };
 
   const displayedAnexos = parseInitialAnexos();
+  const displayedFacturas = parseInitialFacturas();
 
   return (
     <div className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-xs">
@@ -217,16 +305,13 @@ export const TarjetaPresupuesto: React.FC<TarjetaPresupuestoProps> = ({
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
               <div>
                 <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
-                  Nro. Trámite
-                  <span className="text-[10px] text-slate-400 font-normal ml-1 lowercase">
-                    (alfanumérico)
-                  </span>
+                  Nro / Cod Proceso
                 </label>
                 <input
                   type="text"
                   value={nroTramite}
                   onChange={(e) => setNroTramite(e.target.value.toUpperCase())}
-                  placeholder="ej. SENAE-2026-0042"
+                  placeholder="Ej: SENAE-2026-0042"
                   maxLength={50}
                   className="w-full text-xs bg-white border border-slate-300 rounded-lg p-2.5 font-mono focus:ring-2 focus:ring-blue-500 focus:outline-none uppercase font-semibold"
                 />
@@ -240,7 +325,7 @@ export const TarjetaPresupuesto: React.FC<TarjetaPresupuestoProps> = ({
                   type="text"
                   value={certificacion}
                   onChange={(e) => setCertificacion(e.target.value)}
-                  placeholder="ej. CERT-2026-088"
+                  placeholder="Ej: CERT-2026-088"
                   className="w-full text-xs bg-white border border-slate-300 rounded-lg p-2.5 font-mono focus:ring-2 focus:ring-blue-500 focus:outline-none uppercase font-semibold"
                   required
                 />
@@ -248,33 +333,30 @@ export const TarjetaPresupuesto: React.FC<TarjetaPresupuestoProps> = ({
 
               <div>
                 <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
-                  Ítem Presupuestario {requiereItem ? "*" : "(No Aplica)"}
+                  Ítem Presupuestario {requiereItem ? "*" : ""}
                 </label>
-                <input
-                  type="text"
-                  value={item}
-                  onChange={(e) => setItem(e.target.value)}
-                  disabled={!requiereItem}
-                  placeholder={
-                    requiereItem
-                      ? "ej. 530804 - MATERIALES DE OFICINA"
-                      : "NO APLICA PARA ESTA GESTIÓN"
-                  }
-                  className={`w-full text-xs border rounded-lg p-2.5 focus:ring-2 focus:ring-blue-500 focus:outline-none uppercase font-semibold ${
-                    !requiereItem
-                      ? "bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed"
-                      : "bg-white border-slate-300 text-slate-800"
-                  }`}
-                  required={requiereItem}
-                />
+                {requiereItem ? (
+                  <SearchableSelect
+                    options={itemOptions}
+                    value={item}
+                    onChange={(val) => setItem(val)}
+                    placeholder={loadingItems ? "Cargando catálogo..." : "Seleccione ítem presupuestario..."}
+                    searchPlaceholder="Buscar por código o denominación..."
+                    required={requiereItem}
+                  />
+                ) : (
+                  <input
+                    type="text"
+                    disabled
+                    value="NO APLICA PARA ESTA GESTIÓN"
+                    className="w-full text-xs bg-slate-100 text-slate-400 border border-slate-200 rounded-lg p-2.5 font-semibold cursor-not-allowed uppercase"
+                  />
+                )}
               </div>
 
               <div>
                 <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
                   CUR Compromiso
-                  <span className="text-[10px] text-slate-400 font-normal ml-1 lowercase">
-                    (solo números)
-                  </span>
                 </label>
                 <input
                   type="text"
@@ -283,7 +365,7 @@ export const TarjetaPresupuesto: React.FC<TarjetaPresupuestoProps> = ({
                   onChange={(e) =>
                     setCurCompromiso(e.target.value.replace(/\D/g, "").slice(0, 10))
                   }
-                  placeholder="ej. 1042301"
+                  placeholder="Ej: 1042301"
                   maxLength={10}
                   className="w-full text-xs bg-white border border-slate-300 rounded-lg p-2.5 font-mono focus:ring-2 focus:ring-blue-500 focus:outline-none font-semibold text-slate-900"
                 />
@@ -292,15 +374,12 @@ export const TarjetaPresupuesto: React.FC<TarjetaPresupuestoProps> = ({
               <div>
                 <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
                   Período de Pago
-                  <span className="text-[10px] text-slate-400 font-normal ml-1 lowercase">
-                    (alfanumérico)
-                  </span>
                 </label>
                 <input
                   type="text"
                   value={periodoPago}
                   onChange={(e) => setPeriodoPago(e.target.value.toUpperCase())}
-                  placeholder="ej. ENERO 2026 / 2026-01"
+                  placeholder="Ej: ENERO 2026"
                   maxLength={50}
                   className="w-full text-xs bg-white border border-slate-300 rounded-lg p-2.5 font-mono focus:ring-2 focus:ring-blue-500 focus:outline-none uppercase font-semibold"
                 />
@@ -308,18 +387,54 @@ export const TarjetaPresupuesto: React.FC<TarjetaPresupuestoProps> = ({
 
               <div>
                 <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
-                  Nro. Factura (SRI)
-                  <span className="text-[10px] text-slate-400 font-normal ml-1 lowercase">
-                    (obligatoria para pasar a contabilidad)
-                  </span>
+                  Nro. Factura
                 </label>
-                <input
-                  type="text"
-                  value={numeroFactura}
-                  onChange={(e) => setNumeroFactura(e.target.value)}
-                  placeholder="001-002-000123456"
-                  className="w-full text-xs bg-white border border-slate-300 rounded-lg p-2.5 font-mono focus:ring-2 focus:ring-blue-500 focus:outline-none"
-                />
+                <div className="flex gap-1.5">
+                  <input
+                    type="text"
+                    value={nuevaFacturaInput}
+                    onChange={(e) => setNuevaFacturaInput(e.target.value.toUpperCase())}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        handleAddFactura();
+                      }
+                    }}
+                    placeholder="Ej: 001-002-000123456"
+                    className="flex-1 text-xs bg-white border border-slate-300 rounded-lg p-2 font-mono focus:ring-2 focus:ring-blue-500 focus:outline-none uppercase font-semibold"
+                  />
+                  <button
+                    type="button"
+                    onClick={handleAddFactura}
+                    disabled={!nuevaFacturaInput.trim()}
+                    className="px-2.5 py-1.5 text-xs font-bold uppercase bg-slate-900 hover:bg-blue-700 disabled:bg-slate-300 text-white rounded-lg transition-colors shadow-2xs"
+                    title="Añadir factura"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+
+                {facturasList.length > 0 && (
+                  <div className="flex flex-wrap gap-1.5 mt-2">
+                    {facturasList.map((fac, idx) => (
+                      <span
+                        key={idx}
+                        className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-mono font-bold bg-blue-50 text-blue-800 border border-blue-200"
+                      >
+                        <Receipt className="w-3 h-3 text-blue-600" />
+                        {fac}
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveFactura(idx)}
+                          className="text-slate-400 hover:text-rose-600 ml-0.5 transition-colors"
+                          title="Eliminar factura"
+                        >
+                          <Trash2 className="w-3 h-3" />
+                        </button>
+                      </span>
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
 
@@ -416,7 +531,7 @@ export const TarjetaPresupuesto: React.FC<TarjetaPresupuestoProps> = ({
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 text-xs">
               <div>
                 <span className="text-[11px] font-bold text-slate-500 uppercase block">
-                  Nro. Trámite:
+                  Nro / Cod Proceso:
                 </span>
                 <span className="text-xs font-mono font-bold text-slate-900 uppercase">
                   {tramite.nro_tramite || "PENDIENTE"}
@@ -462,12 +577,26 @@ export const TarjetaPresupuesto: React.FC<TarjetaPresupuestoProps> = ({
               </div>
 
               <div>
-                <span className="text-[11px] font-bold text-slate-500 uppercase block">
-                  Nro. Factura Oficial:
+                <span className="text-[11px] font-bold text-slate-500 uppercase block mb-1">
+                  Nro. Factura:
                 </span>
-                <span className="text-xs font-mono font-semibold text-blue-700">
-                  {tramite.numero_factura || "PENDIENTE DE INGRESO (SRI)"}
-                </span>
+                {displayedFacturas.length > 0 ? (
+                  <div className="flex flex-wrap gap-1.5">
+                    {displayedFacturas.map((fac, idx) => (
+                      <span
+                        key={idx}
+                        className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded text-[11px] font-mono font-bold bg-blue-50 text-blue-800 border border-blue-200 uppercase"
+                      >
+                        <Receipt className="w-3 h-3 text-blue-600" />
+                        {fac}
+                      </span>
+                    ))}
+                  </div>
+                ) : (
+                  <span className="text-xs font-mono font-semibold text-slate-400">
+                    PENDIENTE
+                  </span>
+                )}
               </div>
             </div>
 

@@ -28,14 +28,30 @@ export async function generarActaEntregaExcel(tramites: TramiteParaActa[]): Prom
   const now = new Date();
   const dd = String(now.getDate()).padStart(2, "0");
   const mm = String(now.getMonth() + 1).padStart(2, "0");
-  const aa = String(now.getFullYear()).slice(-2);
-  const fechaStr = `${dd}-${mm}-${aa}`;
+  const yyyy = String(now.getFullYear());
+  const fechaEmisionStr = `${dd}/${mm}/${yyyy}`;
 
-  // 1. TÍTULO UNIFICADO
-  // "DOCUMENTO ENTREGADOS A CONTROL PREVIO / RECIBIDO [DD-MM-AA]"
+  // Configuración de página exacta de la plantilla
+  worksheet.pageSetup = {
+    orientation: "landscape",
+    fitToPage: true,
+    fitToWidth: 1,
+    fitToHeight: 0,
+    paperSize: 9, // A4
+    margins: {
+      left: 0.7,
+      right: 0.7,
+      top: 0.75,
+      bottom: 0.75,
+      header: 0.3,
+      footer: 0.3,
+    },
+  };
+
+  // 1. TÍTULO UNIFICADO (Fila 1 - Altura 28.8pt)
   worksheet.mergeCells("A1:I1");
   const titleCell = worksheet.getCell("A1");
-  titleCell.value = `DOCUMENTO ENTREGADOS A CONTROL PREVIO / RECIBIDO [${fechaStr}]`;
+  titleCell.value = "DOCUMENTO ENTREGADOS A CONTROL PREVIO";
   titleCell.font = { name: "Arial", size: 13, bold: true, color: { argb: "FFFFFFFF" } };
   titleCell.alignment = { horizontal: "center", vertical: "middle" };
   titleCell.fill = {
@@ -43,12 +59,12 @@ export async function generarActaEntregaExcel(tramites: TramiteParaActa[]): Prom
     pattern: "solid",
     fgColor: { argb: "FF0B3B60" }, // Azul institucional SENAE
   };
-  worksheet.getRow(1).height = 36;
+  worksheet.getRow(1).height = 28.8;
 
-  // Subtítulo institucional
+  // 2. SUBTÍTULO CON FECHA DE EMISIÓN (Fila 2 - Altura 16.05pt)
   worksheet.mergeCells("A2:I2");
   const subTitleCell = worksheet.getCell("A2");
-  subTitleCell.value = "SERVICIO NACIONAL DE ADUANA DEL ECUADOR - DIRECCIÓN FINANCIERA (DFI)";
+  subTitleCell.value = `SERVICIO NACIONAL DE ADUANA DEL ECUADOR | FECHA DE EMISION: ${fechaEmisionStr}`;
   subTitleCell.font = { name: "Arial", size: 9, bold: true, color: { argb: "FF475569" } };
   subTitleCell.alignment = { horizontal: "center", vertical: "middle" };
   subTitleCell.fill = {
@@ -56,23 +72,10 @@ export async function generarActaEntregaExcel(tramites: TramiteParaActa[]): Prom
     pattern: "solid",
     fgColor: { argb: "FFF1F5F9" },
   };
-  worksheet.getRow(2).height = 20;
+  worksheet.getRow(2).height = 16.05;
 
-  // Espaciador
-  worksheet.getRow(3).height = 8;
-
-  // 2. ENCABEZADOS DE COLUMNAS (Fila 4)
-  // Columnas oficiales:
-  // 1. Nro
-  // 2. TIPO GESTION
-  // 3. AREA
-  // 4. Documento / Quipux
-  // 5. FECHA MEMORANDO
-  // 6. FECHA RECEPCION
-  // 7. ASUNTO
-  // 8. RECIBE
-  // 9. FECHA RECIBIDO
-  const headerRow = worksheet.getRow(4);
+  // 3. ENCABEZADOS DE COLUMNAS (Fila 3 - Altura 40.05pt)
+  const headerRow = worksheet.getRow(3);
   headerRow.values = [
     "Nro",
     "TIPO GESTION",
@@ -84,25 +87,27 @@ export async function generarActaEntregaExcel(tramites: TramiteParaActa[]): Prom
     "RECIBE",
     "FECHA RECIBIDO",
   ];
-  headerRow.height = 28;
+  headerRow.height = 40.05;
+
+  const thinBorder: Partial<ExcelJS.Borders> = {
+    top: { style: "thin", color: { argb: "FF000000" } },
+    left: { style: "thin", color: { argb: "FF000000" } },
+    bottom: { style: "thin", color: { argb: "FF000000" } },
+    right: { style: "thin", color: { argb: "FF000000" } },
+  };
 
   headerRow.eachCell((cell) => {
-    cell.font = { name: "Arial", size: 9, bold: true, color: { argb: "FFFFFFFF" } };
+    cell.font = { name: "Arial", size: 10, bold: true, color: { argb: "FFFFFFFF" } };
     cell.alignment = { horizontal: "center", vertical: "middle", wrapText: true };
     cell.fill = {
       type: "pattern",
       pattern: "solid",
       fgColor: { argb: "FF1E3A8A" }, // Azul oscuro corporativo
     };
-    cell.border = {
-      top: { style: "thin", color: { argb: "FF0F172A" } },
-      left: { style: "thin", color: { argb: "FF0F172A" } },
-      bottom: { style: "medium", color: { argb: "FF0F172A" } },
-      right: { style: "thin", color: { argb: "FF0F172A" } },
-    };
+    cell.border = thinBorder;
   });
 
-  // Configuración de anchos de columnas
+  // Configuración de anchos de columnas exacta de la plantilla
   worksheet.columns = [
     { key: "nro", width: 6 },
     { key: "tipo_gestion", width: 22 },
@@ -115,9 +120,9 @@ export async function generarActaEntregaExcel(tramites: TramiteParaActa[]): Prom
     { key: "fecha_recibido", width: 18 },
   ];
 
-  // 3. FILAS DE DATOS
+  // 4. FILAS DE DATOS (A partir de la Fila 4 - Altura 40.05pt)
   tramites.forEach((t, index) => {
-    const rowNumber = 5 + index;
+    const rowNumber = 4 + index;
     const row = worksheet.getRow(rowNumber);
 
     const padre = t.padre_gestion || "PAGO";
@@ -139,25 +144,20 @@ export async function generarActaEntregaExcel(tramites: TramiteParaActa[]): Prom
       fechaMemoStr,
       fechaRecepStr,
       t.asunto || "Sin asunto especificado",
-      "", // Blanco para firma manuscrita
-      "", // Blanco para fecha manuscrita
+      "", // Blanco para firma manuscrita / recepción
+      "", // Blanco para fecha manuscrita / recepción
     ];
 
-    row.height = 36; // Altura cómoda para firmas y anotaciones manuscritas
+    row.height = 40.05; // Altura exacta plantilla para espaciado holgado y cómodo
 
     row.eachCell((cell, colNumber) => {
-      cell.font = { name: "Arial", size: 8.5 };
-      cell.border = {
-        top: { style: "thin", color: { argb: "FFCBD5E1" } },
-        left: { style: "thin", color: { argb: "FFCBD5E1" } },
-        bottom: { style: "thin", color: { argb: "FFCBD5E1" } },
-        right: { style: "thin", color: { argb: "FFCBD5E1" } },
-      };
+      cell.font = { name: "Arial", size: 10 };
+      cell.border = thinBorder;
 
       if (colNumber === 1 || colNumber === 5 || colNumber === 6) {
         cell.alignment = { horizontal: "center", vertical: "middle" };
       } else if (colNumber === 8 || colNumber === 9) {
-        // Celdas para firma
+        // Celdas para firma y fecha de recepción
         cell.alignment = { horizontal: "center", vertical: "middle" };
         cell.fill = {
           type: "pattern",
@@ -169,32 +169,6 @@ export async function generarActaEntregaExcel(tramites: TramiteParaActa[]): Prom
       }
     });
   });
-
-  // 4. PIE DE PÁGINA Y CONTROL DE ENTREGA
-  const totalTramites = tramites.length;
-  const startFooterRow = 5 + totalTramites + 2;
-
-  worksheet.mergeCells(`A${startFooterRow}:I${startFooterRow}`);
-  const footerCell = worksheet.getCell(`A${startFooterRow}`);
-  footerCell.value = `Total de expedientes entregados en este lote: ${totalTramites}`;
-  footerCell.font = { name: "Arial", size: 9, bold: true, color: { argb: "FF1E293B" } };
-  footerCell.alignment = { horizontal: "left", vertical: "middle" };
-
-  // Bloques de firma al pie
-  const signatureRow = startFooterRow + 3;
-  worksheet.mergeCells(`B${signatureRow}:D${signatureRow}`);
-  const signEntregado = worksheet.getCell(`B${signatureRow}`);
-  signEntregado.value = "_____________________________________\nENTREGADO POR: SECRETARÍA DFI";
-  signEntregado.font = { name: "Arial", size: 8.5, bold: true };
-  signEntregado.alignment = { horizontal: "center", vertical: "middle", wrapText: true };
-
-  worksheet.mergeCells(`F${signatureRow}:H${signatureRow}`);
-  const signRecibido = worksheet.getCell(`F${signatureRow}`);
-  signRecibido.value = "_____________________________________\nRECIBIDO POR: CONTROL PREVIO (PRESUPUESTO)";
-  signRecibido.font = { name: "Arial", size: 8.5, bold: true };
-  signRecibido.alignment = { horizontal: "center", vertical: "middle", wrapText: true };
-
-  worksheet.getRow(signatureRow).height = 36;
 
   const buffer = await workbook.xlsx.writeBuffer();
   return Buffer.from(buffer);

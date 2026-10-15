@@ -3,7 +3,8 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { TramiteCompletoDTO, UsuarioInstitucional } from "@/types";
 import { formatDate } from "@/lib/utils";
-import { CreditCard, CheckCircle2, AlertCircle, Edit3, ChevronDown } from "lucide-react";
+import Link from "next/link";
+import { CreditCard, CheckCircle2, AlertCircle, Edit3, ChevronDown, PackagePlus, Package, X, ExternalLink } from "lucide-react";
 
 interface TarjetaTesoreriaProps {
   tramite: TramiteCompletoDTO;
@@ -34,6 +35,57 @@ export const TarjetaTesoreria: React.FC<TarjetaTesoreriaProps> = ({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Modal para asignar a caja física
+  const [modalCajaOpen, setModalCajaOpen] = useState(false);
+  const [cajasAbiertas, setCajasAbiertas] = useState<any[]>([]);
+  const [loadingCajas, setLoadingCajas] = useState(false);
+  const [selectedCajaId, setSelectedCajaId] = useState<number | null>(null);
+  const [guardandoEnCaja, setGuardandoEnCaja] = useState(false);
+
+  const handleOpenModalCaja = async () => {
+    setModalCajaOpen(true);
+    setLoadingCajas(true);
+    setError(null);
+    try {
+      const res = await fetch("/api/cajas?estado=ABIERTA");
+      const data = await res.json();
+      if (data.cajas) {
+        setCajasAbiertas(data.cajas);
+        if (data.cajas.length > 0) {
+          setSelectedCajaId(data.cajas[0].id_caja);
+        }
+      }
+    } catch (err: any) {
+      console.error("Error al cargar cajas abiertas:", err);
+    } finally {
+      setLoadingCajas(false);
+    }
+  };
+
+  const handleConfirmarAsignacionCaja = async () => {
+    if (!selectedCajaId) return;
+    setGuardandoEnCaja(true);
+    setError(null);
+    try {
+      const res = await fetch(`/api/cajas/${selectedCajaId}/tramites`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          accion: "ASIGNAR",
+          ids_tramites: [tramite.id_tramite],
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Error al asignar a caja física");
+      setModalCajaOpen(false);
+      onRefresh();
+    } catch (err: any) {
+      setError(err.message);
+    } finally {
+      setGuardandoEnCaja(false);
+    }
+  };
+
   useEffect(() => {
     setSpiBce(tramite.spi_bce_referencia || "");
     setFechaAutorizacionPago(
@@ -51,27 +103,38 @@ export const TarjetaTesoreria: React.FC<TarjetaTesoreriaProps> = ({
     );
   }, [tramite]);
 
+  const userRolUpper = (currentUser?.rol || "").toUpperCase();
+  const userCargoUpper = (currentUser?.cargo || "").toUpperCase();
+  const isTesoreriaOrCobranzas =
+    currentUser?.id_area === 4 ||
+    currentUser?.id_area === 5 ||
+    userRolUpper === "ADMIN" ||
+    userRolUpper === "ADMINISTRADOR" ||
+    userRolUpper.includes("TESOR") ||
+    userRolUpper.includes("COBRANZA") ||
+    userCargoUpper.includes("TESOR") ||
+    userCargoUpper.includes("COBRANZA") ||
+    userCargoUpper.includes("CAJA");
+
   const canEdit =
-    (currentUser?.id_area === 4 || currentUser?.rol === "ADMIN") &&
+    isTesoreriaOrCobranzas &&
     tramite.estado_general !== "ARCHIVO" &&
     tramite.estado_general !== "INSUBSISTENTE" &&
     tramite.estado_general !== "FINALIZADO_ARCHIVADO";
 
   const isDefaultOpen = useMemo(() => {
     if (!currentUser) return true;
-    const rol = (currentUser.rol || "").toUpperCase();
-    const cargo = (currentUser.cargo || "").toUpperCase();
     if (
-      rol === "ADMIN" ||
-      rol === "DIRECTORA" ||
-      rol === "SECRETARIA" ||
-      cargo.includes("DIRECTORA") ||
-      cargo.includes("SECRETARIA")
+      userRolUpper === "ADMIN" ||
+      userRolUpper === "DIRECTORA" ||
+      userRolUpper === "SECRETARIA" ||
+      userCargoUpper.includes("DIRECTORA") ||
+      userCargoUpper.includes("SECRETARIA")
     ) {
       return true;
     }
-    return currentUser.id_area === 4 || rol.includes("TESORERIA") || cargo.includes("TESOR") || cargo.includes("CAJA");
-  }, [currentUser]);
+    return isTesoreriaOrCobranzas;
+  }, [currentUser, userRolUpper, userCargoUpper, isTesoreriaOrCobranzas]);
 
   const [isOpen, setIsOpen] = useState(isDefaultOpen);
 
@@ -127,7 +190,7 @@ export const TarjetaTesoreria: React.FC<TarjetaTesoreriaProps> = ({
           />
         </div>
         <div className="flex items-center gap-3" onClick={(e) => e.stopPropagation()}>
-          {tramite.fecha_pago ? (
+          {tramite.fecha_pago || tramite.estado_general === "PAGADO" ? (
             <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
               <CheckCircle2 className="w-3 h-3" /> Pago Confirmado
             </span>
@@ -137,7 +200,8 @@ export const TarjetaTesoreria: React.FC<TarjetaTesoreriaProps> = ({
             </span>
           )}
 
-          {canEdit && !isEditing && (
+          {/* Si NO está pagado: mostrar botón para Registrar Pago */}
+          {!(tramite.fecha_pago || tramite.estado_general === "PAGADO") && canEdit && !isEditing && (
             <button
               onClick={() => {
                 setIsOpen(true);
@@ -147,6 +211,28 @@ export const TarjetaTesoreria: React.FC<TarjetaTesoreriaProps> = ({
             >
               <Edit3 className="w-3 h-3" /> Registrar Pago
             </button>
+          )}
+
+          {/* Si YA está pagado: botón para Asignar a Caja física si aún no está asignado */}
+          {(tramite.fecha_pago || tramite.estado_general === "PAGADO") && !tramite.id_caja && canEdit && (
+            <button
+              onClick={handleOpenModalCaja}
+              className="px-3 py-1 text-xs font-bold bg-blue-600 hover:bg-blue-700 text-white rounded-lg flex items-center gap-1.5 transition-colors shadow-2xs cursor-pointer"
+            >
+              <PackagePlus className="w-3.5 h-3.5" /> Asignar a Caja
+            </button>
+          )}
+
+          {/* Si YA está asignado a una caja */}
+          {(tramite.fecha_pago || tramite.estado_general === "PAGADO") && tramite.id_caja && (
+            <Link
+              href="/cajas"
+              className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded text-[11px] font-bold bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 hover:bg-cyan-500/30 transition-colors"
+              title="Ver en Gestión de Cajas"
+            >
+              <Package className="w-3 h-3" /> {tramite.codigo_tomo_caja || "En Caja"}
+              <ExternalLink className="w-2.5 h-2.5 ml-0.5" />
+            </Link>
           )}
         </div>
       </div>
@@ -272,6 +358,116 @@ export const TarjetaTesoreria: React.FC<TarjetaTesoreriaProps> = ({
               </div>
             </div>
           )}
+        </div>
+      )}
+
+      {/* Modal para Seleccionar y Asignar a Caja Abierta */}
+      {modalCajaOpen && (
+        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl max-w-md w-full shadow-2xl border border-slate-200 overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+            <div className="p-4 bg-slate-900 text-white flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <PackagePlus className="w-5 h-5 text-blue-400" />
+                <h4 className="text-sm font-bold tracking-tight">Asignar Trámite a Caja Física</h4>
+              </div>
+              <button
+                type="button"
+                onClick={() => setModalCajaOpen(false)}
+                className="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="p-5 space-y-4">
+              <div className="bg-blue-50 border border-blue-200 p-3 rounded-xl text-xs text-blue-800 space-y-1">
+                <div className="font-bold">Quipux: {tramite.numero_quipux}</div>
+                <div className="text-[11px] text-blue-700 truncate">
+                  Beneficiario: {tramite.proveedor_beneficiario}
+                </div>
+                <div className="text-[11px] text-blue-700">
+                  Hojas: {tramite.numero_hojas || tramite.fojas_fisicas || 1} fojas
+                </div>
+              </div>
+
+              {loadingCajas ? (
+                <div className="py-8 text-center text-xs text-slate-500">
+                  Cargando cajas abiertas disponibles...
+                </div>
+              ) : cajasAbiertas.length === 0 ? (
+                <div className="py-6 text-center space-y-3">
+                  <Package className="w-8 h-8 text-slate-300 mx-auto" />
+                  <p className="text-xs text-slate-600 font-medium">
+                    No existen cajas en estado <strong>ABIERTA</strong> en este momento.
+                  </p>
+                  <Link
+                    href="/cajas"
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors shadow-2xs"
+                  >
+                    <PackagePlus className="w-3.5 h-3.5" /> Ir a Gestión de Cajas para crear una
+                  </Link>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  <label className="block text-xs font-semibold text-slate-700">
+                    Seleccione la caja física abierta:
+                  </label>
+                  <div className="space-y-2 max-h-56 overflow-y-auto pr-1">
+                    {cajasAbiertas.map((c) => (
+                      <label
+                        key={c.id_caja}
+                        className={`flex items-center justify-between p-3 rounded-xl border cursor-pointer transition-all ${
+                          selectedCajaId === c.id_caja
+                            ? "border-blue-600 bg-blue-50/60 shadow-xs"
+                            : "border-slate-200 hover:bg-slate-50"
+                        }`}
+                      >
+                        <div className="flex items-center gap-3">
+                          <input
+                            type="radio"
+                            name="cajaSeleccionada"
+                            checked={selectedCajaId === c.id_caja}
+                            onChange={() => setSelectedCajaId(c.id_caja)}
+                            className="text-blue-600 focus:ring-blue-500"
+                          />
+                          <div>
+                            <div className="text-xs font-bold text-slate-900">{c.codigo_caja}</div>
+                            {c.nombre && (
+                              <div className="text-[11px] text-slate-500 truncate">{c.nombre}</div>
+                            )}
+                          </div>
+                        </div>
+                        <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-100 text-slate-600">
+                          {c.total_tramites || 0} trámite(s)
+                        </span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {cajasAbiertas.length > 0 && (
+                <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-100">
+                  <button
+                    type="button"
+                    onClick={() => setModalCajaOpen(false)}
+                    disabled={guardandoEnCaja}
+                    className="px-3.5 py-1.5 text-xs font-medium text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleConfirmarAsignacionCaja}
+                    disabled={guardandoEnCaja || !selectedCajaId}
+                    className="px-4 py-1.5 text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors shadow-xs flex items-center gap-1.5 disabled:opacity-50"
+                  >
+                    {guardandoEnCaja ? "Asignando..." : "Guardar en Caja"}
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
         </div>
       )}
     </div>

@@ -102,6 +102,17 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Sesión requerida" }, { status: 401 });
     }
 
+    const userRole = (currentUser.rol || "").toUpperCase();
+    const isAdminOrDFI = currentUser.id_area === 1 || userRole === "ADMIN" || userRole === "DIRECTORA";
+    const isAdmCaja = currentUser.id_area === 4 || userRole.includes("TESOR") || userRole.includes("CAJA") || isAdminOrDFI;
+
+    if (!isAdmCaja) {
+      return NextResponse.json(
+        { error: "La creación de cajas físicas es una función exclusiva de Administración de Caja." },
+        { status: 403 }
+      );
+    }
+
     const body = await request.json();
     const { codigo_caja, nombre, observaciones } = body;
 

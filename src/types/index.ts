@@ -32,7 +32,7 @@ export interface CatalogoAreaDTO {
   created_at?: string | Date | null;
 }
 
-export type SemaforoSLA = "EN_PLAZO" | "POR_VENCER" | "VENCIDO" | "PAUSADO" | "FINALIZADO";
+export type SemaforoSLA = "NO_INICIADO" | "EN_PLAZO" | "POR_VENCER" | "VENCIDO" | "PAUSADO" | "FINALIZADO" | "EXENTO";
 
 export interface SLAResult {
   diasHabilesTranscurridos: number;
@@ -153,6 +153,7 @@ export interface TramiteCompletoDTO {
   padre_gestion?: string | null;
   tipo_gestion?: string | null;
   area_requirente?: string | null;
+  ciudad?: string | null;
   asunto?: string | null;
   proveedor_beneficiario: string;
   ruc_proveedor?: string | null;
@@ -188,6 +189,7 @@ export interface TramiteCompletoDTO {
   motivo_observacion?: string | null;
   detalle_subsanacion?: string | null;
   justificacion_insubsistencia?: string | null;
+  justificacion_desarchivo?: string | null;
 
   // Contabilidad
   numero_cur_devengado?: string | null;
@@ -245,6 +247,7 @@ export interface TramiteCompletoDTO {
 
   // Novedades y Timestamps
   fecha_ingreso: string | Date | null;
+  fecha_entrega_control_previo?: string | Date | null;
   fecha_ultimo_movimiento: string | Date | null;
   fecha_ultima_modificacion: string | Date | null;
   

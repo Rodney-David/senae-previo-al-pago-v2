@@ -198,6 +198,7 @@ model tramites {
   padre_gestion                     String?                 @default("PAGO") // PAGO | GARANTIA
   tipo_gestion                      String?                 @default("PAGO") // PAGO, EXPEDIENTE, Caución, etc.
   area_requirente                   String?
+  ciudad                            String?
   asunto                            String?
   nro_tramite                       String?
   periodo_pago                      String?
@@ -232,10 +233,12 @@ model tramites {
   id_custodio_actual                Int
   estado_general                    String                  @default("INGRESADO")
   sub_estado                        String                  @default("RECEPCIONADO_DFI")
+  fecha_entrega_control_previo      DateTime?
   estado_previo_observacion         String?
   motivo_observacion                String?
   detalle_subsanacion               String?
   justificacion_insubsistencia      String?
+  justificacion_desarchivo          String?
   esta_pausado                      Boolean?                @default(false)
   motivo_pausa                      String?
   fecha_pausa                       DateTime?
@@ -331,4 +334,16 @@ model catalogo_areas {
   descripcion String?
   activo      Boolean?  @default(true)
   created_at  DateTime? @default(now())
+}
+
+model items_presupuestarios {
+  id_item     Int       @id @default(autoincrement())
+  codigo      String    @unique
+  nombre      String
+  descripcion String?
+  activo      Boolean?  @default(true)
+  created_at  DateTime? @default(now())
+
+  @@index([codigo])
+  @@index([nombre])
 }

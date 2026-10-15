@@ -2,7 +2,7 @@ import ExcelJS from "exceljs";
 
 export interface TramiteParaDocumentoCaja {
   id_tramite: number;
-  codigo_tramite: string;
+  codigo_tramite?: string;
   numero_quipux: string;
   proveedor_beneficiario: string;
   asunto?: string | null;
@@ -23,29 +23,55 @@ export interface CajaParaDocumento {
 
 /**
  * Genera el documento oficial Excel para el control físico de la CAJA antes de enviarla al archivo.
- * Columnas requeridas:
- * 1. No. Cartón
- * 2. No. CUR
- * 3. No. Hojas
- * 4. Proveedor y Asunto
- * 5. Valor
- * 6. Fecha y Observaciones (VACÍO)
- * 7. Fecha envió de correos (VACÍO)
+ * Sigue fielmente la estructura, dimensiones, colores y tipografía de la nueva PLANTILLA DOC EXCEL CAJA.xlsx:
+ * - 8 Columnas exactas:
+ *   1. No. (Secuencial: 1, 2, 3...)
+ *   2. Cartón (Siempre 1)
+ *   3. CUR
+ *   4. Hojas
+ *   5. Proveedor y Asunto
+ *   6. Valor
+ *   7. Fecha y Observaciones
+ *   8. Fecha envío de correos
+ * - Colores exactos: Fondo azul marino #244062 para encabezados, #F1F5F9 para subtítulo, #E2E8F0 para totales
+ * - Tipografía: Arial 11pt (13pt para título de caja)
+ * - Dimensiones exactas de columnas y alturas de fila (40.05pt por fila de trámite para espaciado holgado)
  */
 export async function generarDocumentoCajaExcel(caja: CajaParaDocumento): Promise<Buffer> {
   const workbook = new ExcelJS.Workbook();
   workbook.creator = "SENAE - Control Previo al Pago";
   workbook.created = new Date();
 
-  const worksheet = workbook.addWorksheet(caja.codigo_caja.substring(0, 30), {
+  const nombreCaja = (caja.nombre || caja.codigo_caja || "CAJA").trim();
+  const safeSheetName = nombreCaja.replace(/[\\/*?[\]:]/g, "").substring(0, 31) || "Caja";
+
+  const worksheet = workbook.addWorksheet(safeSheetName, {
     pageSetup: {
       orientation: "landscape",
       fitToPage: true,
       fitToWidth: 1,
       fitToHeight: 0,
       paperSize: 9, // A4
+      margins: {
+        left: 0.7,
+        right: 0.7,
+        top: 0.75,
+        bottom: 0.75,
+        header: 0.3,
+        footer: 0.3,
+      },
     },
   });
+
+  // Ancho de las 8 columnas con márgenes holgados para evitar cortes y montado de celdas
+  worksheet.getColumn(1).width = 11.0; // No.
+  worksheet.getColumn(2).width = 12.0; // Cartón
+  worksheet.getColumn(3).width = 22.0; // CUR (ampliado para permitir múltiples CURs con margen)
+  worksheet.getColumn(4).width = 12.0; // Hojas
+  worksheet.getColumn(5).width = 68.0; // Proveedor y Asunto (ampliado generosamente)
+  worksheet.getColumn(6).width = 20.0; // Valor
+  worksheet.getColumn(7).width = 20.0; // Fecha y Observaciones
+  worksheet.getColumn(8).width = 20.0; // Fecha envío de correos
 
   const now = new Date();
   const dd = String(now.getDate()).padStart(2, "0");
@@ -53,219 +79,220 @@ export async function generarDocumentoCajaExcel(caja: CajaParaDocumento): Promis
   const aaaa = String(now.getFullYear());
   const fechaStr = `${dd}/${mm}/${aaaa}`;
 
-  // 1. TÍTULO SUPERIOR CON EL NOMBRE DE LA CAJA
-  worksheet.mergeCells("A1:G1");
+  const thinBorder: Partial<ExcelJS.Borders> = {
+    top: { style: "thin", color: { argb: "FF000000" } },
+    left: { style: "thin", color: { argb: "FF000000" } },
+    bottom: { style: "thin", color: { argb: "FF000000" } },
+    right: { style: "thin", color: { argb: "FF000000" } },
+  };
+
+  // 1. FILA 1: NOMBRE DE LA CAJA (Merge A1:H1, Altura 28.8)
+  worksheet.mergeCells("A1:H1");
+  const row1 = worksheet.getRow(1);
+  row1.height = 28.8;
   const titleCell = worksheet.getCell("A1");
-  titleCell.value = `${caja.codigo_caja.toUpperCase()} ${
-    caja.nombre ? `(${caja.nombre.toUpperCase()})` : ""
-  } - CONTROL Y ENTREGA DE EXPEDIENTES`;
+  titleCell.value = nombreCaja.toUpperCase();
   titleCell.font = { name: "Arial", size: 13, bold: true, color: { argb: "FFFFFFFF" } };
   titleCell.alignment = { horizontal: "center", vertical: "middle" };
   titleCell.fill = {
     type: "pattern",
     pattern: "solid",
-    fgColor: { argb: "FF0B3B60" }, // Azul institucional SENAE
+    fgColor: { argb: "FF244062" }, // Azul marino exacto plantilla
   };
-  worksheet.getRow(1).height = 36;
+  for (let c = 1; c <= 8; c++) {
+    row1.getCell(c).border = thinBorder;
+  }
 
-  // Subtítulo institucional con metadatos
-  worksheet.mergeCells("A2:G2");
+  // 2. FILA 2: SUBTÍTULO INSTITUCIONAL (Merge A2:H2, Altura 28.2)
+  worksheet.mergeCells("A2:H2");
+  const row2 = worksheet.getRow(2);
+  row2.height = 28.2;
   const subTitleCell = worksheet.getCell("A2");
   subTitleCell.value = `SERVICIO NACIONAL DE ADUANA DEL ECUADOR - ADMINISTRACIÓN DE CAJA | FECHA DE EMISIÓN: ${fechaStr}`;
-  subTitleCell.font = { name: "Arial", size: 9, bold: true, color: { argb: "FF475569" } };
+  subTitleCell.font = { name: "Arial", size: 11, bold: true, color: { argb: "FF475569" } };
   subTitleCell.alignment = { horizontal: "center", vertical: "middle" };
   subTitleCell.fill = {
     type: "pattern",
     pattern: "solid",
-    fgColor: { argb: "FFF1F5F9" },
+    fgColor: { argb: "FFF1F5F9" }, // Gris claro exacto plantilla
   };
-  worksheet.getRow(2).height = 20;
+  for (let c = 1; c <= 8; c++) {
+    row2.getCell(c).border = thinBorder;
+  }
 
-  worksheet.getRow(3).height = 8; // Espacio
-
-  // 2. ENCABEZADOS DE COLUMNAS (Fila 4)
+  // 3. FILA 3: ENCABEZADOS DE TABLA (Altura 27.6)
   const headers = [
-    "No. Cartón",
-    "No. CUR",
-    "No. Hojas",
+    "No.",
+    "Cartón",
+    "CUR",
+    "Hojas",
     "Proveedor y Asunto",
     "Valor",
     "Fecha y Observaciones",
-    "Fecha envió de correos",
+    "Fecha envío de correos",
   ];
 
-  const headerRow = worksheet.getRow(4);
-  headerRow.height = 26;
+  const headerRow = worksheet.getRow(3);
+  headerRow.height = 27.6;
 
   headers.forEach((headerText, index) => {
     const colNumber = index + 1;
     const cell = headerRow.getCell(colNumber);
     cell.value = headerText;
-    cell.font = { name: "Arial", size: 9, bold: true, color: { argb: "FFFFFFFF" } };
+    cell.font = { name: "Arial", size: 11, bold: true, color: { argb: "FFFFFFFF" } };
     cell.alignment = { horizontal: "center", vertical: "middle", wrapText: true };
     cell.fill = {
       type: "pattern",
       pattern: "solid",
-      fgColor: { argb: "FF1E293B" }, // Slate 800 oscuro profesional
+      fgColor: { argb: "FF244062" }, // Azul marino exacto plantilla
     };
-    cell.border = {
-      top: { style: "thin", color: { argb: "FF94A3B8" } },
-      left: { style: "thin", color: { argb: "FF94A3B8" } },
-      bottom: { style: "medium", color: { argb: "FF0B3B60" } },
-      right: { style: "thin", color: { argb: "FF94A3B8" } },
-    };
+    cell.border = thinBorder;
   });
 
-  // Ancho de columnas adaptado
-  worksheet.getColumn(1).width = 16; // No. Cartón
-  worksheet.getColumn(2).width = 24; // No. CUR
-  worksheet.getColumn(3).width = 13; // No. Hojas
-  worksheet.getColumn(4).width = 46; // Proveedor y Asunto
-  worksheet.getColumn(5).width = 16; // Valor
-  worksheet.getColumn(6).width = 28; // Fecha y Observaciones (VACÍO)
-  worksheet.getColumn(7).width = 22; // Fecha envió de correos (VACÍO)
-
-  let currentRowIdx = 5;
-  let totalHojas = 0;
+  // 4. FILAS DE DATOS (Fila 4 en adelante con cálculo dinámico de altura para evitar cortes)
+  let currentRowIdx = 4;
   let totalValor = 0;
 
-  // 3. FILAS DE DATOS
-  caja.tramites.forEach((t, index) => {
-    const row = worksheet.getRow(currentRowIdx);
-    row.height = 28;
+  if (caja.tramites && caja.tramites.length > 0) {
+    caja.tramites.forEach((t, index) => {
+      const row = worksheet.getRow(currentRowIdx);
 
-    const carton = caja.codigo_caja;
+      // Col 1: Secuencial (1, 2, 3...)
+      const secuencial = index + 1;
 
-    // Concatenar CURs existentes
-    const curParts = [
-      t.numero_cur_devengado,
-      t.numero_cur_contable,
-      t.numero_cur_compromiso,
-    ].filter(Boolean);
-    const curDisplay = curParts.length > 0 ? curParts.join(", ") : "-";
+      // Col 2: En la columna de Cartón siempre va el número 1 en todos los trámites
+      const carton = 1;
 
-    const hojas = t.numero_hojas || t.fojas_fisicas || 1;
-    totalHojas += Number(hojas);
+      // Col 3: CUR
+      const curParts = [
+        t.numero_cur_devengado,
+        t.numero_cur_contable,
+        t.numero_cur_compromiso,
+      ].filter(Boolean);
+      const curDisplay = curParts.length > 0 ? curParts.join(", ") : "-";
 
-    const proveedorAsunto = `${t.proveedor_beneficiario || "S/P"} - ${t.asunto || ""}`.trim();
-    const monto = Number(t.monto_total || 0);
-    totalValor += monto;
+      // Col 4: Hojas
+      const hojas = Number(t.numero_hojas || t.fojas_fisicas || 1);
 
-    // 1. No. Cartón
-    row.getCell(1).value = carton;
-    row.getCell(1).alignment = { horizontal: "center", vertical: "middle" };
-    row.getCell(1).font = { name: "Arial", size: 9, bold: true };
+      // Col 6: Monto Valor
+      const monto = Number(t.monto_total || 0);
+      totalValor += monto;
 
-    // 2. No. CUR
-    row.getCell(2).value = curDisplay;
-    row.getCell(2).alignment = { horizontal: "center", vertical: "middle" };
-    row.getCell(2).font = { name: "Arial", size: 8.5, bold: true };
+      // Col 5: Proveedor y Asunto
+      const proveedorAsunto = `${t.proveedor_beneficiario || ""}${
+        t.asunto ? ` - ${t.asunto}` : ""
+      }`.trim();
 
-    // 3. No. Hojas
-    row.getCell(3).value = Number(hojas);
-    row.getCell(3).alignment = { horizontal: "center", vertical: "middle" };
-    row.getCell(3).font = { name: "Arial", size: 9 };
+      // CÁLCULO DINÁMICO DE ALTURA DE FILA:
+      // Ancho de columna 5 es 68 (aprox. 52-56 caracteres por línea con Arial 11).
+      // Si el texto se envuelve en 2, 3 o 4 líneas, aumentamos la altura proporcionalmente para que NO se solapen.
+      const charsPerLineCol5 = 54;
+      const charsPerLineCur = 18;
+      const estimatedLinesCol5 = Math.ceil(Math.max(1, proveedorAsunto.length) / charsPerLineCol5);
+      const estimatedLinesCur = Math.ceil(Math.max(1, curDisplay.length) / charsPerLineCur);
+      const maxLines = Math.max(1, estimatedLinesCol5, estimatedLinesCur);
 
-    // 4. Proveedor y Asunto
-    row.getCell(4).value = proveedorAsunto;
-    row.getCell(4).alignment = { horizontal: "left", vertical: "middle", wrapText: true };
-    row.getCell(4).font = { name: "Arial", size: 8.5 };
+      // 36pt base para 1 línea; +18pt por cada línea adicional para asegurar separación visual limpia
+      row.height = Math.max(38, maxLines * 18 + 12);
 
-    // 5. Valor
-    row.getCell(5).value = monto;
-    row.getCell(5).numFmt = '"$"#,##0.00';
-    row.getCell(5).alignment = { horizontal: "right", vertical: "middle" };
-    row.getCell(5).font = { name: "Arial", size: 9, bold: true };
+      // Col 1: No.
+      const c1 = row.getCell(1);
+      c1.value = secuencial;
+      c1.font = { name: "Arial", size: 11, bold: true };
+      c1.alignment = { horizontal: "center", vertical: "middle" };
 
-    // 6. Fecha y Observaciones (VACÍO)
-    row.getCell(6).value = "";
-    row.getCell(6).alignment = { horizontal: "center", vertical: "middle" };
+      // Col 2: Cartón
+      const c2 = row.getCell(2);
+      c2.value = carton;
+      c2.font = { name: "Arial", size: 11, bold: true };
+      c2.alignment = { horizontal: "center", vertical: "middle" };
 
-    // 7. Fecha envió de correos (VACÍO)
-    row.getCell(7).value = "";
-    row.getCell(7).alignment = { horizontal: "center", vertical: "middle" };
+      // Col 3: CUR
+      const c3 = row.getCell(3);
+      c3.value = curDisplay;
+      c3.font = { name: "Arial", size: 11, bold: true };
+      c3.alignment = { horizontal: "center", vertical: "middle", wrapText: true };
 
-    // Bordes y zebra striping
-    const isEven = index % 2 === 0;
-    const bgFill = isEven ? "FFFFFFFF" : "FFF8FAFC";
+      // Col 4: Hojas
+      const c4 = row.getCell(4);
+      c4.value = hojas;
+      c4.font = { name: "Arial", size: 11 };
+      c4.alignment = { horizontal: "center", vertical: "middle" };
 
-    for (let c = 1; c <= 7; c++) {
-      const cell = row.getCell(c);
-      if (c !== 6 && c !== 7) {
+      // Col 5: Proveedor y Asunto
+      const c5 = row.getCell(5);
+      c5.value = proveedorAsunto;
+      c5.font = { name: "Arial", size: 11 };
+      c5.alignment = { horizontal: "left", vertical: "middle", wrapText: true };
+
+      // Col 6: Valor
+      const c6 = row.getCell(6);
+      c6.value = monto;
+      c6.font = { name: "Arial", size: 11, bold: true };
+      c6.alignment = { horizontal: "right", vertical: "middle" };
+      c6.numFmt = '"$"#,##0.00';
+
+      // Col 7: Fecha y Observaciones (VACÍO)
+      const c7 = row.getCell(7);
+      c7.value = "";
+      c7.font = { name: "Arial", size: 11 };
+      c7.alignment = { horizontal: "center", vertical: "middle" };
+
+      // Col 8: Fecha envío de correos (VACÍO)
+      const c8 = row.getCell(8);
+      c8.value = "";
+      c8.font = { name: "Arial", size: 11 };
+      c8.alignment = { horizontal: "center", vertical: "middle" };
+
+      for (let c = 1; c <= 8; c++) {
+        const cell = row.getCell(c);
         cell.fill = {
           type: "pattern",
           pattern: "solid",
-          fgColor: { argb: bgFill },
+          fgColor: { argb: "FFFFFFFF" },
         };
+        cell.border = thinBorder;
       }
-      cell.border = {
-        top: { style: "thin", color: { argb: "FFE2E8F0" } },
-        left: { style: "thin", color: { argb: "FFE2E8F0" } },
-        bottom: { style: "thin", color: { argb: "FFE2E8F0" } },
-        right: { style: "thin", color: { argb: "FFE2E8F0" } },
-      };
-    }
 
-    currentRowIdx++;
-  });
+      currentRowIdx++;
+    });
+  }
 
-  // 4. FILA DE TOTALES
+  // 5. FILA DE TOTALES GENERALES (Altura 19.2)
   const totalsRow = worksheet.getRow(currentRowIdx);
-  totalsRow.height = 24;
+  totalsRow.height = 19.2;
 
-  totalsRow.getCell(1).value = `TOTAL: ${caja.tramites.length} EXP.`;
-  totalsRow.getCell(1).alignment = { horizontal: "center", vertical: "middle" };
-  totalsRow.getCell(1).font = { name: "Arial", size: 9, bold: true };
-
+  totalsRow.getCell(1).value = "";
   totalsRow.getCell(2).value = "";
+  totalsRow.getCell(3).value = "";
+  totalsRow.getCell(4).value = "";
 
-  totalsRow.getCell(3).value = totalHojas;
-  totalsRow.getCell(3).alignment = { horizontal: "center", vertical: "middle" };
-  totalsRow.getCell(3).font = { name: "Arial", size: 9, bold: true };
+  const c5Total = totalsRow.getCell(5);
+  c5Total.value = "TOTAL GENERAL VALORES:";
+  c5Total.font = { name: "Arial", size: 11, bold: true };
+  c5Total.alignment = { horizontal: "right", vertical: "middle" };
 
-  totalsRow.getCell(4).value = "TOTAL GENERAL VALORES:";
-  totalsRow.getCell(4).alignment = { horizontal: "right", vertical: "middle" };
-  totalsRow.getCell(4).font = { name: "Arial", size: 9, bold: true };
+  const c6Total = totalsRow.getCell(6);
+  c6Total.value = {
+    formula: `SUM(F4:F${currentRowIdx - 1})`,
+    result: totalValor,
+  };
+  c6Total.font = { name: "Arial", size: 11, bold: true };
+  c6Total.alignment = { horizontal: "right", vertical: "middle" };
+  c6Total.numFmt = '"$"#,##0.00';
 
-  totalsRow.getCell(5).value = totalValor;
-  totalsRow.getCell(5).numFmt = '"$"#,##0.00';
-  totalsRow.getCell(5).alignment = { horizontal: "right", vertical: "middle" };
-  totalsRow.getCell(5).font = { name: "Arial", size: 9, bold: true };
-
-  totalsRow.getCell(6).value = "";
   totalsRow.getCell(7).value = "";
+  totalsRow.getCell(8).value = "";
 
-  for (let c = 1; c <= 7; c++) {
+  for (let c = 1; c <= 8; c++) {
     const cell = totalsRow.getCell(c);
     cell.fill = {
       type: "pattern",
       pattern: "solid",
-      fgColor: { argb: "FFE2E8F0" },
+      fgColor: { argb: "FFE2E8F0" }, // Fondo gris azulado exacto plantilla
     };
-    cell.border = {
-      top: { style: "medium", color: { argb: "FF0B3B60" } },
-      left: { style: "thin", color: { argb: "FF94A3B8" } },
-      bottom: { style: "medium", color: { argb: "FF0B3B60" } },
-      right: { style: "thin", color: { argb: "FF94A3B8" } },
-    };
+    cell.border = thinBorder;
   }
-
-  // 5. ESPACIO DE FIRMAS AL PIE DE PÁGINA
-  currentRowIdx += 3;
-  const firmaRow = worksheet.getRow(currentRowIdx);
-  firmaRow.height = 40;
-
-  worksheet.mergeCells(`A${currentRowIdx}:C${currentRowIdx}`);
-  const entregaCell = worksheet.getCell(`A${currentRowIdx}`);
-  entregaCell.value = "_____________________________________\nENTREGADO POR (ADMINISTRACIÓN DE CAJA)";
-  entregaCell.alignment = { horizontal: "center", vertical: "middle", wrapText: true };
-  entregaCell.font = { name: "Arial", size: 9, bold: true };
-
-  worksheet.mergeCells(`E${currentRowIdx}:G${currentRowIdx}`);
-  const recibeCell = worksheet.getCell(`E${currentRowIdx}`);
-  recibeCell.value = "_____________________________________\nRECIBIDO POR (ARCHIVO CENTRAL)";
-  recibeCell.alignment = { horizontal: "center", vertical: "middle", wrapText: true };
-  recibeCell.font = { name: "Arial", size: 9, bold: true };
 
   const buffer = await workbook.xlsx.writeBuffer();
   return Buffer.from(buffer);

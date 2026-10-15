@@ -25,6 +25,7 @@ export default function RecepcionPage() {
 
   // Datos del Documento
   const [areaRequirente, setAreaRequirente] = useState("");
+  const [ciudad, setCiudad] = useState("GUAYAQUIL");
   const [asunto, setAsunto] = useState("");
   const [numeroQuipux, setNumeroQuipux] = useState("");
   const [fechaMemorando, setFechaMemorando] = useState(
@@ -35,15 +36,33 @@ export default function RecepcionPage() {
   );
   const [idTipoTramite, setIdTipoTramite] = useState<string>("");
 
-  // Datos Económicos (Solo Proveedor, RUC y Subtotal)
+  // Datos Económicos y Garantías
   const [proveedor, setProveedor] = useState("");
   const [ruc, setRuc] = useState("");
   const [subtotal, setSubtotal] = useState<string>("0");
+  const [numeroJuicio, setNumeroJuicio] = useState("");
+  const [numeroLiquidacion, setNumeroLiquidacion] = useState("");
   const [comentarios, setComentarios] = useState("");
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [authChecking, setAuthChecking] = useState(true);
+
+  const CIUDADES_SENAE = [
+    "GUAYAQUIL",
+    "QUITO",
+    "CUENCA",
+    "ESMERALDAS",
+    "MANTA",
+    "TULCÁN",
+    "HUAQUILLAS",
+    "LOJA",
+    "PUERTO BOLÍVAR",
+    "LATACUNGA",
+    "SALINAS",
+    "SAN CRISTÓBAL (GALÁPAGOS)",
+    "SANTA ROSA",
+  ];
 
   // Protección de acceso: solo DFI (Directora, Secretaria) y ADMIN
   useEffect(() => {
@@ -150,15 +169,15 @@ export default function RecepcionPage() {
     setError(null);
 
     // Validaciones base
-    if (!numeroQuipux.trim() || !idTipoTramite || !areaRequirente.trim() || !asunto.trim()) {
-      setError("Por favor complete los campos obligatorios del ingreso (Quipux, Fechas, Área, Proceso y Asunto).");
+    if (!numeroQuipux.trim() || !idTipoTramite || !areaRequirente.trim() || !ciudad.trim() || !asunto.trim()) {
+      setError("Por favor complete los campos obligatorios del ingreso (Quipux, Fechas, Área, Ciudad, Proceso y Asunto).");
       return;
     }
 
-    // Validación condicional para TIPO PAGO - PAGO
+    // Validación condicional para TIPO PAGO - PAGO (RUC ya no es obligatorio)
     if (esPagoPrincipal) {
-      if (!proveedor.trim() || !ruc.trim() || sub <= 0) {
-        setError("Para el tipo PAGO - PAGO es OBLIGATORIO ingresar Razón Social / Proveedor, RUC y un Subtotal mayor a 0.");
+      if (!proveedor.trim() || sub <= 0) {
+        setError("Para el tipo PAGO es OBLIGATORIO ingresar Razón Social / Proveedor y un Subtotal mayor a 0.");
         return;
       }
     }
@@ -174,12 +193,15 @@ export default function RecepcionPage() {
           tipo_gestion: tipoGestion,
           numero_quipux: numeroQuipux.trim(),
           area_requirente: areaRequirente.trim(),
+          ciudad: ciudad.trim(),
           asunto: asunto.trim(),
           fecha_memorando: fechaMemorando,
           fecha_recepcion_fisica: fechaRecepcion,
           id_tipo_tramite: parseInt(idTipoTramite, 10),
           proveedor_beneficiario: proveedor.trim() || "N/A",
           ruc_proveedor: ruc.trim() || null,
+          numero_juicio: padreGestion === "GARANTIA" ? numeroJuicio.trim() || null : null,
+          numero_liquidacion: padreGestion === "GARANTIA" ? numeroLiquidacion.trim() || null : null,
           subtotal: sub,
           comentarios: comentarios.trim(),
         }),
@@ -239,15 +261,14 @@ export default function RecepcionPage() {
           <div className="flex items-center justify-between border-b border-slate-100 pb-2">
             <h2 className="text-xs font-bold uppercase tracking-wider text-slate-800 flex items-center gap-2">
               <ShieldCheck className="w-4 h-4 text-blue-600" />
-              1. Clasificación de la Gestión (Jerarquía Oficial SENAE)
+              1. Clasificación de la Gestión
             </h2>
-            <span className="text-[11px] font-semibold text-slate-500">Paso 1 de 3</span>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="block text-xs font-semibold text-slate-700 mb-1">
-                Gestión *
+                Gestión <span className="text-rose-500">*</span>
               </label>
               <select
                 value={padreGestion}
@@ -264,7 +285,7 @@ export default function RecepcionPage() {
 
             <div>
               <label className="block text-xs font-semibold text-slate-700 mb-1">
-                Tipo de Gestión *
+                Tipo de Gestión <span className="text-rose-500">*</span>
               </label>
               <select
                 value={tipoGestion}
@@ -288,7 +309,6 @@ export default function RecepcionPage() {
               <FileText className="w-4 h-4 text-blue-600" />
               2. Datos del Documento y Radicación Quipux
             </h2>
-            <span className="text-[11px] font-semibold text-slate-500">Paso 2 de 3</span>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
@@ -332,7 +352,7 @@ export default function RecepcionPage() {
               />
             </div>
 
-            <div className="sm:col-span-1">
+            <div className="sm:col-span-2">
               <label className="block text-xs font-semibold text-slate-700 mb-1">
                 Área Requirente / Solicitante *
               </label>
@@ -351,7 +371,27 @@ export default function RecepcionPage() {
               />
             </div>
 
-            <div className="sm:col-span-2">
+            <div className="sm:col-span-1">
+              <label className="block text-xs font-semibold text-slate-700 mb-1">
+                Ciudad / Jurisdicción *
+              </label>
+              <input
+                list="ciudades-senae-list"
+                type="text"
+                value={ciudad}
+                onChange={(e) => setCiudad(e.target.value.toUpperCase())}
+                placeholder="ej. GUAYAQUIL"
+                className="w-full text-xs bg-white border border-slate-300 rounded-lg p-2.5 font-semibold text-slate-800 uppercase focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                required
+              />
+              <datalist id="ciudades-senae-list">
+                {CIUDADES_SENAE.map((c) => (
+                  <option key={c} value={c} />
+                ))}
+              </datalist>
+            </div>
+
+            <div className="sm:col-span-3">
               <label className="block text-xs font-semibold text-slate-700 mb-1">
                 Tipo de Proceso Normativo (SENAE) *
               </label>
@@ -396,18 +436,15 @@ export default function RecepcionPage() {
 
         {/* Bloque 3: Datos del Beneficiario y Subtotal */}
         <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-xs space-y-4">
-          <div className="flex items-center justify-between border-b border-slate-100 pb-2">
-            <h2 className="text-xs font-bold uppercase tracking-wider text-slate-800 flex items-center gap-2">
-              <DollarSign className="w-4 h-4 text-emerald-600" />
-              3. Beneficiario y Valor Económico (Subtotal)
-            </h2>
-            <span className="text-[11px] font-semibold text-slate-500">Paso 3 de 3</span>
-          </div>
+          <h2 className="text-xs font-bold uppercase tracking-wider text-slate-800 flex items-center gap-2">
+            <DollarSign className="w-4 h-4 text-emerald-600" />
+            3. Beneficiario y Valor Económico
+          </h2>
 
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <div>
               <label className="block text-xs font-semibold text-slate-700 mb-1">
-                Razón Social / Proveedor Beneficiario {esPagoPrincipal ? "*" : "(Opcional)"}
+                Razón Social / Proveedor Beneficiario {esPagoPrincipal && <span className="text-rose-500">*</span>}
               </label>
               <input
                 type="text"
@@ -421,7 +458,7 @@ export default function RecepcionPage() {
 
             <div>
               <label className="block text-xs font-semibold text-slate-700 mb-1">
-                RUC del Proveedor (13 dígitos) {esPagoPrincipal ? "*" : "(Opcional)"}
+                RUC del Proveedor
               </label>
               <input
                 type="text"
@@ -430,13 +467,12 @@ export default function RecepcionPage() {
                 placeholder="ej. 0992384729001"
                 maxLength={13}
                 className="w-full text-xs bg-white border border-slate-300 rounded-lg p-2.5 font-mono focus:ring-2 focus:ring-blue-500 focus:outline-none"
-                required={esPagoPrincipal}
               />
             </div>
 
             <div>
               <label className="block text-xs font-semibold text-slate-700 mb-1">
-                Subtotal ($) {esPagoPrincipal ? "*" : "(Opcional)"}
+                Subtotal {esPagoPrincipal && <span className="text-rose-500">*</span>}
               </label>
               <input
                 type="number"
@@ -449,6 +485,37 @@ export default function RecepcionPage() {
               />
             </div>
           </div>
+
+          {/* Campos exclusivos para tipo GARANTÍA */}
+          {padreGestion === "GARANTIA" && (
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-3 border-t border-slate-100">
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                  Nro. Juicio
+                </label>
+                <input
+                  type="text"
+                  value={numeroJuicio}
+                  onChange={(e) => setNumeroJuicio(e.target.value.toUpperCase())}
+                  placeholder="ej. JUIC-2026-0042"
+                  className="w-full text-xs bg-white border border-slate-300 rounded-lg p-2.5 font-mono focus:ring-2 focus:ring-blue-500 focus:outline-none uppercase"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                  Nro. Liquidación
+                </label>
+                <input
+                  type="text"
+                  value={numeroLiquidacion}
+                  onChange={(e) => setNumeroLiquidacion(e.target.value.toUpperCase())}
+                  placeholder="ej. LIQ-2026-0189"
+                  className="w-full text-xs bg-white border border-slate-300 rounded-lg p-2.5 font-mono focus:ring-2 focus:ring-blue-500 focus:outline-none uppercase"
+                />
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Botones de Acción */}

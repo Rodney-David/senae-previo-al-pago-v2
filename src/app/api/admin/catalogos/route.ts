@@ -38,6 +38,26 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ success: true, items });
     }
 
+    if (tipo === "items" || tipo === "items_presupuestarios") {
+      const q = searchParams.get("q") || "";
+      const limit = searchParams.get("limit") ? Number(searchParams.get("limit")) : undefined;
+      const whereClause = q
+        ? {
+            OR: [
+              { codigo: { contains: q } },
+              { nombre: { contains: q } },
+            ],
+          }
+        : undefined;
+
+      const items = await (prisma as any).items_presupuestarios.findMany({
+        where: whereClause,
+        orderBy: { codigo: "asc" },
+        take: limit || 2000,
+      });
+      return NextResponse.json({ success: true, items });
+    }
+
     return NextResponse.json({ error: "Tipo de catálogo no válido" }, { status: 400 });
   } catch (error: any) {
     console.error("Error fetching catalogo:", error);
@@ -144,6 +164,28 @@ export async function POST(request: NextRequest) {
             omitidos++;
           }
         }
+      } else if (tipo === "items" || tipo === "items_presupuestarios") {
+        for (const line of lines) {
+          try {
+            const parts = line.split(" - ");
+            let codigo = parts.length > 1 ? parts[0].trim() : line.substring(0, 15).trim();
+            let nombre = parts.length > 1 ? parts.slice(1).join(" - ").trim() : line;
+            if (!codigo) continue;
+
+            await (prisma as any).items_presupuestarios.upsert({
+              where: { codigo },
+              update: { nombre, activo: true },
+              create: {
+                codigo,
+                nombre,
+                activo: true,
+              },
+            });
+            insertados++;
+          } catch (e) {
+            omitidos++;
+          }
+        }
       }
 
       return NextResponse.json({
@@ -152,6 +194,29 @@ export async function POST(request: NextRequest) {
         insertados,
         omitidos,
       });
+    }
+
+    // 1.1 IMPORTAR DIRECTO DESDE PDF CLASIFICADOR OFICIAL
+    if (accion === "importar_pdf") {
+      try {
+        const { execSync } = require("child_process");
+        const path = require("path");
+        const scriptPath = path.join(process.cwd(), "scripts", "import_items_presupuestarios.py");
+        execSync(`python "${scriptPath}"`, { stdio: "pipe" });
+
+        const total = await (prisma as any).items_presupuestarios.count();
+        return NextResponse.json({
+          success: true,
+          message: `Catálogo de ítems presupuestarios importado exitosamente desde PDF oficial. Total en BD: ${total} ítems.`,
+          total,
+        });
+      } catch (err: any) {
+        console.error("Error importando PDF:", err);
+        return NextResponse.json(
+          { error: "Error al ejecutar la extracción del PDF oficial: " + (err?.message || "") },
+          { status: 500 }
+        );
+      }
     }
 
     // 2. VACIAR CATÁLOGO
@@ -181,6 +246,27 @@ export async function POST(request: NextRequest) {
         await prisma.tipos_gestion.deleteMany({});
         return NextResponse.json({ success: true, message: "Catálogo de Tipos de Gestión vaciado con éxito." });
       }
+
+      if (tipo === "items" || tipo === "items_presupuestarios") {
+        await (prisma as any).items_presupuestarios.deleteMany({});
+        return NextResponse.json({ success: true, message: "Catálogo de Ítems Presupuestarios vaciado con éxito." });
+      }
+    }
+
+    // 3. CREAR MANUALMENTE UN REGISTRO
+    if (tipo === "items" || tipo === "items_presupuestarios") {
+      if (!data?.codigo?.trim() || !data?.nombre?.trim()) {
+        return NextResponse.json({ error: "El código y nombre del ítem presupuestario son obligatorios" }, { status: 400 });
+      }
+      const nuevo = await (prisma as any).items_presupuestarios.create({
+        data: {
+          codigo: data.codigo.trim(),
+          nombre: data.nombre.trim(),
+          descripcion: data.descripcion?.trim() || null,
+          activo: data.activo !== undefined ? Boolean(data.activo) : true,
+        },
+      });
+      return NextResponse.json({ success: true, item: nuevo }, { status: 201 });
     }
 
     // 3. CREAR MANUALMENTE UN REGISTRO
@@ -304,6 +390,19 @@ export async function PUT(request: NextRequest) {
       return NextResponse.json({ success: true, item: actualizado });
     }
 
+    if (tipo === "items" || tipo === "items_presupuestarios") {
+      const actualizado = await (prisma as any).items_presupuestarios.update({
+        where: { id_item: Number(id) },
+        data: {
+          ...(data.nombre && { nombre: data.nombre.trim() }),
+          ...(data.codigo && { codigo: data.codigo.trim() }),
+          ...(data.descripcion !== undefined && { descripcion: data.descripcion?.trim() || null }),
+          ...(data.activo !== undefined && { activo: Boolean(data.activo) }),
+        },
+      });
+      return NextResponse.json({ success: true, item: actualizado });
+    }
+
     return NextResponse.json({ error: "Tipo de catálogo no válido" }, { status: 400 });
   } catch (error: any) {
     console.error("Error en catalogo PUT:", error);
@@ -352,6 +451,13 @@ export async function DELETE(request: NextRequest) {
         where: { id_tipo_gestion: Number(id) },
       });
       return NextResponse.json({ success: true, message: "Tipo de gestión eliminado" });
+    }
+
+    if (tipo === "items" || tipo === "items_presupuestarios") {
+      await (prisma as any).items_presupuestarios.delete({
+        where: { id_item: Number(id) },
+      });
+      return NextResponse.json({ success: true, message: "Ítem presupuestario eliminado" });
     }
 
     return NextResponse.json({ error: "Tipo de catálogo no válido" }, { status: 400 });

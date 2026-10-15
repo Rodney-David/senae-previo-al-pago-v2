@@ -17,10 +17,11 @@ import {
   X,
   Database,
   Info,
+  Coins,
 } from "lucide-react";
 import { Modal } from "@/components/ui/Modal";
 
-type TipoCatalogo = "areas" | "procesos" | "gestion";
+type TipoCatalogo = "areas" | "procesos" | "gestion" | "items";
 
 interface SeccionCatalogosProps {
   onNotify?: (notification: { type: "success" | "error"; text: string }) => void;
@@ -45,9 +46,10 @@ export const SeccionCatalogos: React.FC<SeccionCatalogosProps> = ({ onNotify }) 
   const [itemActivo, setItemActivo] = useState(true);
   const [savingItem, setSavingItem] = useState(false);
 
-  // Estado de importación TXT
+  // Estado de importación TXT y PDF
   const [importText, setImportText] = useState("");
   const [importing, setImporting] = useState(false);
+  const [importingPdf, setImportingPdf] = useState(false);
   const [vaciando, setVaciando] = useState(false);
 
   const notify = (type: "success" | "error", text: string) => {
@@ -126,6 +128,39 @@ export const SeccionCatalogos: React.FC<SeccionCatalogosProps> = ({ onNotify }) 
     }
   };
 
+  // Re-importar ítems presupuestarios desde el clasificador PDF oficial
+  const handleImportPdf = async () => {
+    if (
+      !confirm(
+        "¿Desea re-importar el Clasificador Presupuestario desde el PDF oficial clasificador_presupuestario_2026.pdf?\n\nEsta operación extraerá y sincronizará todos los ítems presupuestarios en la base de datos."
+      )
+    ) {
+      return;
+    }
+
+    setImportingPdf(true);
+    try {
+      const res = await fetch("/api/admin/catalogos", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          tipo: "items",
+          accion: "importar_pdf",
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Error al importar clasificador PDF");
+
+      notify("success", data.message || "Ítems importados desde el PDF con éxito.");
+      loadCatalog("items");
+    } catch (err: any) {
+      notify("error", err.message || "Error al ejecutar importación de PDF");
+    } finally {
+      setImportingPdf(false);
+    }
+  };
+
   // Vaciar catálogo completo
   const handleExecuteVaciar = async () => {
     setVaciando(true);
@@ -180,7 +215,7 @@ export const SeccionCatalogos: React.FC<SeccionCatalogosProps> = ({ onNotify }) 
       return;
     }
 
-    if ((activeCatalog === "procesos" || activeCatalog === "gestion") && !itemCodigo.trim() && !editingItem) {
+    if ((activeCatalog === "procesos" || activeCatalog === "gestion" || activeCatalog === "items") && !itemCodigo.trim() && !editingItem) {
       notify("error", "El código es obligatorio para este catálogo.");
       return;
     }
@@ -189,7 +224,7 @@ export const SeccionCatalogos: React.FC<SeccionCatalogosProps> = ({ onNotify }) 
     try {
       if (editingItem) {
         // Actualizar
-        const id = editingItem.id_area || editingItem.id_tipo_tramite || editingItem.id_tipo_gestion;
+        const id = editingItem.id_area || editingItem.id_tipo_tramite || editingItem.id_tipo_gestion || editingItem.id_item;
         const res = await fetch("/api/admin/catalogos", {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
@@ -241,7 +276,7 @@ export const SeccionCatalogos: React.FC<SeccionCatalogosProps> = ({ onNotify }) 
 
   // Eliminar un item específico
   const handleDeleteItem = async (item: any) => {
-    const id = item.id_area || item.id_tipo_tramite || item.id_tipo_gestion;
+    const id = item.id_area || item.id_tipo_tramite || item.id_tipo_gestion || item.id_item;
     const nombre = item.nombre;
 
     if (!confirm(`¿Está seguro de eliminar "${nombre}" del catálogo?`)) {
@@ -300,6 +335,14 @@ export const SeccionCatalogos: React.FC<SeccionCatalogosProps> = ({ onNotify }) 
       singular: "Tipo de Gestión",
       icon: Sliders,
     },
+    items: {
+      titulo: "Ítems Presupuestarios (Clasificador Oficial)",
+      descripcion:
+        "Catálogo oficial de partidas e ítems presupuestarios del clasificador de egresos del Estado.",
+      ejemploTxt: `510105 - Remuneraciones Unificadas\n530105 - Telecomunicaciones\n530204 - Edición e Impresión`,
+      singular: "Ítem Presupuestario",
+      icon: Coins,
+    },
   };
 
   const meta = catalogMeta[activeCatalog];
@@ -316,7 +359,7 @@ export const SeccionCatalogos: React.FC<SeccionCatalogosProps> = ({ onNotify }) 
               Administración de Desplegables y Catálogos Paramétricos
             </h2>
             <p className="text-xs text-slate-500">
-              Gestione las listas desplegables del sistema con importación masiva TXT, edición y limpieza.
+              Gestione las listas desplegables del sistema con importación masiva TXT/PDF, edición y limpieza.
             </p>
           </div>
         </div>
@@ -354,6 +397,17 @@ export const SeccionCatalogos: React.FC<SeccionCatalogosProps> = ({ onNotify }) 
           >
             <Sliders className="w-3.5 h-3.5" />
             3. Tipos de Gestión
+          </button>
+          <button
+            onClick={() => setActiveCatalog("items")}
+            className={`px-3 py-1.5 rounded-md transition-all flex items-center gap-1.5 ${
+              activeCatalog === "items"
+                ? "bg-white text-blue-900 shadow-xs font-bold"
+                : "text-slate-600 hover:text-slate-900"
+            }`}
+          >
+            <Coins className="w-3.5 h-3.5 text-amber-600" />
+            4. Ítems Presupuestarios ({activeCatalog === "items" ? items.length : "..."})
           </button>
         </div>
       </div>
@@ -400,6 +454,19 @@ export const SeccionCatalogos: React.FC<SeccionCatalogosProps> = ({ onNotify }) 
             <Plus className="w-3.5 h-3.5" />
             Agregar Manual
           </button>
+
+          {/* Botón Importar PDF Oficial (exclusivo para ítems presupuestarios) */}
+          {activeCatalog === "items" && (
+            <button
+              onClick={handleImportPdf}
+              disabled={importingPdf}
+              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold uppercase bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg transition-colors shadow-2xs disabled:opacity-50"
+              title="Importar automáticamente desde el PDF clasificador_presupuestario_2026.pdf"
+            >
+              <FileText className="w-3.5 h-3.5" />
+              {importingPdf ? "Importando PDF..." : "Importar PDF Oficial"}
+            </button>
+          )}
 
           {/* Botón Importar TXT */}
           <button
@@ -453,7 +520,7 @@ export const SeccionCatalogos: React.FC<SeccionCatalogosProps> = ({ onNotify }) 
               <tr className="border-b border-slate-200 bg-slate-50 text-[11px] font-bold text-slate-700 uppercase tracking-wide">
                 <th className="py-2.5 px-4 w-12 text-center">#</th>
                 <th className="py-2.5 px-4">Nombre / Valor</th>
-                {(activeCatalog === "procesos" || activeCatalog === "gestion") && (
+                {(activeCatalog === "procesos" || activeCatalog === "gestion" || activeCatalog === "items") && (
                   <th className="py-2.5 px-4 w-44">Código</th>
                 )}
                 {activeCatalog === "procesos" && (
@@ -465,7 +532,7 @@ export const SeccionCatalogos: React.FC<SeccionCatalogosProps> = ({ onNotify }) 
             </thead>
             <tbody className="divide-y divide-slate-100">
               {filteredItems.map((item, index) => {
-                const id = item.id_area || item.id_tipo_tramite || item.id_tipo_gestion;
+                const id = item.id_area || item.id_tipo_tramite || item.id_tipo_gestion || item.id_item;
                 const isActivo = item.activo !== false;
 
                 return (
@@ -483,7 +550,7 @@ export const SeccionCatalogos: React.FC<SeccionCatalogosProps> = ({ onNotify }) 
                       )}
                     </td>
 
-                    {(activeCatalog === "procesos" || activeCatalog === "gestion") && (
+                    {(activeCatalog === "procesos" || activeCatalog === "gestion" || activeCatalog === "items") && (
                       <td className="py-2.5 px-4 font-mono font-medium text-slate-600">
                         {item.codigo || "—"}
                       </td>
@@ -635,17 +702,17 @@ export const SeccionCatalogos: React.FC<SeccionCatalogosProps> = ({ onNotify }) 
             />
           </div>
 
-          {(activeCatalog === "procesos" || activeCatalog === "gestion") && (
+          {(activeCatalog === "procesos" || activeCatalog === "gestion" || activeCatalog === "items") && (
             <div>
               <label className="block font-bold text-slate-700 uppercase mb-1">
-                Código Institucional {editingItem ? "" : "*"}
+                Código {activeCatalog === "items" ? "Presupuestario" : "Institucional"} {editingItem ? "" : "*"}
               </label>
               <input
                 type="text"
                 value={itemCodigo}
                 onChange={(e) => setItemCodigo(e.target.value)}
                 className="w-full p-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 font-mono uppercase"
-                placeholder="Ej: PROC_INFIMA_CUANTIA"
+                placeholder={activeCatalog === "items" ? "Ej: 530204" : "Ej: PROC_INFIMA_CUANTIA"}
                 required={!editingItem}
               />
             </div>

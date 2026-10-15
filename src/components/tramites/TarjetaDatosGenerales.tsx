@@ -3,7 +3,7 @@
 import React, { useState } from "react";
 import { TramiteCompletoDTO, UsuarioInstitucional } from "@/types";
 import { formatCurrency, formatDate } from "@/lib/utils";
-import { Building, Building2, AlignLeft, FileText, Calendar, DollarSign, Receipt, Edit3, Scale, Tag } from "lucide-react";
+import { Building, Building2, AlignLeft, FileText, Calendar, DollarSign, Receipt, Edit3, Scale, Tag, MapPin } from "lucide-react";
 import { ModalEditarDatosGenerales } from "./ModalEditarDatosGenerales";
 
 interface TarjetaDatosGeneralesProps {
@@ -120,9 +120,9 @@ export const TarjetaDatosGenerales: React.FC<TarjetaDatosGeneralesProps> = ({
           )}
         </div>
 
-        {/* Área Requirente & Asunto del Trámite */}
-        {(tramite.area_requirente || tramite.asunto) && (
-          <div className="col-span-1 md:col-span-2 lg:col-span-4 pt-3 mt-1 border-t border-slate-100 grid grid-cols-1 md:grid-cols-3 gap-3">
+        {/* Área Requirente, Ciudad & Asunto del Trámite */}
+        {(tramite.area_requirente || tramite.ciudad || tramite.asunto) && (
+          <div className="col-span-1 md:col-span-2 lg:col-span-4 pt-3 mt-1 border-t border-slate-100 grid grid-cols-1 md:grid-cols-4 gap-3">
             {tramite.area_requirente && (
               <div className="bg-slate-50/80 p-3 rounded-lg border border-slate-200/80 flex flex-col justify-start">
                 <span className="text-[11px] font-bold text-slate-500 uppercase flex items-center gap-1.5 mb-1">
@@ -133,8 +133,16 @@ export const TarjetaDatosGenerales: React.FC<TarjetaDatosGeneralesProps> = ({
                 </span>
               </div>
             )}
+            <div className="bg-slate-50/80 p-3 rounded-lg border border-slate-200/80 flex flex-col justify-start">
+              <span className="text-[11px] font-bold text-slate-500 uppercase flex items-center gap-1.5 mb-1">
+                <MapPin className="w-3.5 h-3.5 text-rose-600" /> Ciudad / Jurisdicción
+              </span>
+              <span className="text-xs font-semibold text-slate-800 uppercase tracking-tight">
+                {tramite.ciudad || "GUAYAQUIL"}
+              </span>
+            </div>
             {tramite.asunto && (
-              <div className={`bg-slate-50/80 p-3 rounded-lg border border-slate-200/80 flex flex-col justify-start ${tramite.area_requirente ? 'md:col-span-2' : 'col-span-full'}`}>
+              <div className="bg-slate-50/80 p-3 rounded-lg border border-slate-200/80 flex flex-col justify-start md:col-span-2">
                 <span className="text-[11px] font-bold text-slate-500 uppercase flex items-center gap-1.5 mb-1">
                   <AlignLeft className="w-3.5 h-3.5 text-indigo-600" /> Asunto del Trámite
                 </span>

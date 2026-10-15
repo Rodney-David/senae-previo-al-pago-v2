@@ -28,10 +28,18 @@ export async function POST(
       return NextResponse.json({ error: "Trámite no encontrado" }, { status: 404 });
     }
 
-    // Si el trámite está INSUBSISTENTE, no permite avance de flujo
-    if (tramite.estado_general === "INSUBSISTENTE") {
+    // Si el trámite está INSUBSISTENTE, solo se permite revertir
+    if (tramite.estado_general === "INSUBSISTENTE" && accion !== "REVERTIR_INSUBSISTENCIA") {
       return NextResponse.json(
-        { error: "El trámite se encuentra INSUBSISTENTE. Su flujo está cortado de forma permanente." },
+        { error: "El trámite se encuentra INSUBSISTENTE. Su flujo está cortado. Solo se puede revertir la insubsistencia con la justificación obligatoria." },
+        { status: 400 }
+      );
+    }
+
+    // Si el trámite está ARCHIVADO, solo se permite desarchivar
+    if ((tramite.estado_general === "ARCHIVO" || tramite.estado_general === "FINALIZADO_ARCHIVADO") && accion !== "DESARCHIVAR_TRAMITE") {
+      return NextResponse.json(
+        { error: "El trámite se encuentra archivado. Para continuar su gestión debe ser desarchivado con justificación obligatoria." },
         { status: 400 }
       );
     }
@@ -62,10 +70,11 @@ export async function POST(
         tramiteActualizado = await prisma.tramites.update({
           where: { id_tramite: idTramite },
           data: {
-            estado_general: "REVISION",
-            sub_estado: "EN_REVISION_PRESUPUESTO",
+            estado_general: "INGRESADO",
+            sub_estado: "POR_RECIBIR_FISICAMENTE",
             id_area_actual: 2, // PRESUPUESTO
             id_custodio_actual: idJefe,
+            fecha_entrega_control_previo: now,
             fecha_ultimo_movimiento: now,
             fecha_ultima_modificacion: now,
           },
@@ -78,7 +87,42 @@ export async function POST(
           id_area_origen: 1,
           id_area_destino: 2,
           tipo_accion: "ENTREGA_CONTROL_PREVIO",
-          comentarios: `Expediente entregado físicamente a Control Previo (Presupuesto). Custodio asignado: Jefa de Presupuesto. ${comentarios || ""}`,
+          comentarios: `Expediente entregado físicamente a Control Previo (Presupuesto). Custodio asignado: Jefa de Presupuesto. En espera de recepción física. ${comentarios || ""}`,
+        });
+        break;
+      }
+
+      case "RECIBIR_FISICAMENTE": {
+        const userRole = (currentUser.rol || "").toUpperCase();
+        const isPresupuestoOrAdmin = currentUser.id_area === 2 || ["ADMIN", "ADMINISTRADOR"].includes(userRole);
+        if (!isPresupuestoOrAdmin) {
+          return NextResponse.json(
+            { error: "Solo personal de Presupuesto o Administrador puede dar recepción física al expediente" },
+            { status: 403 }
+          );
+        }
+
+        tramiteActualizado = await prisma.tramites.update({
+          where: { id_tramite: idTramite },
+          data: {
+            estado_general: "REVISION",
+            sub_estado: "RECIBIDO_EN_PRESUPUESTO",
+            id_area_actual: 2,
+            id_custodio_actual: currentUserId,
+            fecha_recepcion_fisica: now,
+            fecha_ultimo_movimiento: now,
+            fecha_ultima_modificacion: now,
+          },
+        });
+
+        await registrarBitacora({
+          id_tramite: idTramite,
+          id_usuario_entrega: currentUserId,
+          id_usuario_recibe: currentUserId,
+          id_area_origen: 2,
+          id_area_destino: 2,
+          tipo_accion: "RECEPCION_FISICA_PRESUPUESTO",
+          comentarios: `Expediente recibido físicamente en Presupuesto por ${currentUser.nombre_completo}. Inicia cómputo de SLA institucional. ${comentarios || ""}`,
         });
         break;
       }
@@ -138,6 +182,8 @@ export async function POST(
                 : tramite.numero_cur_compromiso,
             nro_tramite:
               datos?.nro_tramite !== undefined ? (datos.nro_tramite ? String(datos.nro_tramite).trim() : null) : tramite.nro_tramite,
+            numero_factura:
+              datos?.numero_factura !== undefined ? (datos.numero_factura ? String(datos.numero_factura).trim() : null) : tramite.numero_factura,
             periodo_pago:
               datos?.periodo_pago !== undefined ? (datos.periodo_pago ? String(datos.periodo_pago).trim() : null) : tramite.periodo_pago,
             anexos: datos?.anexos !== undefined ? (datos.anexos ? String(datos.anexos).trim() : null) : tramite.anexos,
@@ -154,7 +200,7 @@ export async function POST(
           id_area_origen: 2,
           id_area_destino: 2,
           tipo_accion: "REGISTRO_DATOS_PRESUPUESTO",
-          comentarios: `Datos presupuestarios actualizados por ${currentUser.nombre_completo}. Nro Trámite: ${
+          comentarios: `Datos presupuestarios actualizados por ${currentUser.nombre_completo}. Nro / Cod Proceso: ${
             datos?.nro_tramite || tramite.nro_tramite || "N/A"
           }, Compromiso CUR: ${
             datos?.numero_cur_compromiso || tramite.numero_cur_compromiso || "N/A"
@@ -175,6 +221,9 @@ export async function POST(
             id_custodio_actual: idJefe,
             id_analista_presupuesto_previo: currentUserId,
             sub_estado: "PENDIENTE_VISTO_BUENO_JEFE",
+            ...(datos?.numero_factura !== undefined && {
+              numero_factura: datos.numero_factura ? String(datos.numero_factura).trim() : null,
+            }),
             fecha_ultimo_movimiento: now,
             fecha_ultima_modificacion: now,
           },
@@ -345,12 +394,20 @@ export async function POST(
           );
         }
 
+        const esGarantia = (tramite.padre_gestion || "").toUpperCase() === "GARANTIA" || (tramite.tipo_flujo || "").toUpperCase() === "GARANTIA";
         const numFactura = datos?.numero_factura || tramite.numero_factura;
-        if (!numFactura) {
-          return NextResponse.json(
-            { error: "No se puede derivar a Contabilidad sin número de factura tributaria (SRI)" },
-            { status: 400 }
-          );
+
+        if (!esGarantia && !numFactura) {
+          const tipoTramite = await prisma.tipos_tramite.findUnique({
+            where: { id_tipo_tramite: tramite.id_tipo_tramite },
+          });
+          const noRequiere = tipoTramite?.requiere_factura === false || ["EXPEDIENTE", "JUSTIFICACION"].includes((tramite.tipo_gestion || "").toUpperCase());
+          if (!noRequiere) {
+            return NextResponse.json(
+              { error: "No se puede derivar a Contabilidad sin número de factura tributaria (SRI) para este tipo de trámite" },
+              { status: 400 }
+            );
+          }
         }
 
         const contadorGeneral = await prisma.usuarios.findFirst({
@@ -661,6 +718,29 @@ export async function POST(
           return NextResponse.json({ error: "El trámite no se encuentra en estado OBSERVADO" }, { status: 400 });
         }
 
+        // Buscar el usuario que reportó la última observación
+        const ultimaObservacion = await prisma.historial_movimientos.findFirst({
+          where: {
+            id_tramite: idTramite,
+            tipo_accion: "OBSERVACION_TRANSVERSAL",
+          },
+          orderBy: { fecha_hora: "desc" },
+          include: {
+            usuarios_historial_movimientos_id_usuario_entregaTousuarios: true,
+          },
+        });
+
+        const idUsuarioObservo = ultimaObservacion?.id_usuario_entrega;
+        const nombreObservador = ultimaObservacion?.usuarios_historial_movimientos_id_usuario_entregaTousuarios?.nombre_completo || "el usuario que observó";
+        const isAdmin = ["ADMIN", "ADMINISTRADOR"].includes((currentUser.rol || "").toUpperCase());
+
+        if (idUsuarioObservo && currentUserId !== idUsuarioObservo && !isAdmin) {
+          return NextResponse.json(
+            { error: `Solo ${nombreObservador} (quien reportó la observación) o un Administrador puede levantar formalmente la observación.` },
+            { status: 403 }
+          );
+        }
+
         const { detalle_subsanacion } = datos || {};
         if (!detalle_subsanacion?.trim()) {
           return NextResponse.json({ error: "Debe ingresar el detalle de la resolución / subsanación" }, { status: 400 });
@@ -727,7 +807,146 @@ export async function POST(
           id_area_origen: tramite.id_area_actual,
           id_area_destino: tramite.id_area_actual,
           tipo_accion: "DECLARAR_INSUBSISTENTE",
-          comentarios: `Trámite declarado INSUBSISTENTE (Estado terminal por nulidad o invalidez insubsanable). Justificación: ${justificacion.trim()}`,
+          comentarios: `Trámite declarado INSUBSISTENTE (Estado terminal por nulidad o invalidez insubsanable). Exento de SLA. Justificación: ${justificacion.trim()}`,
+        });
+        break;
+      }
+
+      case "REVERTIR_INSUBSISTENCIA": {
+        if (tramite.estado_general !== "INSUBSISTENTE") {
+          return NextResponse.json({ error: "El trámite no se encuentra en estado INSUBSISTENTE" }, { status: 400 });
+        }
+
+        const { justificacion } = datos || {};
+        if (!justificacion?.trim()) {
+          return NextResponse.json({ error: "Debe ingresar la justificación obligatoria para revertir la insubsistencia" }, { status: 400 });
+        }
+
+        // Verificar quién declaró la insubsistencia
+        const ultimoInsubsistente = await prisma.historial_movimientos.findFirst({
+          where: {
+            id_tramite: idTramite,
+            tipo_accion: "DECLARAR_INSUBSISTENTE",
+          },
+          orderBy: { fecha_hora: "desc" },
+          include: {
+            usuarios_historial_movimientos_id_usuario_entregaTousuarios: true,
+          },
+        });
+
+        const idUsuarioDeclaro = ultimoInsubsistente?.id_usuario_entrega;
+        const nombreDeclaro = ultimoInsubsistente?.usuarios_historial_movimientos_id_usuario_entregaTousuarios?.nombre_completo || "el usuario que declaró la insubsistencia";
+        const isAdmin = ["ADMIN", "ADMINISTRADOR"].includes((currentUser.rol || "").toUpperCase());
+
+        if (idUsuarioDeclaro && currentUserId !== idUsuarioDeclaro && !isAdmin) {
+          return NextResponse.json(
+            { error: `Solo ${nombreDeclaro} o un Administrador puede revertir la declaratoria de insubsistencia.` },
+            { status: 403 }
+          );
+        }
+
+        const estadoRestaurado = tramite.estado_previo_observacion || "REVISION";
+
+        tramiteActualizado = await prisma.tramites.update({
+          where: { id_tramite: idTramite },
+          data: {
+            estado_general: estadoRestaurado,
+            sub_estado: `INSUBSISTENCIA_REVERTIDA_EN_${estadoRestaurado}`,
+            esta_pausado: false,
+            motivo_pausa: null,
+            justificacion_insubsistencia: null,
+            fecha_ultimo_movimiento: now,
+            fecha_ultima_modificacion: now,
+          },
+        });
+
+        await registrarBitacora({
+          id_tramite: idTramite,
+          id_usuario_entrega: currentUserId,
+          id_usuario_recibe: currentUserId,
+          id_area_origen: tramite.id_area_actual,
+          id_area_destino: tramite.id_area_actual,
+          tipo_accion: "REVERSION_INSUBSISTENCIA",
+          comentarios: `Insubsistencia revertida por ${currentUser.nombre_completo}. Expediente reactivado a estado ${estadoRestaurado}. Justificación: ${justificacion.trim()}`,
+        });
+        break;
+      }
+
+      case "DEVOLUCION_FORMAL": {
+        const { numero_quipux_devolucion, motivo_devolucion } = datos || {};
+        if (!numero_quipux_devolucion?.trim() || !motivo_devolucion?.trim()) {
+          return NextResponse.json(
+            { error: "El Número Quipux de devolución y el motivo son obligatorios para la devolución formal" },
+            { status: 400 }
+          );
+        }
+
+        tramiteActualizado = await prisma.tramites.update({
+          where: { id_tramite: idTramite },
+          data: {
+            estado_general: "DEVUELTO",
+            sub_estado: "DEVUELTO_FORMALMENTE",
+            es_devuelto: true,
+            motivo_devolucion: motivo_devolucion.trim(),
+            id_area_actual: 1, // Devuelto a DFI / Ventanilla
+            fecha_ultimo_movimiento: now,
+            fecha_ultima_modificacion: now,
+          },
+        });
+
+        await registrarBitacora({
+          id_tramite: idTramite,
+          id_usuario_entrega: currentUserId,
+          id_usuario_recibe: currentUserId,
+          id_area_origen: tramite.id_area_actual,
+          id_area_destino: 1,
+          tipo_accion: "DEVOLUCION_FORMAL",
+          comentarios: `Expediente devuelto formalmente. Memo Quipux Devolución: ${numero_quipux_devolucion.trim()}. Motivo: ${motivo_devolucion.trim()}. Exento de SLA. ${comentarios || ""}`,
+        });
+        break;
+      }
+
+      case "DESARCHIVAR_TRAMITE": {
+        const isArchivado = tramite.estado_general === "ARCHIVO" || tramite.estado_general === "FINALIZADO_ARCHIVADO";
+        if (!isArchivado) {
+          return NextResponse.json({ error: "El trámite no se encuentra en estado ARCHIVO" }, { status: 400 });
+        }
+
+        const { justificacion_desarchivo } = datos || {};
+        if (!justificacion_desarchivo?.trim()) {
+          return NextResponse.json({ error: "Debe ingresar la justificación obligatoria para desarchivar el expediente" }, { status: 400 });
+        }
+
+        const userRole = (currentUser.rol || "").toUpperCase();
+        const canDesarchivar = currentUser.id_area === 6 || currentUser.id_area === 4 || ["ADMIN", "ADMINISTRADOR"].includes(userRole);
+        if (!canDesarchivar) {
+          return NextResponse.json(
+            { error: "No tiene permisos para desarchivar este expediente institucional" },
+            { status: 403 }
+          );
+        }
+
+        tramiteActualizado = await prisma.tramites.update({
+          where: { id_tramite: idTramite },
+          data: {
+            estado_general: "PAGADO",
+            sub_estado: "DESARCHIVADO_EN_TRAMITE",
+            id_area_actual: 4, // Regresa a Tesorería / Adm Caja
+            id_custodio_actual: currentUserId,
+            justificacion_desarchivo: justificacion_desarchivo.trim(),
+            fecha_ultimo_movimiento: now,
+            fecha_ultima_modificacion: now,
+          },
+        });
+
+        await registrarBitacora({
+          id_tramite: idTramite,
+          id_usuario_entrega: currentUserId,
+          id_usuario_recibe: currentUserId,
+          id_area_origen: 6,
+          id_area_destino: 4,
+          tipo_accion: "DESARCHIVO_TRAMITE",
+          comentarios: `Expediente desarchivado por ${currentUser.nombre_completo}. Devuelto a Tesorería para gestión activa. Justificación: ${justificacion_desarchivo.trim()}`,
         });
         break;
       }

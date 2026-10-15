@@ -54,9 +54,71 @@ export async function GET(
     // Calcular SLA
     const sla = await calculateTramiteSLA(tramite);
 
+    const historial_movimientos = (tramite.historial_movimientos || []).map((m: any) => ({
+      id_movimiento: m.id_movimiento,
+      id_tramite: m.id_tramite,
+      tipo_accion: m.tipo_accion,
+      comentarios: m.comentarios,
+      fecha_hora: m.fecha_hora,
+      id_usuario_entrega: m.id_usuario_entrega,
+      id_usuario_recibe: m.id_usuario_recibe,
+      id_area_origen: m.id_area_origen,
+      id_area_destino: m.id_area_destino,
+      usuario_entrega: m.usuarios_historial_movimientos_id_usuario_entregaTousuarios
+        ? {
+            id_usuario: m.usuarios_historial_movimientos_id_usuario_entregaTousuarios.id_usuario,
+            nombre_completo: m.usuarios_historial_movimientos_id_usuario_entregaTousuarios.nombre_completo,
+            cargo: m.usuarios_historial_movimientos_id_usuario_entregaTousuarios.cargo,
+            rol: m.usuarios_historial_movimientos_id_usuario_entregaTousuarios.rol,
+          }
+        : null,
+      usuario_recibe: m.usuarios_historial_movimientos_id_usuario_recibeTousuarios
+        ? {
+            id_usuario: m.usuarios_historial_movimientos_id_usuario_recibeTousuarios.id_usuario,
+            nombre_completo: m.usuarios_historial_movimientos_id_usuario_recibeTousuarios.nombre_completo,
+            cargo: m.usuarios_historial_movimientos_id_usuario_recibeTousuarios.cargo,
+            rol: m.usuarios_historial_movimientos_id_usuario_recibeTousuarios.rol,
+          }
+        : null,
+      area_origen: m.areas_historial_movimientos_id_area_origenToareas
+        ? {
+            id_area: m.areas_historial_movimientos_id_area_origenToareas.id_area,
+            nombre: m.areas_historial_movimientos_id_area_origenToareas.nombre,
+            codigo: m.areas_historial_movimientos_id_area_origenToareas.codigo,
+          }
+        : null,
+      area_destino: m.areas_historial_movimientos_id_area_destinoToareas
+        ? {
+            id_area: m.areas_historial_movimientos_id_area_destinoToareas.id_area,
+            nombre: m.areas_historial_movimientos_id_area_destinoToareas.nombre,
+            codigo: m.areas_historial_movimientos_id_area_destinoToareas.codigo,
+          }
+        : null,
+    }));
+
+    const observaciones = (tramite.observaciones || []).map((o: any) => ({
+      ...o,
+      usuario_reporta: o.usuarios_observaciones_id_usuario_reportaTousuarios
+        ? {
+            id_usuario: o.usuarios_observaciones_id_usuario_reportaTousuarios.id_usuario,
+            nombre_completo: o.usuarios_observaciones_id_usuario_reportaTousuarios.nombre_completo,
+            cargo: o.usuarios_observaciones_id_usuario_reportaTousuarios.cargo,
+          }
+        : null,
+      area_reporta: o.areas
+        ? {
+            id_area: o.areas.id_area,
+            nombre: o.areas.nombre,
+            codigo: o.areas.codigo,
+          }
+        : null,
+    }));
+
     return NextResponse.json({
       tramite: {
         ...tramite,
+        historial_movimientos,
+        observaciones,
         sla,
       },
     });
@@ -86,6 +148,7 @@ export async function PUT(
       tipo_flujo,
       numero_quipux,
       area_requirente,
+      ciudad,
       asunto,
       fecha_memorando,
       fecha_recepcion_fisica,
@@ -128,6 +191,7 @@ export async function PUT(
       ...(tipo_flujo && { tipo_flujo }),
       ...(numero_quipux && { numero_quipux }),
       ...(area_requirente !== undefined && { area_requirente }),
+      ...(ciudad !== undefined && { ciudad: ciudad ? String(ciudad).trim() : null }),
       ...(asunto !== undefined && { asunto }),
       ...(fecha_memorando && { fecha_memorando: new Date(fecha_memorando) }),
       ...(fecha_recepcion_fisica && {

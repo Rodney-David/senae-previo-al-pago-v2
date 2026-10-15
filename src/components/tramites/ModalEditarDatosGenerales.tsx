@@ -44,7 +44,24 @@ export const ModalEditarDatosGenerales: React.FC<ModalEditarDatosGeneralesProps>
   const [numeroLiquidacion, setNumeroLiquidacion] = useState(tramite.numero_liquidacion || "");
   const [numeroJuicio, setNumeroJuicio] = useState(tramite.numero_juicio || "");
   const [areaRequirente, setAreaRequirente] = useState(tramite.area_requirente || "");
+  const [ciudad, setCiudad] = useState(tramite.ciudad || "GUAYAQUIL");
   const [asunto, setAsunto] = useState(tramite.asunto || "");
+
+  const CIUDADES_SENAE = [
+    "GUAYAQUIL",
+    "QUITO",
+    "CUENCA",
+    "ESMERALDAS",
+    "MANTA",
+    "TULCÁN",
+    "HUAQUILLAS",
+    "LOJA",
+    "PUERTO BOLÍVAR",
+    "LATACUNGA",
+    "SALINAS",
+    "SAN CRISTÓBAL (GALÁPAGOS)",
+    "SANTA ROSA",
+  ];
 
   const [procesos, setProcesos] = useState<any[]>([]);
   const [areas, setAreas] = useState<any[]>([]);
@@ -126,6 +143,7 @@ export const ModalEditarDatosGenerales: React.FC<ModalEditarDatosGeneralesProps>
           tipo_flujo: padreGestion,
           numero_quipux: numeroQuipux.trim(),
           area_requirente: areaRequirente.trim() || null,
+          ciudad: ciudad.trim() || null,
           asunto: asunto.trim() || null,
           fecha_memorando: fechaMemorando || null,
           fecha_recepcion_fisica: fechaRecepcionFisica || null,
@@ -312,36 +330,39 @@ export const ModalEditarDatosGenerales: React.FC<ModalEditarDatosGeneralesProps>
             </select>
           </div>
 
-          {/* Num Liquidacion */}
-          <div>
-            <label className="block font-bold text-slate-700 uppercase mb-1">
-              Nro. Liquidación (Si aplica)
-            </label>
-            <input
-              type="text"
-              value={numeroLiquidacion}
-              onChange={(e) => setNumeroLiquidacion(e.target.value)}
-              className="w-full p-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 font-mono"
-              placeholder="LIQ-2026-XXXX"
-            />
-          </div>
+          {/* Num Liquidacion y Juicio exclusivos para GARANTIA */}
+          {padreGestion === "GARANTIA" && (
+            <>
+              <div>
+                <label className="block font-bold text-slate-700 uppercase mb-1">
+                  Nro. Liquidación
+                </label>
+                <input
+                  type="text"
+                  value={numeroLiquidacion}
+                  onChange={(e) => setNumeroLiquidacion(e.target.value)}
+                  className="w-full p-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 font-mono uppercase"
+                  placeholder="LIQ-2026-XXXX"
+                />
+              </div>
 
-          {/* Num Juicio */}
-          <div>
-            <label className="block font-bold text-slate-700 uppercase mb-1">
-              Nro. Juicio (Si aplica)
-            </label>
-            <input
-              type="text"
-              value={numeroJuicio}
-              onChange={(e) => setNumeroJuicio(e.target.value)}
-              className="w-full p-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 font-mono"
-              placeholder="JUICIO-XXXX-2026"
-            />
-          </div>
+              <div>
+                <label className="block font-bold text-slate-700 uppercase mb-1">
+                  Nro. Juicio
+                </label>
+                <input
+                  type="text"
+                  value={numeroJuicio}
+                  onChange={(e) => setNumeroJuicio(e.target.value)}
+                  className="w-full p-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 font-mono uppercase"
+                  placeholder="JUICIO-XXXX-2026"
+                />
+              </div>
+            </>
+          )}
 
           {/* Área Requirente */}
-          <div className="sm:col-span-2">
+          <div className="sm:col-span-1">
             <label className="block font-bold text-slate-700 uppercase mb-1">
               Área Requirente / Solicitante
             </label>
@@ -356,6 +377,26 @@ export const ModalEditarDatosGenerales: React.FC<ModalEditarDatosGeneralesProps>
             <datalist id="modal-areas-list">
               {areas.map((a) => (
                 <option key={a.id_area || a.nombre} value={a.nombre} />
+              ))}
+            </datalist>
+          </div>
+
+          {/* Ciudad */}
+          <div className="sm:col-span-1">
+            <label className="block font-bold text-slate-700 uppercase mb-1">
+              Ciudad / Jurisdicción
+            </label>
+            <input
+              list="modal-ciudades-list"
+              type="text"
+              value={ciudad}
+              onChange={(e) => setCiudad(e.target.value.toUpperCase())}
+              className="w-full p-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 uppercase text-xs font-semibold"
+              placeholder="ej. GUAYAQUIL"
+            />
+            <datalist id="modal-ciudades-list">
+              {CIUDADES_SENAE.map((c) => (
+                <option key={c} value={c} />
               ))}
             </datalist>
           </div>

@@ -11,6 +11,7 @@ import {
   Plus,
   RefreshCw,
   FileSpreadsheet,
+  FileDown,
   Printer,
   Archive,
   Trash2,
@@ -23,13 +24,19 @@ import {
   CheckSquare,
   Square,
   ArrowLeft,
+  Lock,
+  Unlock,
+  Send,
+  RotateCcw,
 } from "lucide-react";
+
+import { generarDocumentoCajaPdf } from "@/services/documentoCajaPdfService";
 
 export default function CajasPage() {
   const router = useRouter();
   const [cajas, setCajas] = useState<CajaDTO[]>([]);
   const [loading, setLoading] = useState(true);
-  const [tabEstado, setTabEstado] = useState<"TODAS" | "ABIERTA" | "ARCHIVADA">("TODAS");
+  const [tabEstado, setTabEstado] = useState<"TODAS" | "ABIERTA" | "CERRADA" | "ENVIADA" | "ARCHIVADA">("TODAS");
   const [selectedCaja, setSelectedCaja] = useState<CajaDTO | null>(null);
   const [loadingCajaDetail, setLoadingCajaDetail] = useState(false);
   const [currentUser, setCurrentUser] = useState<UsuarioInstitucional | null>(null);
@@ -39,6 +46,12 @@ export default function CajasPage() {
   const [nombreNuevaCaja, setNombreNuevaCaja] = useState("");
   const [obsNuevaCaja, setObsNuevaCaja] = useState("");
   const [creandoCaja, setCreandoCaja] = useState(false);
+
+  // Modal para devolver caja (Custodio de Archivo)
+  const [modalDevolverOpen, setModalDevolverOpen] = useState(false);
+  const [cajaADevolver, setCajaADevolver] = useState<CajaDTO | null>(null);
+  const [motivoDevolucion, setMotivoDevolucion] = useState("");
+  const [devolviendoCaja, setDevolviendoCaja] = useState(false);
 
   // Modal para agregar trámites pagados a la caja
   const [modalAgregarTramitesOpen, setModalAgregarTramitesOpen] = useState(false);
@@ -51,6 +64,9 @@ export default function CajasPage() {
   // Modal vista previa de impresión oficial
   const [modalImprimirOpen, setModalImprimirOpen] = useState(false);
 
+  // Modal para ver y gestionar trámites de la caja seleccionada sin tener que desplazarse
+  const [modalVerTramitesOpen, setModalVerTramitesOpen] = useState(false);
+
   // Mensajes de éxito / error
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -61,7 +77,27 @@ export default function CajasPage() {
       try {
         const res = await fetch("/api/auth/session");
         const data = await res.json();
-        if (data.user) setCurrentUser(data.user);
+        if (data.user) {
+          setCurrentUser(data.user);
+          const rol = (data.user.rol || "").toUpperCase();
+          const cargo = (data.user.cargo || "").toUpperCase();
+          const area = data.user.id_area;
+          const allowed =
+            area === 4 ||
+            area === 6 ||
+            rol === "ADMIN" ||
+            rol === "ADMINISTRADOR" ||
+            rol.includes("CAJA") ||
+            rol.includes("TESOR") ||
+            rol.includes("ARCHIVO") ||
+            rol.includes("CUSTODIO") ||
+            cargo.includes("CAJA") ||
+            cargo.includes("ARCHIVO") ||
+            cargo.includes("CUSTODIO");
+          if (!allowed) {
+            router.replace("/escritorio");
+          }
+        }
       } catch (err) {
         console.error("Error al cargar sesión:", err);
       }
@@ -219,28 +255,39 @@ export default function CajasPage() {
     }
   };
 
-  // Cerrar y archivar caja definitivamente
-  const handleArchivarCaja = async (caja: CajaDTO) => {
+  // Permisos según rol
+  const userArea = currentUser?.id_area;
+  const userRole = (currentUser?.rol || "").toUpperCase();
+  const userCargo = (currentUser?.cargo || "").toUpperCase();
+  const isAdmin = userRole === "ADMIN" || userRole === "ADMINISTRADOR";
+  const isAdmCaja = userArea === 4 || userRole.includes("TESOR") || userRole.includes("CAJA") || userCargo.includes("CAJA") || isAdmin;
+  const isCustodio = userArea === 6 || userRole.includes("ARCHIVO") || userRole.includes("CUSTODIO") || userCargo.includes("ARCHIVO") || userCargo.includes("CUSTODIO") || isAdmin;
+  const isCustodioOnly = (userArea === 6 || userRole.includes("ARCHIVO") || userRole.includes("CUSTODIO") || userCargo.includes("ARCHIVO") || userCargo.includes("CUSTODIO")) && !isAdmin && !isAdmCaja;
+
+  // Cerrar caja (Adm. Caja)
+  const handleCerrarCaja = async (caja: CajaDTO) => {
     const totalTr = caja.tramites?.length || caja.total_tramites || 0;
     if (totalTr === 0) {
-      alert("No se puede archivar una caja vacía. Asigne al menos un trámite pagado.");
+      alert("No se puede cerrar una caja vacía. Asigne al menos un trámite pagado.");
       return;
     }
 
     const conf = confirm(
-      `¿Está seguro de cerrar y archivar la caja "${caja.codigo_caja}"?\n\n` +
-      `Se transferirán ${totalTr} trámite(s) al estado ARCHIVO central definitivamente.`
+      `¿Desea cerrar la caja "${caja.codigo_caja}"?\n\n` +
+      `Contiene ${totalTr} expediente(s). Al cerrarla quedará lista para ser enviada formalmente al Archivo Central (o podrá reabrirse para ajustes si lo requiere).`
     );
     if (!conf) return;
 
     try {
-      const res = await fetch(`/api/cajas/${caja.id_caja}/archivar`, {
+      const res = await fetch(`/api/cajas/${caja.id_caja}/estado`, {
         method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ accion: "CERRAR" }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Error al archivar la caja");
+      if (!res.ok) throw new Error(data.error || "Error al cerrar la caja");
 
-      setSuccessMsg(data.message || `Caja "${caja.codigo_caja}" archivada exitosamente.`);
+      setSuccessMsg(data.message || `Caja "${caja.codigo_caja}" cerrada exitosamente.`);
       fetchCajas();
       if (selectedCaja?.id_caja === caja.id_caja) {
         fetchCajaDetail(caja.id_caja);
@@ -250,7 +297,124 @@ export default function CajasPage() {
     }
   };
 
-  // Eliminar caja vacía / abierta
+  // Reabrir caja cerrada para edición (Adm. Caja)
+  const handleReabrirCaja = async (caja: CajaDTO) => {
+    const conf = confirm(
+      `¿Desea reabrir la caja "${caja.codigo_caja}"?\n\n` +
+      `Volverá al estado ABIERTA para permitir agregar o retirar expedientes.`
+    );
+    if (!conf) return;
+
+    try {
+      const res = await fetch(`/api/cajas/${caja.id_caja}/estado`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ accion: "REABRIR" }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Error al reabrir la caja");
+
+      setSuccessMsg(data.message || `Caja "${caja.codigo_caja}" reabierta para edición.`);
+      fetchCajas();
+      if (selectedCaja?.id_caja === caja.id_caja) {
+        fetchCajaDetail(caja.id_caja);
+      }
+    } catch (err: any) {
+      setErrorMsg(err.message);
+    }
+  };
+
+  // Enviar caja al Archivo Central (Adm. Caja)
+  const handleEnviarArchivo = async (caja: CajaDTO) => {
+    const totalTr = caja.tramites?.length || caja.total_tramites || 0;
+    const conf = confirm(
+      `¿Desea enviar formalmente la caja "${caja.codigo_caja}" al Archivo Central?\n\n` +
+      `Los ${totalTr} expediente(s) saldrán de Adm. Caja y pasarán a custodia del Custodio de Archivo para su recepción y aprobación final.`
+    );
+    if (!conf) return;
+
+    try {
+      const res = await fetch(`/api/cajas/${caja.id_caja}/estado`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ accion: "ENVIAR_ARCHIVO" }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Error al enviar la caja al Archivo");
+
+      setSuccessMsg(data.message || `Caja "${caja.codigo_caja}" enviada exitosamente a Custodia de Archivo.`);
+      fetchCajas();
+      if (selectedCaja?.id_caja === caja.id_caja) {
+        fetchCajaDetail(caja.id_caja);
+      }
+    } catch (err: any) {
+      setErrorMsg(err.message);
+    }
+  };
+
+  // Aprobar y archivar definitivamente la caja (Custodio de Archivo)
+  const handleAprobarArchivarCaja = async (caja: CajaDTO) => {
+    const totalTr = caja.tramites?.length || caja.total_tramites || 0;
+    const conf = confirm(
+      `¿Desea aprobar y archivar definitivamente la caja "${caja.codigo_caja}"?\n\n` +
+      `Todos los ${totalTr} expediente(s) contenidos cambiarán su estado general a ARCHIVO y quedarán registrados en esta caja permanentemente.`
+    );
+    if (!conf) return;
+
+    try {
+      const res = await fetch(`/api/cajas/${caja.id_caja}/estado`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ accion: "APROBAR_ARCHIVAR" }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Error al aprobar y archivar la caja");
+
+      setSuccessMsg(data.message || `Caja "${caja.codigo_caja}" archivada definitivamente. Expedientes pasaron a ARCHIVO.`);
+      fetchCajas();
+      if (selectedCaja?.id_caja === caja.id_caja) {
+        fetchCajaDetail(caja.id_caja);
+      }
+    } catch (err: any) {
+      setErrorMsg(err.message);
+    }
+  };
+
+  // Confirmar devolución de caja con motivo (Custodio de Archivo)
+  const handleConfirmarDevolucion = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!cajaADevolver || !motivoDevolucion.trim()) return;
+
+    setDevolviendoCaja(true);
+    setErrorMsg(null);
+    try {
+      const res = await fetch(`/api/cajas/${cajaADevolver.id_caja}/estado`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          accion: "DEVOLVER",
+          motivo_devolucion: motivoDevolucion.trim(),
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Error al devolver la caja");
+
+      setSuccessMsg(data.message || `Caja "${cajaADevolver.codigo_caja}" devuelta a Administración de Caja.`);
+      setModalDevolverOpen(false);
+      setCajaADevolver(null);
+      setMotivoDevolucion("");
+      fetchCajas();
+      if (selectedCaja?.id_caja === cajaADevolver.id_caja) {
+        fetchCajaDetail(cajaADevolver.id_caja);
+      }
+    } catch (err: any) {
+      setErrorMsg(err.message);
+    } finally {
+      setDevolviendoCaja(false);
+    }
+  };
+
+  // Eliminar caja vacía / abierta (Adm. Caja)
   const handleEliminarCaja = async (caja: CajaDTO) => {
     if (!confirm(`¿Desea eliminar la caja "${caja.codigo_caja}"? Los trámites que contenga regresarán a estado PAGADO libre.`)) {
       return;
@@ -276,6 +440,19 @@ export default function CajasPage() {
   // Descargar archivo Excel oficial
   const handleDescargarExcel = (idCaja: number, codigoCaja: string) => {
     window.open(`/api/cajas/${idCaja}/exportar`, "_blank");
+  };
+
+  // Descargar archivo PDF oficial según plantilla
+  const handleDescargarPdf = () => {
+    if (!selectedCaja) return;
+    try {
+      const doc = generarDocumentoCajaPdf(selectedCaja as any);
+      const safeCodigo = (selectedCaja.nombre || selectedCaja.codigo_caja).replace(/[^a-zA-Z0-9_-]/g, "_");
+      doc.save(`Documento_Control_Caja_${safeCodigo}.pdf`);
+    } catch (err) {
+      console.error("Error al generar PDF:", err);
+      window.open(`/api/cajas/${selectedCaja.id_caja}/exportar-pdf`, "_blank");
+    }
   };
 
   // Filtrado de trámites disponibles para agregar
@@ -339,12 +516,14 @@ export default function CajasPage() {
           >
             <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin text-blue-600" : ""}`} />
           </button>
-          <button
-            onClick={() => setModalNuevaCajaOpen(true)}
-            className="px-3.5 py-2 text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors shadow-xs flex items-center gap-1.5"
-          >
-            <Plus className="w-4 h-4" /> Nueva Caja
-          </button>
+          {!isCustodioOnly && (
+            <button
+              onClick={() => setModalNuevaCajaOpen(true)}
+              className="px-3.5 py-2 text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors shadow-xs flex items-center gap-1.5"
+            >
+              <Plus className="w-4 h-4" /> Nueva Caja
+            </button>
+          )}
         </div>
       </div>
 
@@ -396,6 +575,26 @@ export default function CajasPage() {
           En Llenado (Abiertas)
         </button>
         <button
+          onClick={() => setTabEstado("CERRADA")}
+          className={`px-3.5 py-1.5 rounded-md transition-all ${
+            tabEstado === "CERRADA"
+              ? "bg-white text-slate-900 shadow-xs font-semibold"
+              : "text-slate-600 hover:text-slate-900"
+          }`}
+        >
+          Cerradas (Por Enviar)
+        </button>
+        <button
+          onClick={() => setTabEstado("ENVIADA")}
+          className={`px-3.5 py-1.5 rounded-md transition-all ${
+            tabEstado === "ENVIADA"
+              ? "bg-white text-slate-900 shadow-xs font-semibold"
+              : "text-slate-600 hover:text-slate-900"
+          }`}
+        >
+          Enviadas (En Custodia)
+        </button>
+        <button
           onClick={() => setTabEstado("ARCHIVADA")}
           className={`px-3.5 py-1.5 rounded-md transition-all ${
             tabEstado === "ARCHIVADA"
@@ -403,7 +602,7 @@ export default function CajasPage() {
               : "text-slate-600 hover:text-slate-900"
           }`}
         >
-          Archivadas (Cerradas)
+          Archivadas (Definitivas)
         </button>
       </div>
 
@@ -416,12 +615,11 @@ export default function CajasPage() {
           </div>
         ) : cajas.length === 0 ? (
           <div className="col-span-full p-12 bg-white rounded-xl border border-slate-200 text-center text-xs text-slate-500 uppercase font-semibold">
-            No hay cajas registradas en esta categoría. Haga clic en &quot;+ Nueva Caja&quot; para crear una.
+            No hay cajas registradas en esta categoría.
           </div>
         ) : (
           cajas.map((c) => {
             const isSelected = selectedCaja?.id_caja === c.id_caja;
-            const isAbierta = c.estado === "ABIERTA";
 
             return (
               <div
@@ -435,7 +633,17 @@ export default function CajasPage() {
                 <div>
                   <div className="flex items-start justify-between gap-2 mb-2">
                     <div className="flex items-center gap-2">
-                      <div className={`p-2 rounded-lg ${isAbierta ? "bg-cyan-50 text-cyan-700" : "bg-slate-100 text-slate-600"}`}>
+                      <div
+                        className={`p-2 rounded-lg ${
+                          c.estado === "ABIERTA"
+                            ? "bg-cyan-50 text-cyan-700"
+                            : c.estado === "CERRADA"
+                            ? "bg-amber-50 text-amber-700"
+                            : c.estado === "ENVIADA"
+                            ? "bg-purple-50 text-purple-700"
+                            : "bg-emerald-50 text-emerald-700"
+                        }`}
+                      >
                         <Package className="w-5 h-5" />
                       </div>
                       <div>
@@ -449,12 +657,22 @@ export default function CajasPage() {
                     </div>
                     <span
                       className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider border ${
-                        isAbierta
+                        c.estado === "ABIERTA"
                           ? "bg-cyan-50 text-cyan-800 border-cyan-200"
-                          : "bg-slate-100 text-slate-700 border-slate-300"
+                          : c.estado === "CERRADA"
+                          ? "bg-amber-50 text-amber-800 border-amber-200"
+                          : c.estado === "ENVIADA"
+                          ? "bg-purple-50 text-purple-800 border-purple-200"
+                          : "bg-emerald-50 text-emerald-800 border-emerald-200"
                       }`}
                     >
-                      {isAbierta ? "En Llenado" : "Archivada"}
+                      {c.estado === "ABIERTA"
+                        ? "En Llenado"
+                        : c.estado === "CERRADA"
+                        ? "Cerrada"
+                        : c.estado === "ENVIADA"
+                        ? "Enviada a Archivo"
+                        : "Archivada"}
                     </span>
                   </div>
 
@@ -485,64 +703,104 @@ export default function CajasPage() {
                 <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-slate-100">
                   <button
                     onClick={() => {
-                      if (selectedCaja?.id_caja === c.id_caja) {
-                        setSelectedCaja(null);
-                      } else {
-                        fetchCajaDetail(c.id_caja);
-                      }
+                      setSelectedCaja(c);
+                      fetchCajaDetail(c.id_caja);
+                      setModalVerTramitesOpen(true);
                     }}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-bold uppercase transition-colors flex items-center gap-1 ${
-                      isSelected
-                        ? "bg-blue-600 text-white"
-                        : "bg-slate-100 hover:bg-slate-200 text-slate-800"
-                    }`}
+                    className="px-3 py-1.5 rounded-lg text-xs font-bold uppercase transition-colors flex items-center gap-1.5 bg-blue-50 hover:bg-blue-600 hover:text-white text-blue-700 border border-blue-200 shadow-2xs"
+                    title="Ver expedientes contenidos en esta caja"
                   >
                     <FolderOpen className="w-3.5 h-3.5" />
-                    {isSelected ? "Ocultar Trámites" : "Ver Trámites"}
+                    <span>Ver Trámites</span>
                   </button>
 
                   <div className="flex items-center gap-1">
-                    {/* Botón Imprimir / Exportar Documento */}
-                    <button
-                      onClick={() => {
-                        setSelectedCaja(c);
-                        fetchCajaDetail(c.id_caja);
-                        setModalImprimirOpen(true);
-                      }}
-                      className="p-1.5 text-slate-600 hover:text-blue-700 hover:bg-blue-50 rounded-lg transition-colors border border-slate-200"
-                      title="Imprimir / Exportar Documento Oficial"
-                    >
-                      <Printer className="w-4 h-4" />
-                    </button>
+                    {/* Botón Imprimir / Exportar Documento (solo Adm. Caja) */}
+                    {(isAdmCaja || isAdmin) && (
+                      <>
+                        <button
+                          onClick={() => {
+                            setSelectedCaja(c);
+                            fetchCajaDetail(c.id_caja);
+                            setModalImprimirOpen(true);
+                          }}
+                          className="p-1.5 text-slate-600 hover:text-blue-700 hover:bg-blue-50 rounded-lg transition-colors border border-slate-200"
+                          title="Imprimir / Exportar Documento Oficial"
+                        >
+                          <Printer className="w-4 h-4" />
+                        </button>
 
-                    <button
-                      onClick={() => handleDescargarExcel(c.id_caja, c.codigo_caja)}
-                      className="p-1.5 text-slate-600 hover:text-emerald-700 hover:bg-emerald-50 rounded-lg transition-colors border border-slate-200"
-                      title="Descargar Excel Oficial (.xlsx)"
-                    >
-                      <FileSpreadsheet className="w-4 h-4" />
-                    </button>
-
-                    {/* Botón Cerrar y Archivar Caja */}
-                    {isAbierta && (
-                      <button
-                        onClick={() => handleArchivarCaja(c)}
-                        className="p-1.5 text-slate-600 hover:text-emerald-700 hover:bg-emerald-50 rounded-lg transition-colors border border-slate-200"
-                        title="Cerrar y enviar al Archivo Central"
-                      >
-                        <Archive className="w-4 h-4" />
-                      </button>
+                        <button
+                          onClick={() => handleDescargarExcel(c.id_caja, c.codigo_caja)}
+                          className="p-1.5 text-slate-600 hover:text-emerald-700 hover:bg-emerald-50 rounded-lg transition-colors border border-slate-200"
+                          title="Descargar Excel Oficial (.xlsx)"
+                        >
+                          <FileSpreadsheet className="w-4 h-4" />
+                        </button>
+                      </>
                     )}
 
-                    {/* Botón Eliminar si está abierta */}
-                    {isAbierta && (
-                      <button
-                        onClick={() => handleEliminarCaja(c)}
-                        className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
-                        title="Eliminar caja abierta"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
+                    {/* Acciones Adm. Caja en caja ABIERTA */}
+                    {c.estado === "ABIERTA" && (isAdmCaja || isAdmin) && (
+                      <>
+                        <button
+                          onClick={() => handleCerrarCaja(c)}
+                          className="p-1.5 text-slate-600 hover:text-amber-700 hover:bg-amber-50 rounded-lg transition-colors border border-slate-200"
+                          title="Cerrar caja (preparar para enviar)"
+                        >
+                          <Lock className="w-4 h-4" />
+                        </button>
+                        <button
+                          onClick={() => handleEliminarCaja(c)}
+                          className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
+                          title="Eliminar caja abierta"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </>
+                    )}
+
+                    {/* Acciones Adm. Caja en caja CERRADA */}
+                    {c.estado === "CERRADA" && (isAdmCaja || isAdmin) && (
+                      <>
+                        <button
+                          onClick={() => handleReabrirCaja(c)}
+                          className="p-1.5 text-slate-600 hover:text-blue-700 hover:bg-blue-50 rounded-lg transition-colors border border-slate-200"
+                          title="Reabrir caja para edición"
+                        >
+                          <Unlock className="w-4 h-4" />
+                        </button>
+                        <button
+                          onClick={() => handleEnviarArchivo(c)}
+                          className="p-1.5 text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors shadow-2xs"
+                          title="Enviar caja al Archivo Central"
+                        >
+                          <Send className="w-4 h-4" />
+                        </button>
+                      </>
+                    )}
+
+                    {/* Acciones Custodio en caja ENVIADA */}
+                    {c.estado === "ENVIADA" && (isCustodio || isAdmin) && (
+                      <>
+                        <button
+                          onClick={() => {
+                            setCajaADevolver(c);
+                            setModalDevolverOpen(true);
+                          }}
+                          className="p-1.5 text-amber-700 hover:bg-amber-50 rounded-lg transition-colors border border-amber-300"
+                          title="Devolver / Observar caja hacia Adm. Caja"
+                        >
+                          <RotateCcw className="w-4 h-4" />
+                        </button>
+                        <button
+                          onClick={() => handleAprobarArchivarCaja(c)}
+                          className="p-1.5 text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg transition-colors shadow-2xs"
+                          title="Aprobar y Archivar definitivamente"
+                        >
+                          <Archive className="w-4 h-4" />
+                        </button>
+                      </>
                     )}
                   </div>
                 </div>
@@ -552,164 +810,261 @@ export default function CajasPage() {
         )}
       </div>
 
-      {/* Detalle y Trámites de la Caja Seleccionada */}
-      {selectedCaja && (
-        <div className="bg-white rounded-xl border border-blue-200 shadow-md p-6 space-y-4 animate-in fade-in duration-200">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-200">
-            <div>
+      {/* MODAL EMERGENTE: DETALLE Y TRÁMITES DE LA CAJA SELECCIONADA */}
+      {modalVerTramitesOpen && selectedCaja && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-xs p-4 sm:p-6 overflow-y-auto animate-in fade-in duration-150">
+          <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-6xl max-h-[90vh] flex flex-col overflow-hidden animate-in zoom-in-95 duration-150">
+            {/* Header del Modal */}
+            <div className="px-6 py-4 bg-slate-900 text-white flex items-center justify-between gap-4 shrink-0">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-blue-600/30 text-blue-400 rounded-lg">
+                  <Package className="w-5 h-5" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="font-mono font-bold text-sm text-blue-300 uppercase">
+                      {selectedCaja.codigo_caja}
+                    </span>
+                    <span
+                      className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider ${
+                        selectedCaja.estado === "ABIERTA"
+                          ? "bg-cyan-900/80 text-cyan-200 border border-cyan-500/30"
+                          : selectedCaja.estado === "CERRADA"
+                          ? "bg-amber-900/80 text-amber-200 border border-amber-500/30"
+                          : selectedCaja.estado === "ENVIADA"
+                          ? "bg-purple-900/80 text-purple-200 border border-purple-500/30"
+                          : "bg-emerald-900/80 text-emerald-200 border border-emerald-500/30"
+                      }`}
+                    >
+                      {selectedCaja.estado === "ABIERTA"
+                        ? "En Llenado"
+                        : selectedCaja.estado === "CERRADA"
+                        ? "Cerrada"
+                        : selectedCaja.estado === "ENVIADA"
+                        ? "Enviada a Archivo"
+                        : "Archivada"}
+                    </span>
+                  </div>
+                  <h3 className="text-xs text-slate-300 font-medium mt-0.5">
+                    Expedientes Almacenados en esta Caja ({selectedCaja.tramites?.length || 0}) • Total Hojas: {selectedCaja.total_hojas || 0} • Monto: {formatCurrency(selectedCaja.total_monto || 0)}
+                  </h3>
+                </div>
+              </div>
+
               <div className="flex items-center gap-2">
-                <span className="px-2.5 py-0.5 rounded text-xs font-bold font-mono uppercase bg-blue-100 text-blue-800 border border-blue-300">
-                  {selectedCaja.codigo_caja}
-                </span>
-                <h2 className="text-base font-bold text-slate-900 tracking-tight">
-                  Expedientes en esta Caja ({selectedCaja.tramites?.length || 0})
-                </h2>
-                <span
-                  className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase border ${
-                    selectedCaja.estado === "ABIERTA"
-                      ? "bg-cyan-50 text-cyan-800 border-cyan-200"
-                      : "bg-slate-100 text-slate-700 border-slate-300"
-                  }`}
+                <button
+                  type="button"
+                  onClick={() => setModalVerTramitesOpen(false)}
+                  className="p-1.5 text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg transition-colors"
+                  title="Cerrar ventana"
                 >
-                  {selectedCaja.estado === "ABIERTA" ? "En Llenado" : "Archivada"}
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+            </div>
+
+            {/* Barra de Herramientas y Acciones de la Caja */}
+            <div className="px-6 py-3 bg-slate-50 border-b border-slate-200 flex flex-wrap items-center justify-between gap-3 shrink-0">
+              <div className="flex items-center gap-2 text-xs text-slate-600">
+                <span className="font-semibold text-slate-800">Contenido físico de la caja:</span>
+                <span className="bg-white px-2 py-1 rounded border border-slate-200 font-mono text-[11px]">
+                  {selectedCaja.tramites?.length || 0} expediente(s)
                 </span>
               </div>
-              <p className="text-xs text-slate-500 mt-1">
-                Total de Hojas: <strong>{selectedCaja.total_hojas || 0}</strong> | Monto Acumulado:{" "}
-                <strong className="text-emerald-700">{formatCurrency(selectedCaja.total_monto || 0)}</strong>
-              </p>
+
+              <div className="flex flex-wrap items-center gap-2">
+                {/* Acciones Adm. Caja en ABIERTA */}
+                {selectedCaja.estado === "ABIERTA" && (isAdmCaja || isAdmin) && (
+                  <>
+                    <button
+                      onClick={() => {
+                        fetchTramitesPagadosDisponibles();
+                        setModalAgregarTramitesOpen(true);
+                      }}
+                      className="px-3 py-1.5 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg transition-colors shadow-2xs flex items-center gap-1.5"
+                    >
+                      <Plus className="w-3.5 h-3.5" /> Almacenar Trámites Pagados
+                    </button>
+                    <button
+                      onClick={() => handleCerrarCaja(selectedCaja)}
+                      className="px-3 py-1.5 text-xs font-bold text-white bg-amber-600 hover:bg-amber-700 rounded-lg transition-colors shadow-2xs flex items-center gap-1.5"
+                    >
+                      <Lock className="w-3.5 h-3.5" /> Cerrar Caja
+                    </button>
+                  </>
+                )}
+
+                {/* Acciones Adm. Caja en CERRADA */}
+                {selectedCaja.estado === "CERRADA" && (isAdmCaja || isAdmin) && (
+                  <>
+                    <button
+                      onClick={() => handleReabrirCaja(selectedCaja)}
+                      className="px-3 py-1.5 text-xs font-semibold text-slate-700 bg-white hover:bg-slate-100 border border-slate-300 rounded-lg transition-colors flex items-center gap-1.5 shadow-2xs"
+                    >
+                      <Unlock className="w-3.5 h-3.5" /> Reabrir Caja
+                    </button>
+                    <button
+                      onClick={() => handleEnviarArchivo(selectedCaja)}
+                      className="px-3 py-1.5 text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors shadow-2xs flex items-center gap-1.5"
+                    >
+                      <Send className="w-3.5 h-3.5" /> Enviar a Archivo Central
+                    </button>
+                  </>
+                )}
+
+                {/* Acciones Custodio en ENVIADA */}
+                {selectedCaja.estado === "ENVIADA" && (isCustodio || isAdmin) && (
+                  <>
+                    <button
+                      onClick={() => {
+                        setCajaADevolver(selectedCaja);
+                        setModalDevolverOpen(true);
+                      }}
+                      className="px-3 py-1.5 text-xs font-semibold text-amber-800 bg-amber-50 hover:bg-amber-100 border border-amber-300 rounded-lg transition-colors flex items-center gap-1.5"
+                    >
+                      <RotateCcw className="w-3.5 h-3.5 text-amber-600" /> Devolver a Adm. Caja
+                    </button>
+                    <button
+                      onClick={() => handleAprobarArchivarCaja(selectedCaja)}
+                      className="px-3.5 py-1.5 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg transition-colors shadow-2xs flex items-center gap-1.5"
+                    >
+                      <Archive className="w-3.5 h-3.5" /> Aprobar y Archivar Definitivamente
+                    </button>
+                  </>
+                )}
+
+                {(isAdmCaja || isAdmin) && (
+                  <>
+                    <button
+                      onClick={() => setModalImprimirOpen(true)}
+                      className="px-3 py-1.5 text-xs font-semibold text-slate-700 bg-white hover:bg-slate-100 border border-slate-300 rounded-lg transition-colors flex items-center gap-1.5 shadow-2xs"
+                    >
+                      <Printer className="w-3.5 h-3.5" /> Imprimir Documento
+                    </button>
+
+                    <button
+                      onClick={() => handleDescargarExcel(selectedCaja.id_caja, selectedCaja.codigo_caja)}
+                      className="px-3 py-1.5 text-xs font-semibold text-slate-700 bg-white hover:bg-slate-100 border border-slate-300 rounded-lg transition-colors flex items-center gap-1.5 shadow-2xs"
+                    >
+                      <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-600" /> Exportar Excel
+                    </button>
+                  </>
+                )}
+              </div>
             </div>
 
-            <div className="flex flex-wrap items-center gap-2">
-              {selectedCaja.estado === "ABIERTA" && (
-                <button
-                  onClick={() => {
-                    fetchTramitesPagadosDisponibles();
-                    setModalAgregarTramitesOpen(true);
-                  }}
-                  className="px-3.5 py-2 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg transition-colors shadow-2xs flex items-center gap-1.5"
-                >
-                  <Plus className="w-3.5 h-3.5" /> Almacenar Trámites Pagados
-                </button>
-              )}
-
-              <button
-                onClick={() => setModalImprimirOpen(true)}
-                className="px-3 py-2 text-xs font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 border border-slate-300 rounded-lg transition-colors flex items-center gap-1.5"
-              >
-                <Printer className="w-3.5 h-3.5" /> Imprimir Documento
-              </button>
-
-              <button
-                onClick={() => handleDescargarExcel(selectedCaja.id_caja, selectedCaja.codigo_caja)}
-                className="px-3 py-2 text-xs font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 border border-slate-300 rounded-lg transition-colors flex items-center gap-1.5"
-              >
-                <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-600" /> Exportar Excel
-              </button>
-
-              {selectedCaja.estado === "ABIERTA" && (
-                <button
-                  onClick={() => handleArchivarCaja(selectedCaja)}
-                  className="px-4 py-2 text-xs font-bold text-white bg-slate-900 hover:bg-slate-800 rounded-lg transition-colors shadow-2xs flex items-center gap-1.5"
-                >
-                  <Archive className="w-3.5 h-3.5 text-amber-400" /> Cerrar Caja y Archivar
-                </button>
-              )}
-            </div>
-          </div>
-
-          {/* Tabla de Trámites dentro de la Caja */}
-          {loadingCajaDetail ? (
-            <div className="p-8 text-center text-xs text-slate-500 flex flex-col items-center gap-2">
-              <RefreshCw className="w-5 h-5 animate-spin text-blue-600" />
-              <span>Cargando expedientes de la caja...</span>
-            </div>
-          ) : !selectedCaja.tramites || selectedCaja.tramites.length === 0 ? (
-            <div className="p-8 text-center text-xs text-slate-400 uppercase font-semibold">
-              Esta caja aún no tiene expedientes almacenados. Haga clic en &quot;Almacenar Trámites Pagados&quot; para agregar expedientes.
-            </div>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs border-collapse">
-                <thead>
-                  <tr className="border-b border-slate-200 bg-slate-50 text-[11px] font-bold text-slate-700 uppercase tracking-wider">
-                    <th className="py-2.5 px-3">No. Cartón</th>
-                    <th className="py-2.5 px-3">CÓDIGO / QUIPUX</th>
-                    <th className="py-2.5 px-3 text-center">No. CUR</th>
-                    <th className="py-2.5 px-3 text-center">No. Hojas</th>
-                    <th className="py-2.5 px-3">Proveedor y Asunto</th>
-                    <th className="py-2.5 px-3 text-right">Valor</th>
-                    <th className="py-2.5 px-3 text-center">Estado</th>
-                    {selectedCaja.estado === "ABIERTA" && (
-                      <th className="py-2.5 px-3 text-center w-16">Acciones</th>
-                    )}
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {selectedCaja.tramites.map((t) => {
-                    const curDisplay = [
-                      t.numero_cur_devengado,
-                      t.numero_cur_contable,
-                      t.numero_cur_compromiso,
-                    ].filter(Boolean).join(", ") || "-";
-
-                    return (
-                      <tr
-                        key={t.id_tramite}
-                        onDoubleClick={() => router.push(`/tramite/${t.id_tramite}`)}
-                        className="hover:bg-slate-50/80 transition-colors cursor-pointer"
-                        title="Doble clic para ver ficha del trámite"
-                      >
-                        <td className="py-3 px-3 font-mono font-bold text-slate-800 text-[11px]">
-                          {selectedCaja.codigo_caja}
-                        </td>
-                        <td className="py-3 px-3 whitespace-nowrap">
-                          <div className="font-mono font-bold text-slate-900">{t.codigo_tramite}</div>
-                          <div className="text-[11px] font-mono text-blue-700">{t.numero_quipux}</div>
-                        </td>
-                        <td className="py-3 px-3 text-center font-mono font-bold text-slate-700 whitespace-nowrap">
-                          {curDisplay}
-                        </td>
-                        <td className="py-3 px-3 text-center font-mono font-bold text-slate-900">
-                          {t.numero_hojas || t.fojas_fisicas || 1}
-                        </td>
-                        <td className="py-3 px-3">
-                          <div className="font-semibold text-slate-800 uppercase line-clamp-1">
-                            {t.proveedor_beneficiario}
-                          </div>
-                          {t.asunto && (
-                            <div className="text-[11px] text-slate-500 line-clamp-1 italic">
-                              {t.asunto}
-                            </div>
-                          )}
-                        </td>
-                        <td className="py-3 px-3 text-right font-mono font-bold text-slate-900 whitespace-nowrap">
-                          {formatCurrency(t.monto_total || 0)}
-                        </td>
-                        <td className="py-3 px-3 text-center whitespace-nowrap">
-                          <BadgeEstado estado={t.estado_general} subEstado={t.sub_estado} />
-                        </td>
-                        {selectedCaja.estado === "ABIERTA" && (
-                          <td className="py-3 px-3 text-center">
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleRemoverTramiteDeCaja(t.id_tramite);
-                              }}
-                              className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
-                              title="Retirar de esta caja"
-                            >
-                              <Trash2 className="w-3.5 h-3.5" />
-                            </button>
-                          </td>
+            {/* Contenido / Tabla de Trámites Scrollable */}
+            <div className="p-6 overflow-y-auto flex-1">
+              {loadingCajaDetail ? (
+                <div className="p-12 text-center text-xs text-slate-500 flex flex-col items-center gap-2">
+                  <RefreshCw className="w-5 h-5 animate-spin text-blue-600" />
+                  <span>Cargando expedientes de la caja...</span>
+                </div>
+              ) : !selectedCaja.tramites || selectedCaja.tramites.length === 0 ? (
+                <div className="p-12 text-center text-xs text-slate-400 uppercase font-semibold border-2 border-dashed border-slate-200 rounded-xl">
+                  Esta caja aún no tiene expedientes almacenados.
+                </div>
+              ) : (
+                <div className="overflow-x-auto border border-slate-200 rounded-xl">
+                  <table className="w-full text-left text-xs border-collapse">
+                    <thead>
+                      <tr className="border-b border-slate-200 bg-slate-50 text-[11px] font-bold text-slate-700 uppercase tracking-wider">
+                        <th className="py-2.5 px-3 text-center w-12">No.</th>
+                        <th className="py-2.5 px-3">No. Cartón</th>
+                        <th className="py-2.5 px-3">NÚMERO QUIPUX</th>
+                        <th className="py-2.5 px-3 text-center">No. CUR</th>
+                        <th className="py-2.5 px-3 text-center">No. Hojas</th>
+                        <th className="py-2.5 px-3">Proveedor y Asunto</th>
+                        <th className="py-2.5 px-3 text-right">Valor</th>
+                        <th className="py-2.5 px-3 text-center">Estado</th>
+                        {selectedCaja.estado === "ABIERTA" && (isAdmCaja || isAdmin) && (
+                          <th className="py-2.5 px-3 text-center w-16">Acciones</th>
                         )}
                       </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100 bg-white">
+                      {selectedCaja.tramites.map((t, idx) => {
+                        const curDisplay = [
+                          t.numero_cur_devengado,
+                          t.numero_cur_contable,
+                          t.numero_cur_compromiso,
+                        ].filter(Boolean).join(", ") || "-";
+
+                        return (
+                          <tr
+                            key={t.id_tramite}
+                            onDoubleClick={() => router.push(`/tramite/${t.id_tramite}`)}
+                            className="hover:bg-slate-50/80 transition-colors cursor-pointer"
+                            title="Doble clic para ver ficha del trámite"
+                          >
+                            <td className="py-3 px-3 text-center font-mono font-bold text-slate-500 text-[11px]">
+                              {idx + 1}
+                            </td>
+                            <td className="py-3 px-3 font-mono font-bold text-slate-800 text-[11px]">
+                              {selectedCaja.codigo_caja}
+                            </td>
+                            <td className="py-3 px-3 whitespace-nowrap">
+                              <div className="font-mono font-bold text-blue-700">{t.numero_quipux}</div>
+                            </td>
+                            <td className="py-3 px-3 text-center font-mono font-bold text-slate-700 whitespace-nowrap">
+                              {curDisplay}
+                            </td>
+                            <td className="py-3 px-3 text-center font-mono font-bold text-slate-900">
+                              {t.numero_hojas || t.fojas_fisicas || 1}
+                            </td>
+                            <td className="py-3 px-3">
+                              <div className="font-semibold text-slate-800 uppercase line-clamp-1">
+                                {t.proveedor_beneficiario}
+                              </div>
+                              {t.asunto && (
+                                <div className="text-[11px] text-slate-500 line-clamp-1 italic">
+                                  {t.asunto}
+                                </div>
+                              )}
+                            </td>
+                            <td className="py-3 px-3 text-right font-mono font-bold text-slate-900 whitespace-nowrap">
+                              {formatCurrency(t.monto_total || 0)}
+                            </td>
+                            <td className="py-3 px-3 text-center whitespace-nowrap">
+                              <BadgeEstado estado={t.estado_general} subEstado={t.sub_estado} />
+                            </td>
+                            {selectedCaja.estado === "ABIERTA" && (isAdmCaja || isAdmin) && (
+                              <td className="py-3 px-3 text-center">
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleRemoverTramiteDeCaja(t.id_tramite);
+                                  }}
+                                  className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
+                                  title="Retirar de esta caja"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </button>
+                              </td>
+                            )}
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
             </div>
-          )}
+
+            {/* Footer Modal */}
+            <div className="px-6 py-3 bg-slate-100 border-t border-slate-200 flex items-center justify-between shrink-0">
+              <span className="text-xs text-slate-500">
+                Tip: Haga doble clic sobre cualquier fila para abrir la ficha completa del trámite.
+              </span>
+              <button
+                type="button"
+                onClick={() => setModalVerTramitesOpen(false)}
+                className="px-4 py-2 text-xs font-semibold text-slate-700 bg-white hover:bg-slate-50 border border-slate-300 rounded-lg transition-colors shadow-2xs"
+              >
+                Cerrar
+              </button>
+            </div>
+          </div>
         </div>
       )}
 
@@ -784,6 +1139,75 @@ export default function CajasPage() {
         </div>
       )}
 
+      {/* MODAL: DEVOLVER CAJA A ADM. CAJA (CUSTODIO DE ARCHIVO) */}
+      {modalDevolverOpen && cajaADevolver && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-xs p-4">
+          <div className="bg-white rounded-xl shadow-xl border border-slate-200 w-full max-w-md overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+            <div className="px-5 py-4 bg-amber-900 text-white flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <RotateCcw className="w-4 h-4 text-amber-300" />
+                <h3 className="text-xs font-bold uppercase tracking-wider">
+                  Devolver Caja: {cajaADevolver.codigo_caja}
+                </h3>
+              </div>
+              <button
+                onClick={() => {
+                  setModalDevolverOpen(false);
+                  setCajaADevolver(null);
+                  setMotivoDevolucion("");
+                }}
+                className="text-amber-200 hover:text-white transition-colors"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <form onSubmit={handleConfirmarDevolucion} className="p-5 space-y-4">
+              <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg text-xs text-amber-900">
+                Esta caja regresará al estado <strong>CERRADA</strong> en Administración de Caja para que puedan reabrirla, retirar o agregar expedientes y subsanar las observaciones.
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
+                  Motivo de Devolución / Observación *
+                </label>
+                <textarea
+                  rows={3}
+                  value={motivoDevolucion}
+                  onChange={(e) => setMotivoDevolucion(e.target.value)}
+                  placeholder="Detalle el motivo por el cual se devuelve la caja física a Adm. Caja..."
+                  required
+                  autoFocus
+                  className="w-full text-xs bg-white border border-slate-300 rounded-lg p-2.5 text-slate-900 focus:ring-2 focus:ring-amber-500 focus:outline-none"
+                />
+              </div>
+
+              <div className="flex justify-end gap-2 pt-3 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setModalDevolverOpen(false);
+                    setCajaADevolver(null);
+                    setMotivoDevolucion("");
+                  }}
+                  disabled={devolviendoCaja}
+                  className="px-3.5 py-1.5 text-xs font-semibold uppercase text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  disabled={devolviendoCaja || !motivoDevolucion.trim()}
+                  className="px-4 py-1.5 text-xs font-bold uppercase text-white bg-amber-700 hover:bg-amber-800 rounded-lg transition-colors shadow-xs"
+                >
+                  {devolviendoCaja ? "Devolviendo..." : "Confirmar Devolución"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
       {/* MODAL: ALMACENAR TRÁMITES PAGADOS EN LA CAJA */}
       {modalAgregarTramitesOpen && selectedCaja && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-xs p-4">
@@ -847,7 +1271,7 @@ export default function CajasPage() {
                           )}
                         </button>
                       </th>
-                      <th className="py-2 px-3">Código / Quipux</th>
+                      <th className="py-2 px-3">Número Quipux</th>
                       <th className="py-2 px-3">Proveedor y Asunto</th>
                       <th className="py-2 px-3 text-center">No. Hojas</th>
                       <th className="py-2 px-3 text-right">Valor</th>
@@ -879,8 +1303,7 @@ export default function CajasPage() {
                             </button>
                           </td>
                           <td className="py-2.5 px-3 whitespace-nowrap">
-                            <div className="font-mono font-bold text-slate-900">{t.codigo_tramite}</div>
-                            <div className="text-[11px] font-mono text-blue-700">{t.numero_quipux}</div>
+                            <div className="font-mono font-bold text-blue-700">{t.numero_quipux}</div>
                           </td>
                           <td className="py-2.5 px-3">
                             <div className="font-semibold text-slate-800 uppercase line-clamp-1">
@@ -936,73 +1359,90 @@ export default function CajasPage() {
 
       {/* MODAL: VISTA PREVIA Y FORMATO DE IMPRESIÓN OFICIAL DEL DOCUMENTO */}
       {modalImprimirOpen && selectedCaja && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-xs p-4 overflow-y-auto">
-          <div className="bg-white rounded-xl shadow-2xl border border-slate-200 w-full max-w-4xl my-8 overflow-hidden flex flex-col animate-in fade-in zoom-in-95 duration-150">
-            {/* Header del modal */}
-            <div className="px-5 py-3.5 bg-slate-900 text-white flex items-center justify-between print:hidden">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/70 backdrop-blur-xs p-2 sm:p-4 md:p-6 print:p-0 print:bg-white print:static print-document-root">
+          <div className="bg-white rounded-xl shadow-2xl border border-slate-200 w-full max-w-5xl max-h-[92vh] flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-150 print:border-none print:shadow-none print:max-w-none print:max-h-none print:overflow-visible">
+            {/* Header del modal - Siempre fijo y visible arriba */}
+            <div className="px-5 py-3.5 bg-slate-900 text-white flex flex-wrap items-center justify-between gap-3 shrink-0 shadow-md print:hidden">
               <div className="flex items-center gap-2">
-                <Printer className="w-4 h-4 text-blue-400" />
-                <h3 className="text-xs font-bold uppercase tracking-wider">
+                <Printer className="w-4 h-4 text-blue-400 shrink-0" />
+                <h3 className="text-xs font-bold uppercase tracking-wider truncate">
                   Documento Oficial de Entrega a Archivo
                 </h3>
               </div>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 flex-wrap">
                 <button
+                  type="button"
+                  onClick={handleDescargarPdf}
+                  className="px-3 py-1.5 bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold rounded-md flex items-center gap-1.5 transition-colors shadow-xs cursor-pointer"
+                  title="Descargar archivo PDF oficial"
+                >
+                  <FileDown className="w-3.5 h-3.5" /> Descargar PDF
+                </button>
+                <button
+                  type="button"
                   onClick={() => window.print()}
-                  className="px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-md flex items-center gap-1 transition-colors"
+                  className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-md flex items-center gap-1.5 transition-colors shadow-xs cursor-pointer"
+                  title="Imprimir documento oficial en formato A4 horizontal"
                 >
                   <Printer className="w-3.5 h-3.5" /> Imprimir Documento
                 </button>
                 <button
+                  type="button"
                   onClick={() => handleDescargarExcel(selectedCaja.id_caja, selectedCaja.codigo_caja)}
-                  className="px-3 py-1 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-md flex items-center gap-1 transition-colors"
+                  className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-md flex items-center gap-1.5 transition-colors shadow-xs cursor-pointer"
+                  title="Descargar archivo Excel oficial"
                 >
                   <FileSpreadsheet className="w-3.5 h-3.5" /> Descargar Excel
                 </button>
                 <button
+                  type="button"
                   onClick={() => setModalImprimirOpen(false)}
-                  className="text-slate-400 hover:text-white transition-colors p-1"
+                  className="text-slate-400 hover:text-white transition-colors p-1.5 rounded-md hover:bg-slate-800 cursor-pointer ml-1"
+                  title="Cerrar modal"
                 >
                   <X className="w-4 h-4" />
                 </button>
               </div>
             </div>
 
-            {/* Hoja Documento Oficial (Para Impresión) */}
-            <div className="p-8 bg-white text-slate-900 print:p-0 space-y-4">
-              {/* Título Superior */}
-              <div className="border border-slate-900 bg-slate-900 text-white py-3 px-4 text-center">
-                <h2 className="text-sm font-bold uppercase tracking-wide">
-                  {selectedCaja.codigo_caja.toUpperCase()} - CONTROL Y ENTREGA DE EXPEDIENTES
+            {/* Hoja Documento Oficial - Contenedor scrolleable con altura adaptativa */}
+            <div className="flex-1 overflow-y-auto overflow-x-auto p-4 sm:p-8 bg-white text-slate-900 print:p-0 print:overflow-visible font-sans">
+              {/* Fila 1: Título con Nombre o Código de la Caja */}
+              <div className="bg-[#244062] text-white py-2.5 px-4 text-center border border-slate-900">
+                <h2 className="text-sm font-bold uppercase tracking-wide font-sans">
+                  {(selectedCaja.nombre || selectedCaja.codigo_caja).toUpperCase()}
                 </h2>
-                <p className="text-[10px] text-slate-300 uppercase tracking-widest mt-0.5">
-                  SERVICIO NACIONAL DE ADUANA DEL ECUADOR - ADMINISTRACIÓN DE CAJA
-                </p>
               </div>
 
-              {/* Tabla Oficial de 7 Columnas */}
-              <div className="overflow-x-auto border border-slate-300">
-                <table className="w-full text-[11px] border-collapse border border-slate-300">
+              {/* Fila 2: Subtítulo Institucional */}
+              <div className="bg-[#F1F5F9] text-[#475569] py-2 px-4 text-center border-x border-b border-slate-900 font-bold font-sans text-[11px] tracking-wide">
+                SERVICIO NACIONAL DE ADUANA DEL ECUADOR - ADMINISTRACIÓN DE CAJA | FECHA DE EMISIÓN: {new Date().toLocaleDateString("es-EC")}
+              </div>
+
+              {/* Tabla Oficial de 7 Columnas con Estilo Exacto */}
+              <div className="overflow-x-auto">
+                <table className="w-full text-[11px] border-collapse border border-slate-900 font-sans">
                   <thead>
-                    <tr className="bg-slate-100 text-slate-900 font-bold uppercase border-b border-slate-300">
-                      <th className="border border-slate-300 py-2 px-2 text-center w-24">No. Cartón</th>
-                      <th className="border border-slate-300 py-2 px-2 text-center w-28">No. CUR</th>
-                      <th className="border border-slate-300 py-2 px-2 text-center w-20">No. Hojas</th>
-                      <th className="border border-slate-300 py-2 px-3 text-left">Proveedor y Asunto</th>
-                      <th className="border border-slate-300 py-2 px-2 text-right w-24">Valor</th>
-                      <th className="border border-slate-300 py-2 px-2 text-center w-36">Fecha y Observaciones</th>
-                      <th className="border border-slate-300 py-2 px-2 text-center w-32">Fecha envió de correos</th>
+                    <tr className="bg-[#244062] text-white font-bold uppercase border-b border-slate-900">
+                      <th className="border border-slate-900 py-2.5 px-2 text-center w-[4%]">No.</th>
+                      <th className="border border-slate-900 py-2.5 px-2 text-center w-[5%]">Cartón</th>
+                      <th className="border border-slate-900 py-2.5 px-2 text-center w-[11%]">CUR</th>
+                      <th className="border border-slate-900 py-2.5 px-2 text-center w-[6%]">Hojas</th>
+                      <th className="border border-slate-900 py-2.5 px-3.5 text-left w-[36%]">Proveedor y Asunto</th>
+                      <th className="border border-slate-900 py-2.5 px-3 text-right w-[14%]">Valor</th>
+                      <th className="border border-slate-900 py-2.5 px-2 text-center w-[12%]">Fecha y Observaciones</th>
+                      <th className="border border-slate-900 py-2.5 px-2 text-center w-[12%]">Fecha envío de correos</th>
                     </tr>
                   </thead>
                   <tbody>
                     {!selectedCaja.tramites || selectedCaja.tramites.length === 0 ? (
                       <tr>
-                        <td colSpan={7} className="border border-slate-300 py-6 text-center text-slate-400 italic">
+                        <td colSpan={8} className="border border-slate-900 py-6 text-center text-slate-400 italic">
                           No hay expedientes almacenados en esta caja.
                         </td>
                       </tr>
                     ) : (
-                      selectedCaja.tramites.map((t) => {
+                      selectedCaja.tramites.map((t, idx) => {
                         const curDisplay = [
                           t.numero_cur_devengado,
                           t.numero_cur_contable,
@@ -1010,76 +1450,62 @@ export default function CajasPage() {
                         ].filter(Boolean).join(", ") || "-";
 
                         return (
-                          <tr key={t.id_tramite} className="border-b border-slate-200">
-                            <td className="border border-slate-300 py-2 px-2 text-center font-bold font-mono">
-                              {selectedCaja.codigo_caja}
+                          <tr key={t.id_tramite} className="border-b border-slate-900">
+                            {/* Col 1: No. (Secuencial 1, 2, 3...) */}
+                            <td className="border border-slate-900 py-3.5 px-2 text-center font-bold">
+                              {idx + 1}
                             </td>
-                            <td className="border border-slate-300 py-2 px-2 text-center font-bold font-mono">
+                            {/* Col 2: Cartón (siempre 1) */}
+                            <td className="border border-slate-900 py-3.5 px-2 text-center font-bold">
+                              1
+                            </td>
+                            <td className="border border-slate-900 py-3.5 px-2 text-center font-bold">
                               {curDisplay}
                             </td>
-                            <td className="border border-slate-300 py-2 px-2 text-center font-mono font-bold">
+                            <td className="border border-slate-900 py-3.5 px-2 text-center">
                               {t.numero_hojas || t.fojas_fisicas || 1}
                             </td>
-                            <td className="border border-slate-300 py-2 px-3 text-left">
-                              <span className="font-bold uppercase">{t.proveedor_beneficiario}</span>
-                              {t.asunto && <span className="text-slate-600"> - {t.asunto}</span>}
+                            <td className="border border-slate-900 py-3.5 px-3.5 text-left leading-relaxed">
+                              <span className="font-semibold text-slate-900">{t.proveedor_beneficiario}</span>
+                              {t.asunto && <span className="text-slate-800"> - {t.asunto}</span>}
                             </td>
-                            <td className="border border-slate-300 py-2 px-2 text-right font-mono font-bold">
+                            <td className="border border-slate-900 py-3.5 px-3 text-right font-bold">
                               {formatCurrency(t.monto_total || 0)}
                             </td>
-                            <td className="border border-slate-300 py-2 px-2 text-center"></td>
-                            <td className="border border-slate-300 py-2 px-2 text-center"></td>
+                            <td className="border border-slate-900 py-3.5 px-2 text-center"></td>
+                            <td className="border border-slate-900 py-3.5 px-2 text-center"></td>
                           </tr>
                         );
                       })
                     )}
                   </tbody>
                   <tfoot>
-                    <tr className="bg-slate-100 font-bold uppercase border-t-2 border-slate-400">
-                      <td className="border border-slate-300 py-2 px-2 text-center">
-                        TOTAL: {selectedCaja.tramites?.length || 0}
-                      </td>
-                      <td className="border border-slate-300 py-2 px-2"></td>
-                      <td className="border border-slate-300 py-2 px-2 text-center font-mono">
-                        {selectedCaja.total_hojas || 0}
-                      </td>
-                      <td className="border border-slate-300 py-2 px-3 text-right">TOTAL GENERAL:</td>
-                      <td className="border border-slate-300 py-2 px-2 text-right font-mono text-emerald-800">
+                    <tr className="bg-[#E2E8F0] font-bold text-slate-900 border-t border-slate-900">
+                      <td className="border border-slate-900 py-2.5 px-2 text-center"></td>
+                      <td className="border border-slate-900 py-2.5 px-2 text-center"></td>
+                      <td className="border border-slate-900 py-2.5 px-2"></td>
+                      <td className="border border-slate-900 py-2.5 px-2 text-center"></td>
+                      <td className="border border-slate-900 py-2.5 px-3.5 text-right font-bold">TOTAL GENERAL VALORES:</td>
+                      <td className="border border-slate-900 py-2.5 px-3 text-right font-bold">
                         {formatCurrency(selectedCaja.total_monto || 0)}
                       </td>
-                      <td className="border border-slate-300 py-2 px-2"></td>
-                      <td className="border border-slate-300 py-2 px-2"></td>
+                      <td className="border border-slate-900 py-2.5 px-2"></td>
+                      <td className="border border-slate-900 py-2.5 px-2"></td>
                     </tr>
                   </tfoot>
                 </table>
               </div>
-
-              {/* Firmas de Entrega y Recepción */}
-              <div className="grid grid-cols-2 gap-12 pt-12 mt-6">
-                <div className="text-center">
-                  <div className="border-t border-slate-400 w-48 mx-auto pt-1 font-bold text-xs uppercase">
-                    ENTREGADO POR
-                  </div>
-                  <div className="text-[10px] text-slate-500 uppercase">Administración de Caja (DFI)</div>
-                </div>
-
-                <div className="text-center">
-                  <div className="border-t border-slate-400 w-48 mx-auto pt-1 font-bold text-xs uppercase">
-                    RECIBIDO POR
-                  </div>
-                  <div className="text-[10px] text-slate-500 uppercase">Archivo Central Contable</div>
-                </div>
-              </div>
             </div>
 
-            {/* Footer modal */}
-            <div className="px-5 py-3 bg-slate-100 border-t border-slate-200 flex items-center justify-between print:hidden">
+            {/* Footer modal - Fijo abajo */}
+            <div className="px-5 py-3 bg-slate-100 border-t border-slate-200 flex items-center justify-between shrink-0 print:hidden">
               <span className="text-xs text-slate-500">
-                Una vez impreso este documento, proceda a hacer clic en <strong>&quot;Cerrar Caja y Archivar&quot;</strong> para finalizar el ciclo.
+                Puede descargar el archivo en formato PDF o Excel oficial, o imprimirlo directamente en hoja horizontal.
               </span>
               <button
+                type="button"
                 onClick={() => setModalImprimirOpen(false)}
-                className="px-3 py-1.5 text-xs font-semibold uppercase text-slate-700 bg-white border border-slate-300 hover:bg-slate-50 rounded-lg transition-colors"
+                className="px-3 py-1.5 text-xs font-semibold uppercase text-slate-700 bg-white border border-slate-300 hover:bg-slate-50 rounded-lg transition-colors cursor-pointer"
               >
                 Cerrar Vista Previa
               </button>

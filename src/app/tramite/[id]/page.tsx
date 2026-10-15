@@ -1,7 +1,7 @@
 "use client";
 
-import React, { useEffect, useState, useCallback } from "react";
-import { useParams, useRouter } from "next/navigation";
+import React, { useEffect, useState, useCallback, useMemo } from "react";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { TramiteCompletoDTO, UsuarioInstitucional } from "@/types";
 import { BadgeEstado } from "@/components/ui/BadgeEstado";
@@ -14,12 +14,14 @@ import { TarjetaContabilidad } from "@/components/tramites/TarjetaContabilidad";
 import { TarjetaTesoreria } from "@/components/tramites/TarjetaTesoreria";
 import { TarjetaArchivo } from "@/components/tramites/TarjetaArchivo";
 import { TimelineBitacora } from "@/components/tramites/TimelineBitacora";
-import { ArrowLeft, RefreshCw, FileText, AlertTriangle } from "lucide-react";
+import { ArrowLeft, RefreshCw, FileText, AlertTriangle, Eye, Building2, UserCheck } from "lucide-react";
 
 export default function TramiteDetallePage() {
   const params = useParams();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const id = params?.id as string;
+  const isReadOnlyParam = searchParams.get("readonly") === "true";
 
   const [tramite, setTramite] = useState<TramiteCompletoDTO | null>(null);
   const [currentUser, setCurrentUser] = useState<UsuarioInstitucional | null>(null);
@@ -57,6 +59,29 @@ export default function TramiteDetallePage() {
     fetchTramite();
   }, [fetchTramite]);
 
+  // Determinar si el usuario actual es custodio o si está en modo solo lectura
+  const isCustodio = useMemo(() => {
+    if (!currentUser || !tramite) return false;
+    if (currentUser.rol === "ADMIN") return true;
+    return tramite.id_custodio_actual === currentUser.id_usuario;
+  }, [currentUser, tramite]);
+
+  const isReadOnly = isReadOnlyParam || (!isCustodio && currentUser?.rol !== "ADMIN");
+
+  const custodioNombre =
+    tramite?.usuarios?.nombre_completo ||
+    tramite?.custodio_actual?.nombre_completo ||
+    "Sin asignar";
+  const custodioCargo =
+    tramite?.usuarios?.cargo ||
+    tramite?.custodio_actual?.cargo ||
+    tramite?.usuarios?.rol ||
+    "Servidor";
+  const areaActualNombre =
+    tramite?.areas?.nombre ||
+    tramite?.area_actual?.nombre ||
+    "Área Institucional";
+
   if (loading && !tramite) {
     return (
       <div className="p-16 text-center text-xs text-slate-500 flex flex-col items-center justify-center gap-3">
@@ -85,28 +110,45 @@ export default function TramiteDetallePage() {
     );
   }
 
+  // Si está en solo lectura, pasamos currentUser como null a las tarjetas para bloquear edición
+  const targetUserForEditing = isReadOnly ? null : currentUser;
+
   return (
     <div className="space-y-6 pb-12">
-      {/* Top Header Navigation */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-5 rounded-xl border border-slate-200 shadow-xs">
-        <div className="flex items-center gap-3">
-          <Link
-            href="/escritorio"
-            className="p-2 text-slate-500 hover:text-slate-900 hover:bg-slate-100 rounded-lg border border-slate-200 transition-colors"
-            title="Volver a Mi Escritorio"
+      {/* Top Header Navigation con Área Actual y Custodio Actual */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-5 rounded-xl border border-slate-200 shadow-xs">
+        <div className="flex items-start sm:items-center gap-3">
+          <button
+            type="button"
+            onClick={() => router.back()}
+            className="p-2 text-slate-500 hover:text-slate-900 hover:bg-slate-100 rounded-lg border border-slate-200 transition-colors cursor-pointer shrink-0 mt-0.5 sm:mt-0"
+            title="Volver"
           >
             <ArrowLeft className="w-4 h-4" />
-          </Link>
-          <div>
+          </button>
+          <div className="space-y-1.5">
             <div className="flex items-center gap-2 flex-wrap">
               <h1 className="text-lg font-bold font-mono text-slate-900 tracking-tight">
-                {tramite.codigo_tramite}
+                {tramite.numero_quipux}
               </h1>
               <BadgeEstado estado={tramite.estado_general} subEstado={tramite.sub_estado} />
               <SemaforoSLA sla={tramite.sla} />
             </div>
-            <div className="flex items-center gap-2 text-xs text-slate-500 mt-1">
-              <span className="font-mono text-blue-700 font-semibold">{tramite.numero_quipux}</span>
+
+            {/* Datos de Área Actual y Custodio Actual */}
+            <div className="flex flex-wrap items-center gap-2 pt-0.5">
+              <div className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-slate-100 border border-slate-200 rounded-md text-xs">
+                <Building2 className="w-3.5 h-3.5 text-blue-600 shrink-0" />
+                <span className="text-slate-500 font-semibold uppercase text-[10px]">Área:</span>
+                <span className="font-bold text-slate-800 uppercase">{areaActualNombre}</span>
+              </div>
+
+              <div className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-slate-100 border border-slate-200 rounded-md text-xs">
+                <UserCheck className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                <span className="text-slate-500 font-semibold uppercase text-[10px]">Custodio:</span>
+                <span className="font-bold text-slate-800 uppercase">{custodioNombre}</span>
+                <span className="text-slate-500 text-[11px] font-medium">({custodioCargo})</span>
+              </div>
             </div>
           </div>
         </div>
@@ -114,24 +156,43 @@ export default function TramiteDetallePage() {
         <button
           onClick={fetchTramite}
           disabled={loading}
-          className="p-2 text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-lg border border-slate-200 transition-colors self-start sm:self-auto"
+          className="p-2 text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-lg border border-slate-200 transition-colors self-start md:self-center"
           title="Actualizar datos del expediente"
         >
           <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin text-blue-600" : ""}`} />
         </button>
       </div>
 
-      {/* Action Header / Barra de Acciones Dinámicas */}
-      <BarraAcciones
-        tramite={tramite}
-        currentUser={currentUser}
-        onRefresh={fetchTramite}
-      />
+      {/* Action Header vs Banner de Modo Solo Lectura */}
+      {!isReadOnly ? (
+        <BarraAcciones
+          tramite={tramite}
+          currentUser={currentUser}
+          onRefresh={fetchTramite}
+        />
+      ) : (
+        <div className="bg-slate-50 border border-slate-300 rounded-xl p-3.5 px-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-2xs">
+          <div className="flex items-center gap-2.5 text-xs text-slate-700">
+            <Eye className="w-4 h-4 text-blue-600 shrink-0" />
+            <div>
+              <span className="font-bold uppercase tracking-wide text-slate-800">
+                Modo Consulta (Solo Lectura)
+              </span>
+              <p className="text-[11px] text-slate-500 mt-0.5">
+                Usted está visualizando este expediente sin permisos de modificación directa por encontrarse bajo la custodia de <strong>{custodioNombre}</strong> ({custodioCargo}) en <strong>{areaActualNombre}</strong>.
+              </p>
+            </div>
+          </div>
+          <span className="self-start sm:self-auto px-2.5 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider bg-slate-200 text-slate-700 border border-slate-300">
+            Solo Lectura
+          </span>
+        </div>
+      )}
 
       {/* Card 1: Datos Generales */}
       <TarjetaDatosGenerales
         tramite={tramite}
-        currentUser={currentUser}
+        currentUser={targetUserForEditing}
         onRefresh={fetchTramite}
       />
 
@@ -139,35 +200,35 @@ export default function TramiteDetallePage() {
       <TablaReferencias
         idTramite={tramite.id_tramite}
         referencias={tramite.tramite_referencias}
-        currentUser={currentUser}
+        currentUser={targetUserForEditing}
         onRefresh={fetchTramite}
       />
 
-      {/* Card 4: Fase Presupuesto */}
+      {/* Card 3: Fase Presupuesto */}
       <TarjetaPresupuesto
         tramite={tramite}
-        currentUser={currentUser}
+        currentUser={targetUserForEditing}
         onRefresh={fetchTramite}
       />
 
       {/* Card 4: Fase Contabilidad */}
       <TarjetaContabilidad
         tramite={tramite}
-        currentUser={currentUser}
+        currentUser={targetUserForEditing}
         onRefresh={fetchTramite}
       />
 
       {/* Card 5: Fase Tesorería y Pagos */}
       <TarjetaTesoreria
         tramite={tramite}
-        currentUser={currentUser}
+        currentUser={targetUserForEditing}
         onRefresh={fetchTramite}
       />
 
       {/* Card 6: Custodia de Archivo */}
       <TarjetaArchivo
         tramite={tramite}
-        currentUser={currentUser}
+        currentUser={targetUserForEditing}
         onRefresh={fetchTramite}
       />
 

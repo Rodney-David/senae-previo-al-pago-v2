@@ -27,9 +27,20 @@ export async function POST(
       return NextResponse.json({ error: "Caja no encontrada" }, { status: 404 });
     }
 
-    if (caja.estado === "ARCHIVADA") {
+    const userRole = (currentUser.rol || "").toUpperCase();
+    const isAdminOrDFI = currentUser.id_area === 1 || userRole === "ADMIN" || userRole === "DIRECTORA";
+    const isAdmCaja = currentUser.id_area === 4 || userRole.includes("TESOR") || userRole.includes("CAJA") || isAdminOrDFI;
+
+    if (!isAdmCaja) {
       return NextResponse.json(
-        { error: "Esta caja ya ha sido archivada y cerrada. No se pueden modificar sus trámites." },
+        { error: "La asignación y retiro de expedientes de las cajas es exclusiva de Administración de Caja." },
+        { status: 403 }
+      );
+    }
+
+    if (caja.estado !== "ABIERTA") {
+      return NextResponse.json(
+        { error: `Esta caja se encuentra en estado "${caja.estado}". Para agregar o retirar trámites debe estar ABIERTA (puede reabrirla si está CERRADA).` },
         { status: 400 }
       );
     }

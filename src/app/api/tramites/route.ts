@@ -29,60 +29,80 @@ export async function GET(request: NextRequest) {
           { ruc_proveedor: { contains: search.trim() } },
           { numero_factura: { contains: search.trim() } },
           { area_requirente: { contains: search.trim() } },
+          { ciudad: { contains: search.trim() } },
           { asunto: { contains: search.trim() } },
         ],
       });
     }
 
-    // Filtros de Mi Escritorio (estrictamente limitados a lo que le corresponde al usuario en su bandeja)
+    // Filtros de Mi Escritorio (estrictamente adaptados al área y custodio)
     if (tipo !== "todos" && currentUser) {
       const userRole = (currentUser.rol || "").toUpperCase();
+      const userArea = currentUser.id_area;
 
-      // Condición de pertenencia al escritorio/área del usuario (salvo ADMIN)
-      if (userRole !== "ADMIN" && userRole !== "ADMINISTRADOR") {
-        if (userRole === "JEFE" || userRole === "DIRECTORA") {
+      if (tipo === "escritorio") {
+        // En Mi Escritorio: trámites asignados a mi persona como custodio activo
+        if (userRole === "ADMIN" || userRole === "ADMINISTRADOR") {
           conditions.push({
-            OR: [
-              { id_custodio_actual: currentUser.id_usuario },
-              { id_area_actual: currentUser.id_area },
-            ],
+            NOT: {
+              estado_general: { in: ["ARCHIVO", "FINALIZADO_ARCHIVADO", "ANULADO"] },
+            },
           });
         } else {
-          // Analista / Secretaria
           conditions.push({
             id_custodio_actual: currentUser.id_usuario,
+            NOT: {
+              estado_general: { in: ["ARCHIVO", "FINALIZADO_ARCHIVADO", "ANULADO"] },
+            },
           });
         }
-      }
-
-      if (tipo === "ingresados") {
-        // Exclusivo para DFI: trámites en estado INGRESADO para despacho por lote
-        conditions.push({ estado_general: "INGRESADO" });
-      } else if (tipo === "observados") {
-        // Trámites observados o pausados en la bandeja del usuario
+      } else if (tipo === "reasignados") {
+        // Trámites reasignados por jefatura dentro del área
         conditions.push({
+          id_area_actual: userArea,
+          sub_estado: { contains: "ASIGNADO_A_" },
+          NOT: {
+            estado_general: { in: ["ARCHIVO", "FINALIZADO_ARCHIVADO", "ANULADO"] },
+          },
+        });
+      } else if (tipo === "aprobacion") {
+        // Trámites enviados a jefatura para revisión / visto bueno
+        conditions.push({
+          id_area_actual: userArea,
+          sub_estado: "PENDIENTE_VISTO_BUENO_JEFE",
+          NOT: {
+            estado_general: { in: ["ARCHIVO", "FINALIZADO_ARCHIVADO", "ANULADO"] },
+          },
+        });
+      } else if (tipo === "observados") {
+        // Trámites observados o pausados en el área del usuario
+        conditions.push({
+          id_area_actual: userArea,
           OR: [
             { estado_general: "OBSERVADO" },
             { estado_general: "OBSERVADO_72H" },
             { esta_pausado: true },
           ],
         });
+      } else if (tipo === "todos_area" || tipo === "area") {
+        // Todos los trámites activos que están actualmente en el área del usuario
+        conditions.push({
+          id_area_actual: userArea,
+          NOT: {
+            estado_general: { in: ["ARCHIVO", "FINALIZADO_ARCHIVADO", "ANULADO"] },
+          },
+        });
+      } else if (tipo === "ingresados") {
+        // Exclusivo para DFI / Secretaría: trámites en estado INGRESADO para despacho por lote
+        conditions.push({ estado_general: "INGRESADO" });
       } else if (tipo === "caja") {
-        // Trámites en caja en la bandeja del usuario
+        // Trámites en caja en custodia de Tesorería o Archivo
         conditions.push({
           OR: [
             { estado_general: "CAJA" },
             { sub_estado: "EN_CAJA" },
             { id_caja: { not: null } },
           ],
-        });
-      } else {
-        // tipo === "escritorio" ("En Mi Gestión")
-        // Trámites activos en mi bandeja (no archivados ni anulados)
-        conditions.push({
-          NOT: {
-            estado_general: { in: ["ARCHIVO", "FINALIZADO_ARCHIVADO", "ANULADO"] },
-          },
         });
       }
     }
@@ -151,12 +171,15 @@ export async function POST(request: NextRequest) {
       tipo_gestion,
       numero_quipux,
       area_requirente,
+      ciudad,
       asunto,
       fecha_memorando,
       fecha_recepcion_fisica,
       id_tipo_tramite,
       proveedor_beneficiario,
       ruc_proveedor,
+      numero_juicio,
+      numero_liquidacion,
       subtotal,
       comentarios,
     } = body;
@@ -172,12 +195,12 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Si es TIPO PAGO - PAGO: Proveedor, RUC y Subtotal son OBLIGATORIOS
+    // Si es TIPO PAGO - PAGO: Proveedor y Subtotal son obligatorios (RUC es opcional según regla SENAE)
     const esPagoPago = padre === "PAGO" && tipo === "PAGO";
     if (esPagoPago) {
-      if (!proveedor_beneficiario?.trim() || !ruc_proveedor?.trim() || subtotal === undefined || subtotal === null || Number(subtotal) <= 0) {
+      if (!proveedor_beneficiario?.trim() || subtotal === undefined || subtotal === null || Number(subtotal) <= 0) {
         return NextResponse.json(
-          { error: "Para trámites PAGO - PAGO es obligatorio registrar Razón Social/Proveedor, RUC y Subtotal mayor a 0." },
+          { error: "Para trámites PAGO - PAGO es obligatorio registrar Razón Social/Proveedor y Subtotal mayor a 0." },
           { status: 400 }
         );
       }
@@ -190,12 +213,15 @@ export async function POST(request: NextRequest) {
       tipo_gestion: tipo,
       numero_quipux: numero_quipux.trim(),
       area_requirente: area_requirente.trim(),
+      ciudad: ciudad?.trim() || "GUAYAQUIL",
       asunto: asunto.trim(),
       fecha_memorando: fecha_memorando || new Date(),
       fecha_recepcion_fisica: fecha_recepcion_fisica || new Date(),
       id_tipo_tramite: Number(id_tipo_tramite),
       proveedor_beneficiario: proveedor_beneficiario?.trim() || "N/A",
       ruc_proveedor: ruc_proveedor?.trim() || null,
+      numero_juicio: numero_juicio?.trim() || null,
+      numero_liquidacion: numero_liquidacion?.trim() || null,
       subtotal: sub,
       id_usuario_creador: currentUserId,
       comentarios: comentarios?.trim() || "",

@@ -15,6 +15,18 @@ export async function GET(
       return NextResponse.json({ error: "Sesión requerida" }, { status: 401 });
     }
 
+    const userArea = currentUser.id_area;
+    const userRole = (currentUser.rol || "").toUpperCase();
+    const isAdmin = userRole === "ADMIN" || userRole === "ADMINISTRADOR";
+    const isAdmCaja = userArea === 4 || userRole.includes("TESOR") || userRole.includes("CAJA") || isAdmin;
+
+    if (!isAdmCaja) {
+      return NextResponse.json(
+        { error: "Acceso no autorizado. La generación y exportación del reporte oficial de caja es exclusiva para Administración de Caja." },
+        { status: 403 }
+      );
+    }
+
     const idCaja = parseInt(params.id, 10);
     if (isNaN(idCaja)) {
       return NextResponse.json({ error: "ID de caja inválido" }, { status: 400 });

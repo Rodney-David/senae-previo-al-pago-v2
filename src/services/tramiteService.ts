@@ -7,12 +7,15 @@ export interface CrearTramiteInput {
   tipo_flujo?: string;
   numero_quipux: string;
   area_requirente?: string;
+  ciudad?: string;
   asunto?: string;
   fecha_memorando?: string | Date | null;
   fecha_recepcion_fisica?: string | Date | null;
   id_tipo_tramite: number;
   proveedor_beneficiario?: string;
   ruc_proveedor?: string;
+  numero_juicio?: string | null;
+  numero_liquidacion?: string | null;
   subtotal?: number;
   id_usuario_creador: number;
   comentarios?: string;
@@ -49,9 +52,12 @@ export class TramiteService {
         padre_gestion: input.padre_gestion || "PAGO",
         tipo_gestion: input.tipo_gestion || "PAGO",
         area_requirente: input.area_requirente || null,
+        ciudad: input.ciudad?.trim() || null,
         asunto: input.asunto || null,
         proveedor_beneficiario: input.proveedor_beneficiario || "N/A",
         ruc_proveedor: input.ruc_proveedor || null,
+        numero_juicio: input.numero_juicio || null,
+        numero_liquidacion: input.numero_liquidacion || null,
         subtotal: sub,
         monto_total: sub,
         es_alta_cuantia: esAltaCuantia,
@@ -73,7 +79,7 @@ export class TramiteService {
       id_area_origen: 1, // DFI
       id_area_destino: 1, // DFI
       tipo_accion: "INGRESO_SECRETARIA",
-      comentarios: `Trámite ingresado en DFI por Secretaría en Mi Escritorio. Estado INGRESADO. Gestión: ${
+      comentarios: `Trámite ingresado en DFI por Secretaría en Mi Escritorio. Estado INGRESADO. Ciudad: ${input.ciudad || "N/A"}. Gestión: ${
         input.padre_gestion || "PAGO"
       } - ${input.tipo_gestion || "PAGO"}. ${input.comentarios || ""}`,
     });
@@ -83,8 +89,8 @@ export class TramiteService {
 
   /**
    * Paso 2: Despacho por Lote a Presupuesto (Control Previo).
-   * Los trámites seleccionados cambian en bloque: INGRESADO -> REVISION.
-   * Custodio pasa a la Jefa de Presupuesto (id_area: 2, id_custodio: 3).
+   * Custodio pasa a la Jefa de Presupuesto (id_area: 2).
+   * Estado permanece en INGRESADO (sub_estado: POR_RECIBIR_FISICAMENTE) hasta que la Jefa marque recibo físico.
    */
   public static async entregarControlPrevioLote(
     idsTramites: number[],
@@ -118,10 +124,11 @@ export class TramiteService {
       const updated = await prisma.tramites.update({
         where: { id_tramite: id },
         data: {
-          estado_general: "REVISION",
-          sub_estado: "EN_REVISION_PRESUPUESTO",
+          estado_general: "INGRESADO",
+          sub_estado: "POR_RECIBIR_FISICAMENTE",
           id_area_actual: 2, // PRESUPUESTO
           id_custodio_actual: idJefePresupuesto,
+          fecha_entrega_control_previo: now,
           fecha_ultimo_movimiento: now,
           fecha_ultima_modificacion: now,
         },
@@ -136,11 +143,63 @@ export class TramiteService {
         id_area_origen: 1, // DFI
         id_area_destino: 2, // PRESUPUESTO
         tipo_accion: "ENTREGA_CONTROL_PREVIO_LOTE",
-        comentarios: "Expediente entregado formalmente a Control Previo (Presupuesto) mediante acta de entrega.",
+        comentarios: "Expediente despachado formalmente a Control Previo (Presupuesto) con Acta oficial. En espera de recepción física.",
       });
     }
 
     return tramitesActualizados;
+  }
+
+  /**
+   * Paso 2.5: Recepción Física por la Jefa de Presupuesto.
+   * Cambia INGRESADO -> REVISION.
+   * Inicia formalmente el cómputo de SLA reglamentario (6 días laborables).
+   */
+  public static async recibirFisicamenteLote(
+    idsTramites: number[],
+    idUsuarioRecibe: number
+  ) {
+    if (!idsTramites || idsTramites.length === 0) {
+      throw new Error("Debe seleccionar al menos un trámite para recibir físicamente");
+    }
+
+    const now = new Date();
+    const tramitesRecibidos = [];
+
+    for (const id of idsTramites) {
+      const tramite = await prisma.tramites.findUnique({
+        where: { id_tramite: id },
+      });
+
+      if (!tramite) continue;
+
+      const updated = await prisma.tramites.update({
+        where: { id_tramite: id },
+        data: {
+          estado_general: "REVISION",
+          sub_estado: "EN_REVISION_PRESUPUESTO",
+          id_area_actual: 2, // PRESUPUESTO
+          id_custodio_actual: idUsuarioRecibe,
+          fecha_recepcion_fisica: now,
+          fecha_ultimo_movimiento: now,
+          fecha_ultima_modificacion: now,
+        },
+      });
+
+      tramitesRecibidos.push(updated);
+
+      await registrarBitacora({
+        id_tramite: id,
+        id_usuario_entrega: idUsuarioRecibe,
+        id_usuario_recibe: idUsuarioRecibe,
+        id_area_origen: 2,
+        id_area_destino: 2,
+        tipo_accion: "RECEPCION_FISICA_PRESUPUESTO",
+        comentarios: "Expediente recibido físicamente en Control Previo (Presupuesto). Inicio formal del conteo de SLA reglamentario (6 días laborables).",
+      });
+    }
+
+    return tramitesRecibidos;
   }
 
   /**

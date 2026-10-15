@@ -81,16 +81,10 @@ export const Sidebar: React.FC = () => {
       description: "Catálogo institucional completo",
     },
     {
-      label: "Indicadores SLA",
-      href: "/indicadores",
-      icon: BarChart3,
-      description: "Tiempos de pago (6 días)",
-    },
-    {
-      label: "Reportería",
+      label: "Reportes e Indicadores",
       href: "/reportes",
       icon: FileSpreadsheet,
-      description: "Ingresos, custodia y tardanza",
+      description: "Custodia, SLA, tiempos y desempeño",
     },
     {
       label: "Administración",
@@ -111,9 +105,10 @@ export const Sidebar: React.FC = () => {
   };
 
   const userRole = (currentUser?.rol || "").toUpperCase();
+  const userCargo = (currentUser?.cargo || "").toUpperCase();
+  const isAdmin = userRole === "ADMIN" || userRole === "ADMINISTRADOR";
   const isDFIOrAdmin =
-    userRole === "ADMIN" ||
-    userRole === "ADMINISTRADOR" ||
+    isAdmin ||
     currentUser?.id_area === 1 ||
     ["DIRECTORA", "SECRETARIA", "DIRECTORA_FINANCIERA", "SECRETARIA_DFI"].includes(userRole);
 
@@ -149,7 +144,7 @@ export const Sidebar: React.FC = () => {
               pathname === item.href ||
               (item.href !== "/escritorio" && pathname.startsWith(item.href));
 
-            if (item.adminOnly && userRole !== "ADMIN" && userRole !== "ADMINISTRADOR") {
+            if (item.adminOnly && !isAdmin) {
               return null;
             }
 
@@ -159,12 +154,16 @@ export const Sidebar: React.FC = () => {
 
             if (item.cajasAccess) {
               const canAccess =
-                isDFIOrAdmin ||
+                isAdmin ||
                 currentUser?.id_area === 4 ||
                 currentUser?.id_area === 6 ||
                 userRole.includes("CAJA") ||
                 userRole.includes("TESORERIA") ||
-                userRole.includes("ARCHIVO");
+                userRole.includes("ARCHIVO") ||
+                userRole.includes("CUSTODIO") ||
+                userCargo.includes("CAJA") ||
+                userCargo.includes("ARCHIVO") ||
+                userCargo.includes("CUSTODIO");
               if (!canAccess) {
                 return null;
               }

@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 
+export const dynamic = "force-dynamic";
+
 // Función auxiliar para calcular días hábiles entre dos fechas descontando fines de semana y feriados
 function calcularDiasHabilesRango(
   fechaInicio: Date,
@@ -200,7 +202,7 @@ export async function GET(request: NextRequest) {
 
       return {
         id_tramite: t.id_tramite,
-        numero_tramite: t.nro_tramite || t.codigo_tramite,
+        numero_tramite: t.numero_quipux,
         numero_quipux: t.numero_quipux,
         proveedor_nombre: t.proveedor_beneficiario || "No especificado",
         proveedor_ruc: t.ruc_proveedor,
@@ -371,7 +373,7 @@ export async function GET(request: NextRequest) {
         { fase: "Tesorería / Caja (Pago SPI)", dias: caja_prom },
       ];
       fasesArr.sort((a, b) => b.dias - a.dias);
-      const cuelloBotella = fasesArr[0]?.fase || "N/A";
+      const faseMayorDemora = fasesArr[0]?.fase || "N/A";
 
       const tasa_cumplimiento =
         item.total > 0
@@ -394,7 +396,7 @@ export async function GET(request: NextRequest) {
           contabilidad: contabilidad_prom,
           caja: caja_prom,
         },
-        fase_mayor_demora: cuelloBotella,
+        fase_mayor_demora: faseMayorDemora,
       };
     });
 
@@ -522,6 +524,315 @@ export async function GET(request: NextRequest) {
 
     causasDemora.sort((a, b) => b.tramites_afectados - a.tramites_afectados);
 
+    // -------------------------------------------------------------
+    // REPORTE 3: DESEMPEÑO POR FUNCIONARIO (HISTÓRICO EN PERIODO)
+    // -------------------------------------------------------------
+    const slaPorArea: Record<number, number> = {
+      1: 2.0, // Dirección Financiera / Recepción
+      2: 2.0, // Presupuesto
+      3: 3.0, // Contabilidad / Control Previo
+      4: 2.0, // Tesorería / Caja
+    };
+
+    const usuariosActivos = await prisma.usuarios.findMany({
+      where: { activo: true },
+      include: { areas: true },
+      orderBy: { nombre_completo: "asc" },
+    });
+
+    const todosLosMovimientos = await prisma.historial_movimientos.findMany({
+      include: {
+        tramites: {
+          include: { tipos_tramite: true },
+        },
+      },
+      orderBy: { fecha_hora: "asc" },
+    });
+
+    const movsPorTramite: Record<number, typeof todosLosMovimientos> = {};
+    todosLosMovimientos.forEach((m) => {
+      if (!movsPorTramite[m.id_tramite]) {
+        movsPorTramite[m.id_tramite] = [];
+      }
+      movsPorTramite[m.id_tramite].push(m);
+    });
+
+    const reporteDesempenoFuncionarios = usuariosActivos.map((usr) => {
+      const slaLimite = slaPorArea[usr.id_area] || 2.5;
+
+      const recepcionesEnPeriodo = todosLosMovimientos.filter((m) => {
+        if (m.id_usuario_recibe !== usr.id_usuario) return false;
+        if (!m.fecha_hora) return false;
+        const f = new Date(m.fecha_hora);
+        return f >= fechaDesde && f <= fechaHasta;
+      });
+
+      let totalDespachados = 0;
+      let entregadosATiempo = 0;
+      let entregadosConRetraso = 0;
+      let enCursoActual = 0;
+      let sumaDiasDespacho = 0;
+
+      const detalleTramitesMesa: Array<{
+        id_tramite: number;
+        nro_tramite: string;
+        numero_quipux: string;
+        proveedor: string;
+        tipo_proceso: string;
+        fecha_llegada: string;
+        fecha_salida: string | null;
+        dias_en_mesa: number;
+        estado_entrega: "A_TIEMPO" | "CON_RETRASO" | "EN_CURSO";
+        sla_limite_dias: number;
+      }> = [];
+
+      recepcionesEnPeriodo.forEach((rec) => {
+        const tramiteMovs = movsPorTramite[rec.id_tramite] || [];
+        const fLlegada = new Date(rec.fecha_hora!);
+
+        const siguienteDespacho = tramiteMovs.find((sig) => {
+          if (!sig.fecha_hora) return false;
+          const fSig = new Date(sig.fecha_hora);
+          return fSig > fLlegada && sig.id_usuario_entrega === usr.id_usuario;
+        });
+
+        if (siguienteDespacho && siguienteDespacho.fecha_hora) {
+          totalDespachados++;
+          const fSalida = new Date(siguienteDespacho.fecha_hora);
+          const diasMesa = Math.max(
+            0.5,
+            calcularDiasHabilesRango(fLlegada, fSalida, feriadosSet)
+          );
+          sumaDiasDespacho += diasMesa;
+
+          const aTiempo = diasMesa <= slaLimite;
+          if (aTiempo) {
+            entregadosATiempo++;
+          } else {
+            entregadosConRetraso++;
+          }
+
+          detalleTramitesMesa.push({
+            id_tramite: rec.id_tramite,
+            nro_tramite: rec.tramites?.numero_quipux || `ID-${rec.id_tramite}`,
+            numero_quipux: rec.tramites?.numero_quipux || `ID-${rec.id_tramite}`,
+            proveedor: rec.tramites?.proveedor_beneficiario || "N/A",
+            tipo_proceso: rec.tramites?.tipos_tramite?.nombre || "GENERAL",
+            fecha_llegada: fLlegada.toISOString().split("T")[0],
+            fecha_salida: fSalida.toISOString().split("T")[0],
+            dias_en_mesa: Number(diasMesa.toFixed(1)),
+            estado_entrega: aTiempo ? "A_TIEMPO" : "CON_RETRASO",
+            sla_limite_dias: slaLimite,
+          });
+        } else {
+          const diasMesa = Math.max(
+            0.5,
+            calcularDiasHabilesRango(fLlegada, now, feriadosSet)
+          );
+          const vencidoEnMesa = diasMesa > slaLimite;
+
+          if (vencidoEnMesa) {
+            entregadosConRetraso++;
+          } else {
+            enCursoActual++;
+          }
+
+          detalleTramitesMesa.push({
+            id_tramite: rec.id_tramite,
+            nro_tramite: rec.tramites?.numero_quipux || `ID-${rec.id_tramite}`,
+            numero_quipux: rec.tramites?.numero_quipux || `ID-${rec.id_tramite}`,
+            proveedor: rec.tramites?.proveedor_beneficiario || "N/A",
+            tipo_proceso: rec.tramites?.tipos_tramite?.nombre || "GENERAL",
+            fecha_llegada: fLlegada.toISOString().split("T")[0],
+            fecha_salida: null,
+            dias_en_mesa: Number(diasMesa.toFixed(1)),
+            estado_entrega: vencidoEnMesa ? "CON_RETRASO" : "EN_CURSO",
+            sla_limite_dias: slaLimite,
+          });
+        }
+      });
+
+      const totalRecibidos = recepcionesEnPeriodo.length;
+      const totalEvaluables = entregadosATiempo + entregadosConRetraso;
+      const tasaCumplimiento =
+        totalEvaluables > 0
+          ? Math.round((entregadosATiempo / totalEvaluables) * 100)
+          : totalRecibidos > 0
+          ? 100
+          : 100;
+
+      const tiempoPromedioDias =
+        totalDespachados > 0
+          ? Number((sumaDiasDespacho / totalDespachados).toFixed(1))
+          : 0;
+
+      return {
+        id_usuario: usr.id_usuario,
+        nombre_completo: usr.nombre_completo,
+        cargo: usr.cargo,
+        area_nombre: usr.areas?.nombre || "Área General",
+        total_tramites_recibidos: totalRecibidos,
+        tramites_despachados: totalDespachados,
+        entregados_a_tiempo: entregadosATiempo,
+        entregados_con_retraso: entregadosConRetraso,
+        en_curso: enCursoActual,
+        tasa_cumplimiento: tasaCumplimiento,
+        tiempo_promedio_dias: tiempoPromedioDias,
+        sla_limite_dias: slaLimite,
+        detalle_tramites: detalleTramitesMesa,
+      };
+    });
+
+    reporteDesempenoFuncionarios.sort(
+      (a, b) => b.total_tramites_recibidos - a.total_tramites_recibidos
+    );
+
+    // -------------------------------------------------------------
+    // REPORTE 4: CARGA ACTUAL EN MESA POR FUNCIONARIO (TIEMPO REAL)
+    // -------------------------------------------------------------
+    const tramitesActivos = await prisma.tramites.findMany({
+      where: {
+        estado_general: { not: "PAGADO" },
+      },
+      include: {
+        usuarios: { include: { areas: true } },
+        areas: true,
+        tipos_tramite: true,
+        historial_movimientos: {
+          orderBy: { fecha_hora: "desc" },
+          take: 1,
+        },
+      },
+      orderBy: { fecha_ingreso: "asc" },
+    });
+
+    const mapaCargaActual: Record<
+      number,
+      {
+        id_usuario: number;
+        nombre_completo: string;
+        cargo: string;
+        area_nombre: string;
+        total_tramites_actuales: number;
+        dias_acumulados: number;
+        en_plazo: number;
+        en_riesgo: number;
+        vencidos: number;
+        tramites: Array<{
+          id_tramite: number;
+          nro_tramite: string;
+          numero_quipux: string;
+          proveedor_beneficiario: string;
+          tipo_proceso: string;
+          monto_total: number;
+          fecha_llegada: string;
+          dias_en_mesa: number;
+          sla_limite_dias: number;
+          semaforo_sla: "VERDE" | "AMARILLO" | "ROJO";
+          estado_general: string;
+        }>;
+      }
+    > = {};
+
+    usuariosActivos.forEach((u) => {
+      mapaCargaActual[u.id_usuario] = {
+        id_usuario: u.id_usuario,
+        nombre_completo: u.nombre_completo,
+        cargo: u.cargo,
+        area_nombre: u.areas?.nombre || "Área General",
+        total_tramites_actuales: 0,
+        dias_acumulados: 0,
+        en_plazo: 0,
+        en_riesgo: 0,
+        vencidos: 0,
+        tramites: [],
+      };
+    });
+
+    tramitesActivos.forEach((t) => {
+      const custodioId = t.id_custodio_actual;
+      if (!mapaCargaActual[custodioId]) {
+        mapaCargaActual[custodioId] = {
+          id_usuario: custodioId,
+          nombre_completo: t.usuarios?.nombre_completo || `Usuario ${custodioId}`,
+          cargo: t.usuarios?.cargo || "Funcionario",
+          area_nombre: t.areas?.nombre || "Área General",
+          total_tramites_actuales: 0,
+          dias_acumulados: 0,
+          en_plazo: 0,
+          en_riesgo: 0,
+          vencidos: 0,
+          tramites: [],
+        };
+      }
+
+      const item = mapaCargaActual[custodioId];
+      const slaLimite = slaPorArea[t.id_area_actual] || 2.5;
+
+      const ultMov = t.historial_movimientos?.[0];
+      const fechaLlegada = ultMov?.fecha_hora
+        ? new Date(ultMov.fecha_hora)
+        : t.fecha_ingreso
+        ? new Date(t.fecha_ingreso)
+        : now;
+
+      const diasEnMesa = Math.max(
+        0.5,
+        calcularDiasHabilesRango(fechaLlegada, now, feriadosSet)
+      );
+
+      item.total_tramites_actuales++;
+      item.dias_acumulados += diasEnMesa;
+
+      let semaforo: "VERDE" | "AMARILLO" | "ROJO" = "VERDE";
+      if (diasEnMesa > slaLimite) {
+        semaforo = "ROJO";
+        item.vencidos++;
+      } else if (diasEnMesa >= slaLimite * 0.75) {
+        semaforo = "AMARILLO";
+        item.en_riesgo++;
+      } else {
+        semaforo = "VERDE";
+        item.en_plazo++;
+      }
+
+      item.tramites.push({
+        id_tramite: t.id_tramite,
+        nro_tramite: t.numero_quipux || `ID-${t.id_tramite}`,
+        numero_quipux: t.numero_quipux || `ID-${t.id_tramite}`,
+        proveedor_beneficiario: t.proveedor_beneficiario || "N/A",
+        tipo_proceso: t.tipos_tramite?.nombre || "GENERAL",
+        monto_total: Number(t.monto_total || 0),
+        fecha_llegada: fechaLlegada.toISOString().split("T")[0],
+        dias_en_mesa: Number(diasEnMesa.toFixed(1)),
+        sla_limite_dias: slaLimite,
+        semaforo_sla: semaforo,
+        estado_general: t.estado_general,
+      });
+    });
+
+    const reporteCargaActualFuncionarios = Object.values(mapaCargaActual).map(
+      (c) => ({
+        id_usuario: c.id_usuario,
+        nombre_completo: c.nombre_completo,
+        cargo: c.cargo,
+        area_nombre: c.area_nombre,
+        total_tramites_actuales: c.total_tramites_actuales,
+        tiempo_promedio_dias:
+          c.total_tramites_actuales > 0
+            ? Number((c.dias_acumulados / c.total_tramites_actuales).toFixed(1))
+            : 0,
+        en_plazo: c.en_plazo,
+        en_riesgo: c.en_riesgo,
+        vencidos: c.vencidos,
+        tramites: c.tramites,
+      })
+    );
+
+    reporteCargaActualFuncionarios.sort(
+      (a, b) => b.total_tramites_actuales - a.total_tramites_actuales
+    );
+
     return NextResponse.json({
       success: true,
       rango: {
@@ -545,6 +856,8 @@ export async function GET(request: NextRequest) {
         fases_comparativo: fasesComparativo,
         causas_demora: causasDemora,
       },
+      reporte_desempeno_funcionarios: reporteDesempenoFuncionarios,
+      reporte_carga_actual_funcionarios: reporteCargaActualFuncionarios,
     });
   } catch (error) {
     console.error("Error generating reports:", error);

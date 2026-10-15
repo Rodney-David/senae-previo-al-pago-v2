@@ -81,6 +81,17 @@ export async function DELETE(
       return NextResponse.json({ error: "ID de caja inválido" }, { status: 400 });
     }
 
+    const userRole = (currentUser.rol || "").toUpperCase();
+    const isAdminOrDFI = currentUser.id_area === 1 || userRole === "ADMIN" || userRole === "DIRECTORA";
+    const isAdmCaja = currentUser.id_area === 4 || userRole.includes("TESOR") || userRole.includes("CAJA") || isAdminOrDFI;
+
+    if (!isAdmCaja) {
+      return NextResponse.json(
+        { error: "La eliminación de cajas es una función exclusiva de Administración de Caja." },
+        { status: 403 }
+      );
+    }
+
     const caja = await prisma.cajas.findUnique({
       where: { id_caja: idCaja },
       include: { tramites: true },

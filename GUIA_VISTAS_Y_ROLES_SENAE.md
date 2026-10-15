@@ -379,21 +379,34 @@ Módulo de auditoría cuantitativa que responde:
 
 ---
 
-### VISTA 8: MÓDULO DE ADMINISTRACIÓN DEL SISTEMA (`/administracion`)
+### VISTA 9: GESTIÓN DE CAJAS FÍSICAS Y ARCHIVO CENTRAL (`/cajas`)
 
 #### Propósito:
-Configuración global del sistema. Solo accesible para el rol `ADMIN`.
+Agrupación física de expedientes en estado `PAGADO` en cartones/cajas oficiales, generación de acta/documento de entrega de 7 columnas, control de cierre/reapertura y transferencia formal a custodia del Archivo Central.
 
-#### Pestañas Administrativas:
-1. **Catálogos Institucionales:**
-   - Gestión de Áreas y Departamentos.
-   - Tipos de Gestión y Tipos de Trámite.
-2. **Reglas de Campos por Etapa:**
-   - Configuración de visibilidad (Visible / Oculto) y obligatoriedad (Obligatorio / Opcional) para cada campo según la etapa procesal.
-3. **Calendario de Feriados Institucionales:**
-   - Registro y activación de días feriados y asuetos nacionales o locales para excluirlos del cómputo normativo de días hábiles del SLA.
-4. **Usuarios y Asignación de Roles:**
-   - Creación y edición de cuentas de funcionarios, correo institucional, cargo, área y rol asignado.
+#### Ciclo de Vida Formal de las Cajas:
+1. **`ABIERTA` (En Llenado):**
+   - Creada por **Administración de Caja** (`id_area: 4`) o `ADMIN`.
+   - Permite agregar expedientes pagados y retirar expedientes.
+   - Acción disponible para Adm. Caja: **«Cerrar Caja»** (pasa a `CERRADA`).
+2. **`CERRADA` (Lista para envío):**
+   - Caja cerrada por Adm. Caja.
+   - Permite imprimir la vista previa oficial y exportar el Excel de 7 columnas.
+   - Acciones disponibles para Adm. Caja:
+     - **«Reabrir Caja»**: Vuelve a `ABIERTA` para agregar o retirar expedientes.
+     - **«Enviar a Archivo Central»**: Transfiere formalmente la caja y sus expedientes a custodia de Archivo (`id_area_actual = 6`, Sr. Manuel Ramos), pasando a estado `ENVIADA`.
+3. **`ENVIADA` (En Custodia / Revisión de Archivo):**
+   - Recibida por el **Custodio de Archivo** (`id_area: 6`).
+   - Acciones disponibles para Custodio:
+     - **«Devolver a Adm. Caja»**: Devuelve la caja a `CERRADA` en Adm. Caja con registro de observaciones.
+     - **«Aprobar y Archivar Definitivamente»**: Aprueba la caja, pasa a `ARCHIVADA`, transiciona todos los expedientes a `estado_general = "ARCHIVO"` y `sub_estado = "ARCHIVADO_DEFINITIVO"`, y graba automáticamente la caja asignada en la data del expediente.
+4. **`ARCHIVADA` (Definitiva / Ciclo Cerrado):**
+   - Estado final permanente de custodia física e histórica.
+   - Solo lectura, impresión y exportación a Excel.
+
+#### Matriz de Acceso en Cajas (`/cajas`):
+- **Administración de Caja (`id_area: 4`):** CRUD de cajas, asignación/remoción de trámites pagados, cierre de caja (`CERRADA`), reapertura (`ABIERTA`) y envío a archivo (`ENVIADA`). No puede archivar definitivamente.
+- **Custodio de Archivo (`id_area: 6`):** **Solo lectura de cajas**. No puede crear (`+ Nueva Caja` oculto), ni editar, ni eliminar cajas, ni agregar/quitar trámites de las cajas (tachitos y botones ocultos). Únicamente puede aprobar/archivar o devolver cajas en estado `ENVIADA`.
 
 ---
 
@@ -416,3 +429,12 @@ Configuración global del sistema. Solo accesible para el rol `ADMIN`.
    - Quedaron únicamente las pestañas acordes al rol: *En Mi Gestión*, *Por Entregar (Ingresados)* (solo DFI) y *Observados*.
 7. **Reportería Oficial:**
    - Se implementó la nueva sección `/reportes` con los reportes de *Ingresos y Custodia* y *Tardanza y Cuellos de Botella* con exportación a Excel multioja.
+8. **Rol de Custodio de Archivo en Ficha de Trámite:**
+   - Para el usuario Custodio de Archivo (Sr. Manuel Ramos), solo aparece desplegada por defecto la tarjeta de **Custodia y Archivo**; la tarjeta de Contabilidad permanece plegada.
+   - Se eliminó de la tarjeta de Custodia/Archivo el botón individual **«PASAR A ARCHIVO»**, dado que ningún expediente se archiva de forma suelta o individual.
+9. **Flujo de Pago y Asignación a Caja:**
+   - Al marcarse individualmente como `PAGADO` en Adm. Caja, el botón en la ficha cambia inmediatamente a **«Asignar a Caja»**, permitiendo elegir mediante modal cualquier caja física en estado `ABIERTA`.
+   - El Custodio de Archivo tiene acceso de solo lectura en `/cajas` (sin crear, editar, eliminar cajas ni modificar su contenido), siendo el único autorizado a **«Aprobar y Archivar»** la caja una vez que le es enviada.
+10. **Reporte e Impresión Oficial de Caja:**
+    - La vista previa de impresión y la descarga del Excel oficial de 7 columnas son **exclusivas para el rol de Administración de Caja** (y Administrador); los botones no están disponibles para el Custodio de Archivo.
+    - Se eliminó el bloque inferior de firmas tanto en la vista previa del documento como en el archivo Excel generado.

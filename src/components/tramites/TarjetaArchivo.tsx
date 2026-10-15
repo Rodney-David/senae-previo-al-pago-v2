@@ -42,34 +42,7 @@ export const TarjetaArchivo: React.FC<TarjetaArchivoProps> = ({
 
   const isPaid = tramite.estado_general === "PAGADO";
 
-  const canArchivarDirecto =
-    (currentUser?.id_area === 6 || currentUser?.id_area === 4 || currentUser?.rol === "ADMIN") &&
-    (isInCaja || isPaid) &&
-    !isArchived;
 
-  const handleArchivar = async () => {
-    if (!confirm("¿Desea confirmar el envío y custodia definitiva a ARCHIVO de este trámite?")) {
-      return;
-    }
-    setLoading(true);
-    setError(null);
-    try {
-      const res = await fetch(`/api/tramites/${tramite.id_tramite}/flujo`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          accion: "ARCHIVAR_DEFINITIVO",
-        }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Error al archivar expediente");
-      onRefresh();
-    } catch (err: any) {
-      setError(err.message);
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const nombreCaja =
     tramite.caja?.codigo_caja ||
@@ -111,16 +84,6 @@ export const TarjetaArchivo: React.FC<TarjetaArchivoProps> = ({
               En Trámite Previo
             </span>
           )}
-
-          {canArchivarDirecto && (
-            <button
-              onClick={handleArchivar}
-              disabled={loading}
-              className="px-3 py-1 text-xs font-bold uppercase bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg flex items-center gap-1 transition-colors shadow-2xs"
-            >
-              <PackageCheck className="w-3.5 h-3.5" /> {loading ? "Archivando..." : "Pasar a Archivo"}
-            </button>
-          )}
         </div>
       </div>
 
@@ -157,11 +120,13 @@ export const TarjetaArchivo: React.FC<TarjetaArchivoProps> = ({
               </span>
               <span className="text-xs font-semibold text-slate-800">
                 {isArchived
-                  ? "Custodia final en Archivo Central (Ciclo Finalizado)"
+                  ? "Custodia definitiva en Archivo Central (Ciclo Finalizado)"
+                  : tramite.id_area_actual === 6
+                  ? `Recibido en Archivo Central en ${nombreCaja} (En revisión de custodia)`
                   : isInCaja
                   ? `Almacenado físicamente en ${nombreCaja} (Adm. Caja)`
                   : isPaid
-                  ? "Pago verificado en Adm. Caja (Esperando caja física)"
+                  ? "Pago verificado en Adm. Caja (Esperando asignación a caja)"
                   : "En flujo previo a pago y archivo"}
               </span>
             </div>

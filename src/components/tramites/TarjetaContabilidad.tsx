@@ -59,7 +59,10 @@ export const TarjetaContabilidad: React.FC<TarjetaContabilidadProps> = ({
     ) {
       return true;
     }
-    return currentUser.id_area === 3 || rol.includes("CONTABILIDAD") || cargo.includes("CONTAB");
+    if (currentUser.id_area === 6 || cargo.includes("ARCHIVO")) {
+      return false;
+    }
+    return currentUser.id_area === 3;
   }, [currentUser]);
 
   const [isOpen, setIsOpen] = useState(isDefaultOpen);

@@ -17,7 +17,7 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { ids } = body;
+    const { ids, accion = "ENTREGAR" } = body;
 
     if (!ids || !Array.isArray(ids) || ids.length === 0) {
       return NextResponse.json(
@@ -46,41 +46,48 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         {
           error: `Los siguientes trámites no están en estado INGRESADO: ${noIngresados
-            .map((t) => t.codigo_tramite)
+            .map((t) => t.numero_quipux || t.codigo_tramite)
             .join(", ")}`,
         },
         { status: 400 }
       );
     }
 
-    // Realizar entrega en lote en la base de datos (pasan a REVISION con custodio Jefa Presupuesto)
+    // MODO 1: SOLO GENERAR/DESCARGAR EXCEL (Sin cambiar de estado ni mover flujo)
+    if (accion === "EXCEL") {
+      const excelBuffer = await generarActaEntregaExcel(tramitesSeleccionados);
+      const now = new Date();
+      const dd = String(now.getDate()).padStart(2, "0");
+      const mm = String(now.getMonth() + 1).padStart(2, "0");
+      const aa = String(now.getFullYear()).slice(-2);
+      const filename = `Acta_Entrega_Control_Previo_${dd}-${mm}-${aa}.xlsx`;
+
+      return new NextResponse(new Uint8Array(excelBuffer), {
+        status: 200,
+        headers: {
+          "Content-Type":
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+          "Content-Disposition": `attachment; filename="${filename}"`,
+          "X-Tramites-Count": String(ids.length),
+        },
+      });
+    }
+
+    // MODO 2: ENTREGAR A CONTROL PREVIO (Pasan a REVISION con custodio Jefa Presupuesto)
     await TramiteService.entregarControlPrevioLote(
       ids.map((id: any) => Number(id)),
       currentUser.id_usuario
     );
 
-    // Generar archivo Excel oficial
-    const excelBuffer = await generarActaEntregaExcel(tramitesSeleccionados);
-
-    const now = new Date();
-    const dd = String(now.getDate()).padStart(2, "0");
-    const mm = String(now.getMonth() + 1).padStart(2, "0");
-    const aa = String(now.getFullYear()).slice(-2);
-    const filename = `Acta_Entrega_Control_Previo_${dd}-${mm}-${aa}.xlsx`;
-
-    return new NextResponse(new Uint8Array(excelBuffer), {
-      status: 200,
-      headers: {
-        "Content-Type":
-          "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        "Content-Disposition": `attachment; filename="${filename}"`,
-        "X-Tramites-Entregados": String(ids.length),
-      },
+    return NextResponse.json({
+      success: true,
+      mensaje: `${ids.length} trámite(s) entregados con éxito a Control Previo (Presupuesto).`,
+      count: ids.length,
     });
   } catch (error: any) {
     console.error("Error en entrega por lote:", error);
     return NextResponse.json(
-      { error: error?.message || "Error al despachar el lote a Control Previo" },
+      { error: error?.message || "Error al procesar el lote" },
       { status: 500 }
     );
   }
