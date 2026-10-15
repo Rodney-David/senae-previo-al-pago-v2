@@ -580,7 +580,7 @@ async function main() {
         fecha_pausa: fechaPausa,
         dias_pausa_acumulados: diasPausaAcumulados,
         id_caja: idCaja,
-        fojas_fisicas: 35 + (index % 25),
+        numero_hojas: 10 + (index % 25),
         fecha_ingreso: fechaIngreso,
         fecha_ultimo_movimiento: bitacoraEvents[bitacoraEvents.length - 1]?.fecha || fechaIngreso,
         fecha_ultima_modificacion: bitacoraEvents[bitacoraEvents.length - 1]?.fecha || fechaIngreso,

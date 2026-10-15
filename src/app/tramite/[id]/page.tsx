@@ -110,8 +110,12 @@ export default function TramiteDetallePage() {
     );
   }
 
-  // Si está en solo lectura, pasamos currentUser como null a las tarjetas para bloquear edición
-  const targetUserForEditing = isReadOnly ? null : currentUser;
+  const userRole = (currentUser?.rol || "").toUpperCase();
+  const isAdmin = userRole === "ADMIN" || userRole === "ADMINISTRADOR";
+
+  // Si está en solo lectura y no es Administrador, bloqueamos edición pasando null
+  // El Administrador Universal siempre mantiene capacidad de edición y acción
+  const targetUserForEditing = (isReadOnly && !isAdmin) ? null : currentUser;
 
   return (
     <div className="space-y-6 pb-12">
@@ -133,6 +137,11 @@ export default function TramiteDetallePage() {
               </h1>
               <BadgeEstado estado={tramite.estado_general} subEstado={tramite.sub_estado} />
               <SemaforoSLA sla={tramite.sla} />
+              {isAdmin && (
+                <span className="px-2 py-0.5 text-[10px] font-bold uppercase rounded bg-purple-100 text-purple-800 border border-purple-200">
+                  Modo Superusuario ADMIN
+                </span>
+              )}
             </div>
 
             {/* Datos de Área Actual y Custodio Actual */}
@@ -164,7 +173,7 @@ export default function TramiteDetallePage() {
       </div>
 
       {/* Action Header vs Banner de Modo Solo Lectura */}
-      {!isReadOnly ? (
+      {(!isReadOnly || isAdmin) ? (
         <BarraAcciones
           tramite={tramite}
           currentUser={currentUser}

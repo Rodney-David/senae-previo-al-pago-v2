@@ -606,22 +606,41 @@ export async function POST(
       case "PROGRAMAR_Y_PAGAR_MEF_BCE": {
         const { spi_bce_referencia, fecha_autorizacion_pago, fecha_pago, numero_hojas } = datos || {};
 
-        const hojas = numero_hojas ? Number(numero_hojas) : (tramite.numero_hojas || tramite.fojas_fisicas || 1);
+        const hojas = numero_hojas !== undefined && numero_hojas !== null && numero_hojas !== ""
+          ? Number(numero_hojas)
+          : (tramite.numero_hojas || null);
+
+        // Sin fechas inventadas automaticas: respetar exactamente lo que ingresa el usuario o lo que ya existia
+        const fAut = fecha_autorizacion_pago ? new Date(fecha_autorizacion_pago) : (tramite.fecha_autorizacion_pago || null);
+        const fPago = fecha_pago ? new Date(fecha_pago) : (tramite.fecha_pago || null);
+
+        const tieneAutorizacion = Boolean(fAut);
+        const esEfectivamentePagado = Boolean(fPago);
+
+        const nuevoEstado = esEfectivamentePagado
+          ? "PAGADO"
+          : (tieneAutorizacion ? "AUTORIZADO_PAGO" : tramite.estado_general);
+
+        const nuevoSubEstado = esEfectivamentePagado
+          ? "PAGADO_EN_CUSTODIA_CAJA"
+          : (tieneAutorizacion ? "AUTORIZADO_PENDIENTE_PAGO" : tramite.sub_estado);
+
+        const targetArea = (currentUser.id_area === 5 || currentUser.id_area === 4)
+          ? currentUser.id_area
+          : (tramite.id_area_actual === 5 ? 5 : 4);
 
         tramiteActualizado = await prisma.tramites.update({
           where: { id_tramite: idTramite },
           data: {
             spi_bce_referencia: spi_bce_referencia !== undefined ? spi_bce_referencia : tramite.spi_bce_referencia,
-            fecha_pago: fecha_pago ? new Date(fecha_pago) : (tramite.fecha_pago || now),
-            fecha_autorizacion_pago: fecha_autorizacion_pago
-              ? new Date(fecha_autorizacion_pago)
-              : (tramite.fecha_autorizacion_pago || now),
+            fecha_pago: fPago,
+            fecha_autorizacion_pago: fAut,
+            autorizado_pago: tieneAutorizacion || Boolean(tramite.autorizado_pago),
             numero_hojas: hojas,
-            fojas_fisicas: hojas,
-            id_area_actual: 4, // Permanece en ADM CAJA (Tesorería / Caja) esperando asignación a caja física!
+            id_area_actual: targetArea,
             id_custodio_actual: currentUserId,
-            estado_general: "PAGADO",
-            sub_estado: "PAGADO_EN_CUSTODIA_CAJA",
+            estado_general: nuevoEstado,
+            sub_estado: nuevoSubEstado,
             fecha_ultimo_movimiento: now,
             fecha_ultima_modificacion: now,
           },
@@ -631,12 +650,12 @@ export async function POST(
           id_tramite: idTramite,
           id_usuario_entrega: currentUserId,
           id_usuario_recibe: currentUserId,
-          id_area_origen: 4,
-          id_area_destino: 4,
-          tipo_accion: "PAGO_CONFIRMADO_ADM_CAJA",
-          comentarios: `Pago procesado en Administración de Caja. Ref SPI-BCE: ${
-            spi_bce_referencia || "Sin registrar"
-          }. Hojas verificadas: ${hojas}. El expediente permanece en Adm. Caja a la espera de almacenamiento en caja física. ${comentarios || ""}`,
+          id_area_origen: targetArea,
+          id_area_destino: targetArea,
+          tipo_accion: esEfectivamentePagado ? "PAGO_CONFIRMADO_ADM_CAJA" : "AUTORIZACION_PAGO_REGISTRADA",
+          comentarios: esEfectivamentePagado
+            ? `Pago efectivo confirmado en Tesorería / Cobranzas. Fecha pago: ${fPago?.toISOString().split("T")[0]}. Ref SPI-BCE: ${spi_bce_referencia || "Sin registrar"}. Hojas verificadas: ${hojas ?? "Sin registrar"}. ${comentarios || ""}`
+            : `Datos de autorización guardados en Tesorería / Cobranzas (Fin SLA institucional). Pendiente de pago efectivo. Ref SPI-BCE: ${spi_bce_referencia || "Sin registrar"}. Hojas: ${hojas ?? "Sin registrar"}. ${comentarios || ""}`,
         });
         break;
       }

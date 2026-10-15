@@ -17,12 +17,21 @@ export async function GET(
 
     const userArea = currentUser.id_area;
     const userRole = (currentUser.rol || "").toUpperCase();
+    const userCargo = (currentUser.cargo || "").toUpperCase();
     const isAdmin = userRole === "ADMIN" || userRole === "ADMINISTRADOR";
-    const isAdmCaja = userArea === 4 || userRole.includes("TESOR") || userRole.includes("CAJA") || isAdmin;
+    const isAdmCaja =
+      userArea === 4 ||
+      userArea === 5 ||
+      userRole.includes("TESOR") ||
+      userRole.includes("COBRANZA") ||
+      userRole.includes("CAJA") ||
+      userCargo.includes("COBRANZA") ||
+      userCargo.includes("TESOR") ||
+      isAdmin;
 
     if (!isAdmCaja) {
       return NextResponse.json(
-        { error: "Acceso no autorizado. La generación y exportación del reporte oficial de caja es exclusiva para Administración de Caja." },
+        { error: "Acceso no autorizado. La generación y exportación del reporte oficial de caja es exclusiva para Tesorería / Cobranzas." },
         { status: 403 }
       );
     }
@@ -44,7 +53,6 @@ export async function GET(
             asunto: true,
             monto_total: true,
             numero_hojas: true,
-            fojas_fisicas: true,
             numero_cur_devengado: true,
             numero_cur_contable: true,
             numero_cur_compromiso: true,

@@ -107,10 +107,10 @@ export const TarjetaArchivo: React.FC<TarjetaArchivoProps> = ({
 
             <div>
               <span className="text-[11px] font-bold text-slate-500 uppercase block">
-                Número de Hojas (Fojas):
+                Número de Hojas:
               </span>
               <span className="text-xs font-bold text-slate-900 font-mono">
-                {tramite.numero_hojas || tramite.fojas_fisicas || 1} hojas
+                {tramite.numero_hojas !== null && tramite.numero_hojas !== undefined ? `${tramite.numero_hojas} hojas` : "Sin conteo"}
               </span>
             </div>
 

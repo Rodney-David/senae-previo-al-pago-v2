@@ -73,7 +73,7 @@ export function generarDocumentoCajaPdf(caja: CajaParaDocumento): jsPDF {
     ].filter(Boolean);
     const curDisplay = curParts.length > 0 ? curParts.join(", ") : "-";
 
-    const hojas = Number(t.numero_hojas || t.fojas_fisicas || 1);
+    const hojas = t.numero_hojas !== null && t.numero_hojas !== undefined ? t.numero_hojas : "-";
     const monto = Number(t.monto_total || 0);
     totalValor += monto;
 

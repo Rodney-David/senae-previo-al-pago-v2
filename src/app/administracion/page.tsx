@@ -6,7 +6,6 @@ import {
   ShieldCheck,
   Users,
   Calendar,
-  Sliders,
   FileCode2,
   Plus,
   CheckCircle2,
@@ -15,35 +14,47 @@ import {
   Edit2,
   Trash2,
   Search,
-  Eye,
   History,
   Lock,
   X,
   Database,
   FileSpreadsheet,
+  Clock,
+  Settings,
+  Building2,
+  SlidersHorizontal,
+  KeyRound,
 } from "lucide-react";
 import { SeccionCatalogos } from "@/components/admin/SeccionCatalogos";
 import { SeccionMigracionExcel } from "@/components/admin/SeccionMigracionExcel";
+import { SeccionConfiguracionSLA } from "@/components/admin/SeccionConfiguracionSLA";
+
+type AdminTab = "usuarios" | "parametros" | "catalogos" | "auditoria";
+type ParametrosSubTab = "sla" | "feriados" | "institucionales";
+type CatalogosSubTab = "maestros" | "procesos_cur";
+type AuditoriaSubTab = "bitacora" | "migracion";
 
 export default function AdministracionPage() {
-  const [activeTab, setActiveTab] = useState<
-    "procesos" | "usuarios" | "feriados" | "campos" | "auditoria" | "catalogos" | "migracion"
-  >("procesos");
+  // Pestañas Principales (Exactamente 4 Vistas Maestras)
+  const [activeTab, setActiveTab] = useState<AdminTab>("usuarios");
 
-  // States
+  // Sub-pestañas organizativas
+  const [paramSubTab, setParamSubTab] = useState<ParametrosSubTab>("sla");
+  const [catSubTab, setCatSubTab] = useState<CatalogosSubTab>("maestros");
+  const [auditSubTab, setAuditSubTab] = useState<AuditoriaSubTab>("bitacora");
+
+  // Estados de datos
   const [usuarios, setUsuarios] = useState<any[]>([]);
   const [feriados, setFeriados] = useState<any[]>([]);
-  const [campos, setCampos] = useState<any[]>([]);
-  const [reglas, setReglas] = useState<any[]>([]);
   const [procesos, setProcesos] = useState<any[]>([]);
   const [auditoria, setAuditoria] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // Modales
+  // Modal Usuario (Crear / Editar)
   const [modalUsuarioOpen, setModalUsuarioOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<any | null>(null);
 
-  // Form User
+  // Formulario Usuario
   const [userNombre, setUserNombre] = useState("");
   const [userCorreo, setUserCorreo] = useState("");
   const [userCargo, setUserCargo] = useState("");
@@ -51,25 +62,12 @@ export default function AdministracionPage() {
   const [userArea, setUserArea] = useState("2");
   const [userDisp, setUserDisp] = useState("DISPONIBLE");
 
-  // Form New Holiday
+  // Formulario Feriado
   const [newFeriadoFecha, setNewFeriadoFecha] = useState("");
   const [newFeriadoDesc, setNewFeriadoDesc] = useState("");
   const [newFeriadoTipo, setNewFeriadoTipo] = useState("NACIONAL");
 
-  // Form New Dynamic Field
-  const [newCampoClave, setNewCampoClave] = useState("");
-  const [newCampoEtiqueta, setNewCampoEtiqueta] = useState("");
-  const [newCampoTipo, setNewCampoTipo] = useState("TEXT");
-  const [newCampoDept, setNewCampoDept] = useState("GLOBAL");
-
-  // Form New Rule
-  const [reglaCampoClave, setReglaCampoClave] = useState("item_presupuestario");
-  const [reglaTipoGestion, setReglaTipoGestion] = useState("EXPEDIENTE");
-  const [reglaEtapa, setReglaEtapa] = useState("PRESUPUESTO");
-  const [reglaVisibilidad, setReglaVisibilidad] = useState("OCULTO");
-  const [reglaObligatoriedad, setReglaObligatoriedad] = useState("OPCIONAL");
-
-  // Filter Auditoria
+  // Filtro Auditoría
   const [auditSearch, setAuditSearch] = useState("");
 
   const [saving, setSaving] = useState(false);
@@ -80,24 +78,20 @@ export default function AdministracionPage() {
   const fetchData = async () => {
     setLoading(true);
     try {
-      const [uRes, fRes, cRes, pRes, aRes] = await Promise.all([
+      const [uRes, fRes, pRes, aRes] = await Promise.all([
         fetch("/api/admin/usuarios"),
         fetch("/api/admin/feriados"),
-        fetch("/api/admin/campos"),
         fetch("/api/admin/procesos"),
         fetch("/api/admin/auditoria"),
       ]);
-      const [uData, fData, cData, pData, aData] = await Promise.all([
+      const [uData, fData, pData, aData] = await Promise.all([
         uRes.json(),
         fRes.json(),
-        cRes.json(),
         pRes.json(),
         aRes.json(),
       ]);
       if (uData.usuarios) setUsuarios(uData.usuarios);
       if (fData.feriados) setFeriados(fData.feriados);
-      if (cData.campos) setCampos(cData.campos);
-      if (cData.reglas) setReglas(cData.reglas);
       if (pData.tipos) setProcesos(pData.tipos);
       if (aData.movimientos) setAuditoria(aData.movimientos);
     } catch (err) {
@@ -136,11 +130,13 @@ export default function AdministracionPage() {
         body: JSON.stringify(payload),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Error al guardar usuario");
+      if (!res.ok) throw new Error(data.error || "Error al guardar servidor");
 
       setFeedback({
         type: "success",
-        text: editingUser ? "Funcionario modificado con éxito." : "Nuevo funcionario registrado con éxito.",
+        text: editingUser
+          ? "Servidor público actualizado con éxito."
+          : "Nuevo servidor registrado con éxito en el sistema.",
       });
       setModalUsuarioOpen(false);
       setEditingUser(null);
@@ -174,9 +170,10 @@ export default function AdministracionPage() {
     setModalUsuarioOpen(true);
   };
 
-  // Modificar Feriado / Eliminar Feriado
+  // Feriados: eliminar
   const handleDeleteFeriado = async (id_feriado: number) => {
-    if (!confirm("¿Está seguro de eliminar este día del calendario de feriados?")) return;
+    if (!confirm("¿Está seguro de eliminar este día del calendario de feriados no laborables?"))
+      return;
     try {
       const res = await fetch(`/api/admin/feriados?id=${id_feriado}`, { method: "DELETE" });
       if (!res.ok) throw new Error("Error al eliminar feriado");
@@ -187,7 +184,7 @@ export default function AdministracionPage() {
     }
   };
 
-  // Guardar Feriado
+  // Feriados: agregar
   const handleAddFeriado = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newFeriadoFecha || !newFeriadoDesc.trim()) return;
@@ -207,38 +204,10 @@ export default function AdministracionPage() {
       if (!res.ok) throw new Error(data.error || "Error al registrar día no laborable");
       setNewFeriadoFecha("");
       setNewFeriadoDesc("");
-      setFeedback({ type: "success", text: "Día no laborable agregado al cálculo de SLA." });
-      fetchData();
-    } catch (err: any) {
-      setFeedback({ type: "error", text: err.message });
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  // Guardar Campo Dinámico
-  const handleAddCampo = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newCampoClave.trim() || !newCampoEtiqueta.trim()) return;
-    setSaving(true);
-    setFeedback(null);
-    try {
-      const res = await fetch("/api/admin/campos", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          tipo_recurso: "CAMPO",
-          clave: newCampoClave.trim(),
-          etiqueta: newCampoEtiqueta.trim(),
-          tipo_dato: newCampoTipo,
-          departamento: newCampoDept,
-        }),
+      setFeedback({
+        type: "success",
+        text: "Día no laborable agregado al cómputo oficial de días hábiles del SLA.",
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Error al crear campo dinámico");
-      setNewCampoClave("");
-      setNewCampoEtiqueta("");
-      setFeedback({ type: "success", text: "Campo dinámico configurado con éxito." });
       fetchData();
     } catch (err: any) {
       setFeedback({ type: "error", text: err.message });
@@ -247,46 +216,7 @@ export default function AdministracionPage() {
     }
   };
 
-  // Guardar Regla de Flujo
-  const handleAddRegla = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setSaving(true);
-    setFeedback(null);
-    try {
-      const res = await fetch("/api/admin/campos", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          tipo_recurso: "REGLA",
-          clave_campo: reglaCampoClave,
-          tipo_flujo: reglaTipoGestion,
-          etapa_flujo: reglaEtapa,
-          visibilidad: reglaVisibilidad,
-          obligatoriedad: reglaObligatoriedad,
-        }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Error al registrar regla de campo");
-      setFeedback({ type: "success", text: "Regla de flujo parametrizada correctamente." });
-      fetchData();
-    } catch (err: any) {
-      setFeedback({ type: "error", text: err.message });
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const handleDeleteRegla = async (id_regla: number) => {
-    try {
-      await fetch(`/api/admin/campos?tipo=REGLA&id=${id_regla}`, { method: "DELETE" });
-      setFeedback({ type: "success", text: "Regla eliminada correctamente." });
-      fetchData();
-    } catch (err: any) {
-      setFeedback({ type: "error", text: err.message });
-    }
-  };
-
-  // Actualizar Tipo de Proceso (CUR Devengado vs Contable)
+  // Procesos Normativos: configurar CUR Devengado vs Contable e Ítem
   const handleUpdateProcesoCur = async (
     id_tipo_tramite: number,
     tipo_cur_permitido: string,
@@ -305,7 +235,7 @@ export default function AdministracionPage() {
       if (!res.ok) throw new Error("Error al actualizar proceso normativo");
       setFeedback({
         type: "success",
-        text: "Configuración del proceso normativo actualizada con éxito.",
+        text: "Regla de CUR del proceso normativo actualizada con éxito.",
       });
       fetchData();
     } catch (err: any) {
@@ -320,36 +250,46 @@ export default function AdministracionPage() {
       mov.tramites?.codigo_tramite?.toLowerCase().includes(term) ||
       mov.tramites?.numero_quipux?.toLowerCase().includes(term) ||
       mov.tipo_accion?.toLowerCase().includes(term) ||
-      mov.comentarios?.toLowerCase().includes(term)
+      mov.comentarios?.toLowerCase().includes(term) ||
+      mov.usuarios_historial_movimientos_id_usuario_entregaTousuarios?.nombre_completo
+        ?.toLowerCase()
+        .includes(term)
     );
   });
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-5 rounded-xl border border-slate-200 shadow-xs">
+      {/* ------------------------------------------------------------------- */}
+      {/* 1. ENCABEZADO MAESTRO DE GOBERNANZA                                 */}
+      {/* ------------------------------------------------------------------- */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-5 rounded-xl border border-slate-200 shadow-2xs">
         <div>
-          <div className="flex items-center gap-2">
-            <ShieldCheck className="w-5 h-5 text-blue-600" />
-            <h1 className="text-base font-bold text-slate-900 uppercase tracking-wide">
-              Panel de Administración y Parametrización del Sistema
-            </h1>
+          <div className="flex items-center gap-2.5">
+            <div className="p-2 bg-slate-900 text-white rounded-lg shadow-2xs">
+              <ShieldCheck className="w-5 h-5 text-blue-400" />
+            </div>
+            <div>
+              <h1 className="text-base font-bold text-slate-900 uppercase tracking-wide">
+                Consola de Administración y Gobernanza Institucional
+              </h1>
+              <p className="text-xs text-slate-500 mt-0.5">
+                Supervisión del talento humano, parametrización de reglas y SLA normativo, catálogos maestros y auditoría forense.
+              </p>
+            </div>
           </div>
-          <p className="text-xs text-slate-500 mt-1 uppercase">
-            Gobierno integral de los 17 procesos normativos, reglas de llenado por gestión, usuarios, calendario SLA y auditoría forense.
-          </p>
         </div>
 
         <button
           onClick={fetchData}
           disabled={loading}
           className="p-2 text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-lg border border-slate-200 transition-colors self-start sm:self-auto"
-          title="Actualizar datos"
+          title="Actualizar datos de administración"
         >
           <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin text-blue-600" : ""}`} />
         </button>
       </div>
 
+      {/* Banner de Feedback */}
       {feedback && (
         <div
           className={`p-3 text-xs rounded-lg font-medium border flex items-center justify-between ${
@@ -372,453 +312,74 @@ export default function AdministracionPage() {
         </div>
       )}
 
-      {/* Tabs */}
-      <div className="flex flex-wrap p-1 bg-slate-200/80 rounded-lg border border-slate-300 text-xs font-semibold uppercase self-start gap-1">
-        <button
-          onClick={() => setActiveTab("procesos")}
-          className={`px-3.5 py-1.5 rounded-md transition-all flex items-center gap-1.5 ${
-            activeTab === "procesos"
-              ? "bg-white text-slate-900 shadow-xs font-bold"
-              : "text-slate-600 hover:text-slate-900"
-          }`}
-        >
-          <FileCode2 className="w-3.5 h-3.5" />
-          1. Procesos y Reglas de CUR
-        </button>
-        <button
-          onClick={() => setActiveTab("campos")}
-          className={`px-3.5 py-1.5 rounded-md transition-all flex items-center gap-1.5 ${
-            activeTab === "campos"
-              ? "bg-white text-slate-900 shadow-xs font-bold"
-              : "text-slate-600 hover:text-slate-900"
-          }`}
-        >
-          <Sliders className="w-3.5 h-3.5" />
-          2. Campos Dinámicos & Reglas de Flujo
-        </button>
+      {/* ------------------------------------------------------------------- */}
+      {/* 2. BARRA DE LAS 4 VISTAS MAESTRAS                                   */}
+      {/* ------------------------------------------------------------------- */}
+      <div className="flex flex-wrap p-1.5 bg-slate-200/90 rounded-xl border border-slate-300 text-xs font-semibold uppercase gap-1.5 shadow-2xs">
         <button
           onClick={() => setActiveTab("usuarios")}
-          className={`px-3.5 py-1.5 rounded-md transition-all flex items-center gap-1.5 ${
+          className={`px-4 py-2 rounded-lg transition-all flex items-center gap-2 ${
             activeTab === "usuarios"
               ? "bg-white text-slate-900 shadow-xs font-bold"
-              : "text-slate-600 hover:text-slate-900"
+              : "text-slate-600 hover:text-slate-900 hover:bg-slate-100/60"
           }`}
         >
-          <Users className="w-3.5 h-3.5" />
-          3. Servidores y Disponibilidad
+          <Users className="w-4 h-4 text-blue-600" />
+          1. Talento Humano y Accesos
         </button>
+
         <button
-          onClick={() => setActiveTab("feriados")}
-          className={`px-3.5 py-1.5 rounded-md transition-all flex items-center gap-1.5 ${
-            activeTab === "feriados"
+          onClick={() => setActiveTab("parametros")}
+          className={`px-4 py-2 rounded-lg transition-all flex items-center gap-2 ${
+            activeTab === "parametros"
               ? "bg-white text-slate-900 shadow-xs font-bold"
-              : "text-slate-600 hover:text-slate-900"
+              : "text-slate-600 hover:text-slate-900 hover:bg-slate-100/60"
           }`}
         >
-          <Calendar className="w-3.5 h-3.5" />
-          4. Calendario Feriados SLA
+          <SlidersHorizontal className="w-4 h-4 text-amber-600" />
+          2. Parámetros y Reglas (SLA)
         </button>
-        <button
-          onClick={() => setActiveTab("auditoria")}
-          className={`px-3.5 py-1.5 rounded-md transition-all flex items-center gap-1.5 ${
-            activeTab === "auditoria"
-              ? "bg-white text-slate-900 shadow-xs font-bold"
-              : "text-slate-600 hover:text-slate-900"
-          }`}
-        >
-          <History className="w-3.5 h-3.5" />
-          5. Auditoría Forense
-        </button>
+
         <button
           onClick={() => setActiveTab("catalogos")}
-          className={`px-3.5 py-1.5 rounded-md transition-all flex items-center gap-1.5 ${
+          className={`px-4 py-2 rounded-lg transition-all flex items-center gap-2 ${
             activeTab === "catalogos"
               ? "bg-white text-slate-900 shadow-xs font-bold"
-              : "text-slate-600 hover:text-slate-900"
+              : "text-slate-600 hover:text-slate-900 hover:bg-slate-100/60"
           }`}
         >
-          <Database className="w-3.5 h-3.5" />
-          6. Catálogos y Desplegables
+          <Database className="w-4 h-4 text-indigo-600" />
+          3. Catálogos Maestros y Procesos
         </button>
+
         <button
-          onClick={() => setActiveTab("migracion")}
-          className={`px-3.5 py-1.5 rounded-md transition-all flex items-center gap-1.5 ${
-            activeTab === "migracion"
+          onClick={() => setActiveTab("auditoria")}
+          className={`px-4 py-2 rounded-lg transition-all flex items-center gap-2 ${
+            activeTab === "auditoria"
               ? "bg-white text-slate-900 shadow-xs font-bold"
-              : "text-slate-600 hover:text-slate-900"
+              : "text-slate-600 hover:text-slate-900 hover:bg-slate-100/60"
           }`}
         >
-          <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-600" />
-          7. Migración Bitácora (Excel 2026)
+          <History className="w-4 h-4 text-emerald-600" />
+          4. Auditoría Forense y Migración
         </button>
       </div>
 
-      {/* TAB 1: 17 PROCESOS Y REGLAS DE CUR */}
-      {activeTab === "procesos" && (
-        <div className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-xs space-y-4">
-          <div className="p-4 bg-slate-50 border-b border-slate-200 text-xs text-slate-700 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-            <div>
-              <strong>Catálogo de 17 Procesos Normativos SENAE:</strong> Configure si cada proceso
-              exige <span className="font-semibold text-blue-900">CUR DEVENGADO</span> (adquisiciones/servicios),{" "}
-              <span className="font-semibold text-purple-900">CUR CONTABLE</span> (fondos, viáticos, pólizas, cauciones) o{" "}
-              <span className="font-semibold text-slate-900">AMBOS</span>, así como si aplica Ítem Presupuestario.
-            </div>
-          </div>
-
-          <div className="overflow-x-auto">
-            <table className="min-w-[750px] w-full text-left border-collapse text-xs">
-              <thead>
-                <tr className="border-b border-slate-200 bg-slate-50/70 text-[11px] font-bold text-slate-700 uppercase">
-                  <th className="py-2.5 px-4 w-12">#</th>
-                  <th className="py-2.5 px-4">Proceso Normativo (SENAE)</th>
-                  <th className="py-2.5 px-4 w-44">CUR Exigido en Contabilidad</th>
-                  <th className="py-2.5 px-4 w-40">Ítem Presupuestario</th>
-                  <th className="py-2.5 px-4 w-28 text-center">Estado</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {procesos.map((p, idx) => (
-                  <tr key={p.id_tipo_tramite} className="hover:bg-slate-50 transition-colors">
-                    <td className="py-2.5 px-4 font-mono font-bold text-slate-500">{idx + 1}</td>
-                    <td className="py-2.5 px-4">
-                      <div className="font-semibold text-slate-900 uppercase">{p.nombre}</div>
-                      <div className="text-[10px] font-mono text-slate-500">CÓDIGO: {p.codigo}</div>
-                    </td>
-                    <td className="py-2.5 px-4">
-                      <select
-                        value={p.tipo_cur_permitido || "DEVENGADO"}
-                        onChange={(e) =>
-                          handleUpdateProcesoCur(
-                            p.id_tipo_tramite,
-                            e.target.value,
-                            p.requiere_item_presupuestario ?? true
-                          )
-                        }
-                        className="text-xs bg-slate-50 border border-slate-300 rounded p-1.5 font-bold uppercase focus:ring-2 focus:ring-blue-500"
-                      >
-                        <option value="DEVENGADO">CUR DEVENGADO</option>
-                        <option value="CONTABLE">CUR CONTABLE</option>
-                        <option value="AMBOS">AMBOS (OPCIONAL)</option>
-                      </select>
-                    </td>
-                    <td className="py-2.5 px-4">
-                      <label className="inline-flex items-center gap-2 cursor-pointer">
-                        <input
-                          type="checkbox"
-                          checked={p.requiere_item_presupuestario ?? true}
-                          onChange={(e) =>
-                            handleUpdateProcesoCur(
-                              p.id_tipo_tramite,
-                              p.tipo_cur_permitido || "DEVENGADO",
-                              e.target.checked
-                            )
-                          }
-                          className="rounded text-blue-600"
-                        />
-                        <span className="text-[11px] font-semibold text-slate-700 uppercase">
-                          {p.requiere_item_presupuestario ?? true ? "Aplica Ítem" : "Sin Ítem"}
-                        </span>
-                      </label>
-                    </td>
-                    <td className="py-2.5 px-4 text-center">
-                      <span className="inline-block px-2 py-0.5 rounded text-[10px] bg-emerald-50 text-emerald-700 border border-emerald-200 font-bold uppercase">
-                        ACTIVO
-                      </span>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
-
-      {/* TAB 2: CAMPOS DINÁMICOS & REGLAS DE FLUJO */}
-      {activeTab === "campos" && (
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Matriz de Reglas de Flujo por Tipo de Gestión */}
-          <div className="lg:col-span-2 space-y-6">
-            <div className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-xs">
-              <div className="px-5 py-3.5 bg-slate-900 text-white text-xs font-bold uppercase tracking-wider flex items-center justify-between">
-                <span>Reglas de Obligatoriedad y Visibilidad por Tipo de Gestión</span>
-              </div>
-              <div className="p-4 bg-slate-50 border-b border-slate-200 text-xs text-slate-600">
-                Parametrice qué campos aplican u ocultan según si la gestión es <strong>PAGO</strong> o <strong>EXPEDIENTE</strong>, y su obligatoriedad por fase del flujo.
-              </div>
-
-              <div className="overflow-x-auto">
-                <table className="min-w-[700px] w-full text-left border-collapse text-xs">
-                  <thead>
-                    <tr className="border-b border-slate-200 bg-slate-50 text-[11px] font-bold text-slate-700 uppercase">
-                      <th className="py-2.5 px-4">Campo Clave</th>
-                      <th className="py-2.5 px-4">Tipo Gestión</th>
-                      <th className="py-2.5 px-4">Fase / Etapa</th>
-                      <th className="py-2.5 px-4">Visibilidad</th>
-                      <th className="py-2.5 px-4">Obligatoriedad</th>
-                      <th className="py-2.5 px-4 text-center">Acción</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100">
-                    {reglas.length === 0 ? (
-                      <tr>
-                        <td colSpan={6} className="py-6 text-center text-slate-500 uppercase">
-                          No se han configurado reglas específicas adicionales. Rigen los parámetros predeterminados.
-                        </td>
-                      </tr>
-                    ) : (
-                      reglas.map((r) => (
-                        <tr key={r.id_regla} className="hover:bg-slate-50">
-                          <td className="py-2.5 px-4 font-mono font-bold text-blue-900">{r.clave_campo}</td>
-                          <td className="py-2.5 px-4 font-semibold uppercase text-slate-800">{r.tipo_flujo}</td>
-                          <td className="py-2.5 px-4 uppercase text-slate-600">{r.etapa_flujo}</td>
-                          <td className="py-2.5 px-4">
-                            <span
-                              className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${
-                                r.visibilidad === "VISIBLE"
-                                  ? "bg-emerald-50 text-emerald-800 border border-emerald-200"
-                                  : "bg-slate-100 text-slate-600 border border-slate-300"
-                              }`}
-                            >
-                              {r.visibilidad}
-                            </span>
-                          </td>
-                          <td className="py-2.5 px-4">
-                            <span
-                              className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${
-                                r.obligatoriedad === "OBLIGATORIO"
-                                  ? "bg-rose-50 text-rose-800 border border-rose-200"
-                                  : "bg-slate-100 text-slate-600"
-                              }`}
-                            >
-                              {r.obligatoriedad}
-                            </span>
-                          </td>
-                          <td className="py-2.5 px-4 text-center">
-                            <button
-                              onClick={() => handleDeleteRegla(r.id_regla)}
-                              className="text-slate-400 hover:text-rose-600 p-1"
-                              title="Eliminar regla"
-                            >
-                              <Trash2 className="w-3.5 h-3.5" />
-                            </button>
-                          </td>
-                        </tr>
-                      ))
-                    )}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-
-            {/* Listado de Campos Personalizados */}
-            <div className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-xs">
-              <div className="px-5 py-3.5 bg-slate-900 text-white text-xs font-bold uppercase tracking-wider">
-                Campos Globales Registrados en el Sistema
-              </div>
-              <div className="overflow-x-auto">
-                <table className="min-w-[650px] w-full text-left border-collapse text-xs">
-                  <thead>
-                    <tr className="border-b border-slate-200 bg-slate-50 text-[11px] font-bold text-slate-700 uppercase">
-                      <th className="py-2.5 px-4">Clave</th>
-                      <th className="py-2.5 px-4">Etiqueta</th>
-                      <th className="py-2.5 px-4">Tipo Dato</th>
-                      <th className="py-2.5 px-4">Departamento</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100">
-                    {campos.map((c) => (
-                      <tr key={c.id_campo} className="hover:bg-slate-50">
-                        <td className="py-2.5 px-4 font-mono font-bold text-blue-900">{c.clave}</td>
-                        <td className="py-2.5 px-4 text-slate-800 font-semibold uppercase">{c.etiqueta}</td>
-                        <td className="py-2.5 px-4 text-slate-600 uppercase">{c.tipo_dato}</td>
-                        <td className="py-2.5 px-4 text-slate-600 uppercase">{c.departamento}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          </div>
-
-          {/* Formularios Laterales: Nueva Regla y Nuevo Campo */}
-          <div className="space-y-6">
-            {/* Formulario Nueva Regla */}
-            <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-xs space-y-3 text-xs">
-              <h3 className="font-bold uppercase text-slate-900 border-b border-slate-100 pb-2 flex items-center gap-1.5">
-                <Sliders className="w-4 h-4 text-blue-600" />
-                Agregar Regla de Flujo
-              </h3>
-              <form onSubmit={handleAddRegla} className="space-y-3">
-                <div>
-                  <label className="block font-semibold text-slate-700 mb-1 uppercase">Campo Clave *</label>
-                  <select
-                    value={reglaCampoClave}
-                    onChange={(e) => setReglaCampoClave(e.target.value)}
-                    className="w-full p-2 border border-slate-300 rounded-lg uppercase font-mono font-semibold"
-                  >
-                    <option value="item_presupuestario">item_presupuestario</option>
-                    <option value="certificacion_presupuestaria">certificacion_presupuestaria</option>
-                    <option value="numero_factura">numero_factura</option>
-                    <option value="numero_cur_devengado">numero_cur_devengado</option>
-                    <option value="numero_cur_contable">numero_cur_contable</option>
-                    <option value="numero_liquidacion">numero_liquidacion</option>
-                    <option value="numero_juicio">numero_juicio</option>
-                    {campos.map((c) => (
-                      <option key={c.id_campo} value={c.clave}>
-                        {c.clave}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block font-semibold text-slate-700 mb-1 uppercase">Tipo de Gestión *</label>
-                  <select
-                    value={reglaTipoGestion}
-                    onChange={(e) => setReglaTipoGestion(e.target.value)}
-                    className="w-full p-2 border border-slate-300 rounded-lg uppercase font-semibold"
-                  >
-                    <option value="EXPEDIENTE">EXPEDIENTE</option>
-                    <option value="PAGO">PAGO</option>
-                    <option value="TODOS">TODOS</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block font-semibold text-slate-700 mb-1 uppercase">Fase del Flujo *</label>
-                  <select
-                    value={reglaEtapa}
-                    onChange={(e) => setReglaEtapa(e.target.value)}
-                    className="w-full p-2 border border-slate-300 rounded-lg uppercase font-semibold"
-                  >
-                    <option value="RECEPCION">RECEPCIÓN (DFI)</option>
-                    <option value="PRESUPUESTO">PRESUPUESTO</option>
-                    <option value="CONTABILIDAD">CONTABILIDAD</option>
-                    <option value="TESORERIA">TESORERÍA</option>
-                    <option value="ARCHIVO">ARCHIVO</option>
-                  </select>
-                </div>
-
-                <div className="grid grid-cols-2 gap-2">
-                  <div>
-                    <label className="block font-semibold text-slate-700 mb-1 uppercase">Visibilidad</label>
-                    <select
-                      value={reglaVisibilidad}
-                      onChange={(e) => setReglaVisibilidad(e.target.value)}
-                      className="w-full p-2 border border-slate-300 rounded-lg uppercase font-semibold"
-                    >
-                      <option value="VISIBLE">VISIBLE</option>
-                      <option value="OCULTO">OCULTO</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block font-semibold text-slate-700 mb-1 uppercase">Obligación</label>
-                    <select
-                      value={reglaObligatoriedad}
-                      onChange={(e) => setReglaObligatoriedad(e.target.value)}
-                      className="w-full p-2 border border-slate-300 rounded-lg uppercase font-semibold"
-                    >
-                      <option value="OPCIONAL">OPCIONAL</option>
-                      <option value="OBLIGATORIO">OBLIGATORIO</option>
-                    </select>
-                  </div>
-                </div>
-
-                <button
-                  type="submit"
-                  disabled={saving}
-                  className="w-full py-2 bg-slate-900 hover:bg-blue-700 text-white font-bold uppercase rounded-lg transition-colors shadow-2xs"
-                >
-                  Guardar Regla de Flujo
-                </button>
-              </form>
-            </div>
-
-            {/* Formulario Nuevo Campo */}
-            <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-xs space-y-3 text-xs">
-              <h3 className="font-bold uppercase text-slate-900 border-b border-slate-100 pb-2 flex items-center gap-1.5">
-                <Plus className="w-4 h-4 text-blue-600" />
-                Nuevo Campo Personalizado
-              </h3>
-              <form onSubmit={handleAddCampo} className="space-y-3">
-                <div>
-                  <label className="block font-semibold text-slate-700 mb-1 uppercase">Clave Única *</label>
-                  <input
-                    type="text"
-                    value={newCampoClave}
-                    onChange={(e) => setNewCampoClave(e.target.value)}
-                    placeholder="ej. nro_resolucion_adjudicacion"
-                    className="w-full p-2 border border-slate-300 rounded-lg font-mono uppercase"
-                    required
-                  />
-                </div>
-
-                <div>
-                  <label className="block font-semibold text-slate-700 mb-1 uppercase">Etiqueta Visible *</label>
-                  <input
-                    type="text"
-                    value={newCampoEtiqueta}
-                    onChange={(e) => setNewCampoEtiqueta(e.target.value)}
-                    placeholder="ej. Nro. Resolución Adjudicación"
-                    className="w-full p-2 border border-slate-300 rounded-lg uppercase font-medium"
-                    required
-                  />
-                </div>
-
-                <div className="grid grid-cols-2 gap-2">
-                  <div>
-                    <label className="block font-semibold text-slate-700 mb-1 uppercase">Tipo Dato</label>
-                    <select
-                      value={newCampoTipo}
-                      onChange={(e) => setNewCampoTipo(e.target.value)}
-                      className="w-full p-2 border border-slate-300 rounded-lg uppercase font-medium"
-                    >
-                      <option value="TEXT">TEXTO</option>
-                      <option value="NUMBER">NÚMERO</option>
-                      <option value="DATE">FECHA</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block font-semibold text-slate-700 mb-1 uppercase">Área</label>
-                    <select
-                      value={newCampoDept}
-                      onChange={(e) => setNewCampoDept(e.target.value)}
-                      className="w-full p-2 border border-slate-300 rounded-lg uppercase font-medium"
-                    >
-                      <option value="GLOBAL">GLOBAL</option>
-                      <option value="PRESUPUESTO">PRESUPUESTO</option>
-                      <option value="CONTABILIDAD">CONTABILIDAD</option>
-                    </select>
-                  </div>
-                </div>
-
-                <button
-                  type="submit"
-                  disabled={saving}
-                  className="w-full py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold uppercase rounded-lg transition-colors shadow-xs"
-                >
-                  Registrar Campo
-                </button>
-              </form>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* TAB 3: USUARIOS Y DISPONIBILIDAD */}
+      {/* ------------------------------------------------------------------- */}
+      {/* VISTA 1: GESTIÓN DE TALENTO HUMANO Y ACCESOS                         */}
+      {/* ------------------------------------------------------------------- */}
       {activeTab === "usuarios" && (
-        <div className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-xs space-y-4">
+        <div className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-2xs space-y-4">
           <div className="p-4 bg-slate-50 border-b border-slate-200 text-xs text-slate-700 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div>
-              <strong>Plantilla de Servidores Institucionales y Roles de Control Previo:</strong>{" "}
-              Los servidores con estado <span className="font-semibold text-amber-800">VACACIONES</span> o{" "}
-              <span className="font-semibold text-rose-800">INACTIVO</span> se excluyen del reparto automático por turno (Round-Robin).
+              <strong>Plantilla de Servidores Públicos Institucionales:</strong> Asigne a cada funcionario
+              su departamento orgánico, rol operativo y estado de disponibilidad en el despacho de expedientes.
             </div>
             <button
               onClick={handleOpenCreateUser}
-              className="px-3.5 py-1.5 bg-blue-600 hover:bg-blue-700 text-white font-bold uppercase rounded-lg transition-colors flex items-center gap-1.5 shadow-2xs self-start sm:self-auto"
+              className="px-3.5 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold uppercase rounded-lg transition-colors flex items-center gap-1.5 shadow-2xs self-start sm:self-auto text-xs"
             >
-              <Plus className="w-3.5 h-3.5" /> Nuevo Servidor
+              <Plus className="w-4 h-4" /> Nuevo Servidor Público
             </button>
           </div>
 
@@ -826,31 +387,38 @@ export default function AdministracionPage() {
             <table className="min-w-[850px] w-full text-left border-collapse text-xs">
               <thead>
                 <tr className="border-b border-slate-200 bg-slate-50/70 text-[11px] font-bold text-slate-700 uppercase">
-                  <th className="py-2.5 px-4">Funcionario</th>
-                  <th className="py-2.5 px-4">Correo Institucional</th>
-                  <th className="py-2.5 px-4">Departamento</th>
-                  <th className="py-2.5 px-4">Cargo / Rol</th>
-                  <th className="py-2.5 px-4">Disponibilidad (Turno)</th>
-                  <th className="py-2.5 px-4 text-center">Acciones</th>
+                  <th className="py-3 px-4">Funcionario</th>
+                  <th className="py-3 px-4">Correo Institucional</th>
+                  <th className="py-3 px-4">Departamento Orgánico</th>
+                  <th className="py-3 px-4">Cargo / Rol</th>
+                  <th className="py-3 px-4">Disponibilidad</th>
+                  <th className="py-3 px-4 text-center">Acciones</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
                 {usuarios.map((u) => (
                   <tr key={u.id_usuario} className="hover:bg-slate-50 transition-colors">
-                    <td className="py-2.5 px-4 font-bold text-slate-900 uppercase">{u.nombre_completo}</td>
-                    <td className="py-2.5 px-4 text-slate-600 font-mono text-[11px]">{u.correo_institucional}</td>
-                    <td className="py-2.5 px-4 text-slate-800 uppercase font-semibold">{u.areas?.nombre || "SENAE"}</td>
-                    <td className="py-2.5 px-4">
-                      <span className="inline-block px-2 py-0.5 rounded text-[10px] font-bold bg-slate-100 text-slate-800 border border-slate-200 uppercase">
+                    <td className="py-3 px-4 font-bold text-slate-900 uppercase">
+                      {u.nombre_completo}
+                    </td>
+                    <td className="py-3 px-4 text-slate-600 font-mono text-[11px]">
+                      {u.correo_institucional}
+                    </td>
+                    <td className="py-3 px-4 text-slate-800 uppercase font-semibold">
+                      {u.areas?.nombre || "SENAE"}
+                    </td>
+                    <td className="py-3 px-4">
+                      <span className="inline-block px-2.5 py-0.5 rounded text-[10px] font-bold bg-slate-100 text-slate-800 border border-slate-200 uppercase">
                         {u.cargo} ({u.rol})
                       </span>
                     </td>
-                    <td className="py-2.5 px-4">
+                    <td className="py-3 px-4">
                       <span
-                        className={`inline-block px-2 py-0.5 rounded text-[10px] font-bold uppercase ${
+                        className={`inline-block px-2.5 py-0.5 rounded text-[10px] font-bold uppercase ${
                           u.estado_disponibilidad === "DISPONIBLE"
                             ? "bg-emerald-50 text-emerald-800 border border-emerald-300"
-                            : u.estado_disponibilidad === "VACACIONES"
+                            : u.estado_disponibilidad === "VACACIONES" ||
+                              u.estado_disponibilidad === "EN_COMISION"
                             ? "bg-amber-50 text-amber-800 border border-amber-300"
                             : "bg-rose-50 text-rose-800 border border-rose-300"
                         }`}
@@ -858,11 +426,11 @@ export default function AdministracionPage() {
                         {u.estado_disponibilidad || "DISPONIBLE"}
                       </span>
                     </td>
-                    <td className="py-2.5 px-4 text-center">
+                    <td className="py-3 px-4 text-center">
                       <button
                         onClick={() => handleOpenEditUser(u)}
-                        className="px-2 py-1 text-slate-600 hover:text-blue-700 hover:bg-blue-50 rounded transition-colors"
-                        title="Editar servidor"
+                        className="px-2.5 py-1 text-slate-600 hover:text-blue-700 hover:bg-blue-50 border border-slate-200 rounded-md transition-colors"
+                        title="Modificar perfil o rol del servidor"
                       >
                         <Edit2 className="w-3.5 h-3.5" />
                       </button>
@@ -875,183 +443,425 @@ export default function AdministracionPage() {
         </div>
       )}
 
-      {/* TAB 4: FERIADOS OFICIALES SLA */}
-      {activeTab === "feriados" && (
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          <div className="lg:col-span-2 bg-white border border-slate-200 rounded-xl overflow-hidden shadow-xs">
-            <div className="px-5 py-3.5 bg-slate-900 text-white text-xs font-bold uppercase tracking-wider">
-              Calendario de Días No Laborables Registrados
-            </div>
-            <div className="overflow-x-auto">
-              <table className="min-w-[600px] w-full text-left border-collapse text-xs">
-                <thead>
-                  <tr className="border-b border-slate-200 bg-slate-50 text-[11px] font-bold text-slate-700 uppercase">
-                    <th className="py-2.5 px-4">Fecha</th>
-                    <th className="py-2.5 px-4">Descripción del Feriado</th>
-                    <th className="py-2.5 px-4">Tipo</th>
-                    <th className="py-2.5 px-4 text-center">Acción</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {feriados.map((f) => (
-                    <tr key={f.id_feriado} className="hover:bg-slate-50">
-                      <td className="py-2.5 px-4 font-mono font-bold text-blue-900">
-                        {formatDate(f.fecha)}
-                      </td>
-                      <td className="py-2.5 px-4 font-semibold text-slate-800 uppercase">{f.descripcion}</td>
-                      <td className="py-2.5 px-4">
-                        <span className="inline-block px-2 py-0.5 rounded text-[10px] bg-slate-100 text-slate-700 border border-slate-200 font-bold uppercase">
-                          {f.tipo}
-                        </span>
-                      </td>
-                      <td className="py-2.5 px-4 text-center">
-                        <button
-                          onClick={() => handleDeleteFeriado(f.id_feriado)}
-                          className="text-slate-400 hover:text-rose-600 p-1 transition-colors"
-                          title="Eliminar feriado"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+      {/* ------------------------------------------------------------------- */}
+      {/* VISTA 2: PARÁMETROS DEL SISTEMA Y REGLAS DE NEGOCIO (SLA)           */}
+      {/* ------------------------------------------------------------------- */}
+      {activeTab === "parametros" && (
+        <div className="space-y-4">
+          {/* Sub-selector */}
+          <div className="flex items-center gap-2 border-b border-slate-200 pb-2">
+            <button
+              onClick={() => setParamSubTab("sla")}
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold uppercase transition-all flex items-center gap-1.5 ${
+                paramSubTab === "sla"
+                  ? "bg-blue-600 text-white shadow-2xs"
+                  : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+              }`}
+            >
+              <Clock className="w-3.5 h-3.5" />
+              Semáforo y Motor SLA
+            </button>
+            <button
+              onClick={() => setParamSubTab("feriados")}
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold uppercase transition-all flex items-center gap-1.5 ${
+                paramSubTab === "feriados"
+                  ? "bg-blue-600 text-white shadow-2xs"
+                  : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+              }`}
+            >
+              <Calendar className="w-3.5 h-3.5" />
+              Calendario de Feriados (Días No Laborables)
+            </button>
+            <button
+              onClick={() => setParamSubTab("institucionales")}
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold uppercase transition-all flex items-center gap-1.5 ${
+                paramSubTab === "institucionales"
+                  ? "bg-blue-600 text-white shadow-2xs"
+                  : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+              }`}
+            >
+              <Settings className="w-3.5 h-3.5" />
+              Parámetros Financieros Generales
+            </button>
           </div>
 
-          <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-xs space-y-4">
-            <h3 className="text-xs font-bold uppercase tracking-wider text-slate-800 border-b border-slate-100 pb-2 flex items-center gap-1.5">
-              <Plus className="w-4 h-4 text-blue-600" />
-              Registrar Día No Laborable
-            </h3>
-            <form onSubmit={handleAddFeriado} className="space-y-3 text-xs">
-              <div>
-                <label className="block font-semibold text-slate-700 mb-1 uppercase">Fecha *</label>
-                <input
-                  type="date"
-                  value={newFeriadoFecha}
-                  onChange={(e) => setNewFeriadoFecha(e.target.value)}
-                  className="w-full border border-slate-300 rounded-lg p-2 font-mono"
-                  required
-                />
+          {/* Sub-vista 2.1: Semáforo SLA */}
+          {paramSubTab === "sla" && <SeccionConfiguracionSLA />}
+
+          {/* Sub-vista 2.2: Calendario Feriados */}
+          {paramSubTab === "feriados" && (
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              <div className="lg:col-span-2 bg-white border border-slate-200 rounded-xl overflow-hidden shadow-2xs">
+                <div className="px-5 py-3.5 bg-slate-900 text-white text-xs font-bold uppercase tracking-wider flex items-center justify-between">
+                  <span>Calendario de Días No Laborables Registrados</span>
+                  <span className="text-[11px] text-slate-300 font-normal">
+                    Se descuentan automáticamente del cálculo de días hábiles
+                  </span>
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="min-w-[600px] w-full text-left border-collapse text-xs">
+                    <thead>
+                      <tr className="border-b border-slate-200 bg-slate-50 text-[11px] font-bold text-slate-700 uppercase">
+                        <th className="py-2.5 px-4">Fecha</th>
+                        <th className="py-2.5 px-4">Descripción del Feriado</th>
+                        <th className="py-2.5 px-4">Tipo</th>
+                        <th className="py-2.5 px-4 text-center">Acción</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {feriados.map((f) => (
+                        <tr key={f.id_feriado} className="hover:bg-slate-50">
+                          <td className="py-2.5 px-4 font-mono font-bold text-blue-900">
+                            {formatDate(f.fecha)}
+                          </td>
+                          <td className="py-2.5 px-4 font-semibold text-slate-800 uppercase">
+                            {f.descripcion}
+                          </td>
+                          <td className="py-2.5 px-4">
+                            <span className="inline-block px-2 py-0.5 rounded text-[10px] bg-slate-100 text-slate-700 border border-slate-200 font-bold uppercase">
+                              {f.tipo}
+                            </span>
+                          </td>
+                          <td className="py-2.5 px-4 text-center">
+                            <button
+                              onClick={() => handleDeleteFeriado(f.id_feriado)}
+                              className="text-slate-400 hover:text-rose-600 p-1 transition-colors"
+                              title="Eliminar feriado"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
               </div>
 
-              <div>
-                <label className="block font-semibold text-slate-700 mb-1 uppercase">Descripción *</label>
-                <input
-                  type="text"
-                  value={newFeriadoDesc}
-                  onChange={(e) => setNewFeriadoDesc(e.target.value)}
-                  placeholder="ej. Decreto Ejecutivo Nro. 142"
-                  className="w-full border border-slate-300 rounded-lg p-2 uppercase font-medium"
-                  required
-                />
-              </div>
+              <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-2xs space-y-4">
+                <h3 className="text-xs font-bold uppercase tracking-wider text-slate-800 border-b border-slate-100 pb-2 flex items-center gap-1.5">
+                  <Plus className="w-4 h-4 text-blue-600" />
+                  Registrar Día No Laborable
+                </h3>
+                <form onSubmit={handleAddFeriado} className="space-y-3 text-xs">
+                  <div>
+                    <label className="block font-semibold text-slate-700 mb-1 uppercase">Fecha *</label>
+                    <input
+                      type="date"
+                      value={newFeriadoFecha}
+                      onChange={(e) => setNewFeriadoFecha(e.target.value)}
+                      className="w-full border border-slate-300 rounded-lg p-2 font-mono"
+                      required
+                    />
+                  </div>
 
-              <div>
-                <label className="block font-semibold text-slate-700 mb-1 uppercase">Tipo *</label>
-                <select
-                  value={newFeriadoTipo}
-                  onChange={(e) => setNewFeriadoTipo(e.target.value)}
-                  className="w-full border border-slate-300 rounded-lg p-2 uppercase font-semibold"
-                >
-                  <option value="NACIONAL">NACIONAL</option>
-                  <option value="LOCAL">LOCAL</option>
-                  <option value="DECRETO_EJECUTIVO">DECRETO EJECUTIVO</option>
-                </select>
-              </div>
+                  <div>
+                    <label className="block font-semibold text-slate-700 mb-1 uppercase">
+                      Descripción *
+                    </label>
+                    <input
+                      type="text"
+                      value={newFeriadoDesc}
+                      onChange={(e) => setNewFeriadoDesc(e.target.value)}
+                      placeholder="ej. Feriado Nacional de Independencia"
+                      className="w-full border border-slate-300 rounded-lg p-2 uppercase font-medium"
+                      required
+                    />
+                  </div>
 
-              <button
-                type="submit"
-                disabled={saving}
-                className="w-full py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold uppercase rounded-lg transition-colors shadow-xs"
-              >
-                {saving ? "Guardando..." : "Guardar Día No Laborable"}
-              </button>
-            </form>
-          </div>
+                  <div>
+                    <label className="block font-semibold text-slate-700 mb-1 uppercase">Tipo *</label>
+                    <select
+                      value={newFeriadoTipo}
+                      onChange={(e) => setNewFeriadoTipo(e.target.value)}
+                      className="w-full border border-slate-300 rounded-lg p-2 uppercase font-semibold"
+                    >
+                      <option value="NACIONAL">NACIONAL</option>
+                      <option value="LOCAL">LOCAL</option>
+                      <option value="DECRETO_EJECUTIVO">DECRETO EJECUTIVO</option>
+                    </select>
+                  </div>
+
+                  <button
+                    type="submit"
+                    disabled={saving}
+                    className="w-full py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold uppercase rounded-lg transition-colors shadow-2xs"
+                  >
+                    {saving ? "Guardando..." : "Guardar Día No Laborable"}
+                  </button>
+                </form>
+              </div>
+            </div>
+          )}
+
+          {/* Sub-vista 2.3: Parámetros Financieros Generales */}
+          {paramSubTab === "institucionales" && (
+            <div className="bg-white border border-slate-200 rounded-xl p-6 shadow-2xs space-y-4">
+              <h3 className="text-sm font-bold text-slate-900 uppercase tracking-wide border-b border-slate-100 pb-2">
+                Constantes de Operación Institucional SENAE
+              </h3>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
+                <div className="p-4 bg-slate-50 border border-slate-200 rounded-lg space-y-1">
+                  <span className="text-[10px] uppercase font-bold text-slate-500">
+                    Límite SLA Normativo
+                  </span>
+                  <div className="text-lg font-bold text-blue-900">6 Días Hábiles</div>
+                  <p className="text-[11px] text-slate-600 mt-1">
+                    Cómputo formal entre Presupuesto y Autorización en Tesorería.
+                  </p>
+                </div>
+
+                <div className="p-4 bg-slate-50 border border-slate-200 rounded-lg space-y-1">
+                  <span className="text-[10px] uppercase font-bold text-slate-500">
+                    Umbral de Alta Cuantía
+                  </span>
+                  <div className="text-lg font-bold text-emerald-900">$10.000,00 USD</div>
+                  <p className="text-[11px] text-slate-600 mt-1">
+                    Trámites con monto total mayor o igual se etiquetan como prioritarios.
+                  </p>
+                </div>
+
+                <div className="p-4 bg-slate-50 border border-slate-200 rounded-lg space-y-1">
+                  <span className="text-[10px] uppercase font-bold text-slate-500">
+                    Ejercicio Fiscal Activo
+                  </span>
+                  <div className="text-lg font-bold text-slate-900">Año Fiscal 2026</div>
+                  <p className="text-[11px] text-slate-600 mt-1">
+                    Vigencia de partidas y asignación presupuestaria.
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       )}
 
-      {/* TAB 5: AUDITORÍA FORENSE */}
-      {activeTab === "auditoria" && (
-        <div className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-xs space-y-4">
-          <div className="p-4 bg-slate-50 border-b border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
-            <div className="flex items-center gap-2">
-              <History className="w-4 h-4 text-blue-600" />
-              <span className="font-bold text-slate-800 uppercase">
-                Bitácora Inmutable de Eventos Institucionales
-              </span>
-            </div>
-
-            <div className="relative w-full sm:w-80">
-              <Search className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
-              <input
-                type="text"
-                value={auditSearch}
-                onChange={(e) => setAuditSearch(e.target.value)}
-                placeholder="BUSCAR POR QUIPUX, ACCIÓN, USUARIO..."
-                className="w-full pl-9 pr-3 py-1.5 text-xs bg-white border border-slate-300 rounded-lg font-medium uppercase focus:ring-2 focus:ring-blue-500"
-              />
-            </div>
-          </div>
-
-          <div className="overflow-x-auto">
-            <table className="min-w-[850px] w-full text-left border-collapse text-xs">
-              <thead>
-                <tr className="border-b border-slate-200 bg-slate-50 text-[11px] font-bold text-slate-700 uppercase">
-                  <th className="py-2.5 px-4 w-36">Fecha / Hora</th>
-                  <th className="py-2.5 px-4 w-44">Número Quipux</th>
-                  <th className="py-2.5 px-4 w-44">Acción Ejecutada</th>
-                  <th className="py-2.5 px-4 w-48">Servidor Responsable</th>
-                  <th className="py-2.5 px-4">Detalle / Comentarios</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {filteredAuditoria.map((mov) => (
-                  <tr key={mov.id_movimiento} className="hover:bg-slate-50">
-                    <td className="py-2.5 px-4 font-mono text-[11px] text-slate-500">
-                      {formatDate(mov.fecha_hora)}
-                    </td>
-                    <td className="py-2.5 px-4 font-mono font-bold text-blue-900">
-                      {mov.tramites?.numero_quipux}
-                    </td>
-                    <td className="py-2.5 px-4">
-                      <span className="inline-block px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-slate-100 text-slate-800 border border-slate-200 uppercase">
-                        {mov.tipo_accion}
-                      </span>
-                    </td>
-                    <td className="py-2.5 px-4">
-                      <div className="font-semibold text-slate-800 uppercase">
-                        {mov.usuarios_historial_movimientos_id_usuario_entregaTousuarios?.nombre_completo || "SISTEMA"}
-                      </div>
-                      <div className="text-[10px] text-slate-500 uppercase">
-                        {mov.areas_historial_movimientos_id_area_origenToareas?.nombre || "DFI"}
-                      </div>
-                    </td>
-                    <td className="py-2.5 px-4 text-slate-700 uppercase text-[11px] leading-snug">
-                      {mov.comentarios || "Sin comentarios"}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
-
-      {/* TAB 6: CATÁLOGOS Y DESPLEGABLES */}
+      {/* ------------------------------------------------------------------- */}
+      {/* VISTA 3: CATÁLOGOS MAESTROS Y PROCESOS                              */}
+      {/* ------------------------------------------------------------------- */}
       {activeTab === "catalogos" && (
-        <SeccionCatalogos
-          onNotify={(notif) => setFeedback({ type: notif.type, text: notif.text })}
-        />
+        <div className="space-y-4">
+          {/* Sub-selector */}
+          <div className="flex items-center gap-2 border-b border-slate-200 pb-2">
+            <button
+              onClick={() => setCatSubTab("maestros")}
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold uppercase transition-all flex items-center gap-1.5 ${
+                catSubTab === "maestros"
+                  ? "bg-blue-600 text-white shadow-2xs"
+                  : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+              }`}
+            >
+              <Database className="w-3.5 h-3.5" />
+              Catálogos Maestros (Áreas, Tipos y Gestión)
+            </button>
+            <button
+              onClick={() => setCatSubTab("procesos_cur")}
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold uppercase transition-all flex items-center gap-1.5 ${
+                catSubTab === "procesos_cur"
+                  ? "bg-blue-600 text-white shadow-2xs"
+                  : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+              }`}
+            >
+              <FileCode2 className="w-3.5 h-3.5" />
+              Reglas de CUR por Proceso Normativo
+            </button>
+          </div>
+
+          {/* Sub-vista 3.1: Catálogos Maestros */}
+          {catSubTab === "maestros" && (
+            <SeccionCatalogos
+              onNotify={(notif) => setFeedback({ type: notif.type, text: notif.text })}
+            />
+          )}
+
+          {/* Sub-vista 3.2: 17 Procesos y Reglas de CUR */}
+          {catSubTab === "procesos_cur" && (
+            <div className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-2xs space-y-4">
+              <div className="p-4 bg-slate-50 border-b border-slate-200 text-xs text-slate-700">
+                <strong>Catálogo de 17 Procesos Normativos SENAE:</strong> Configure si cada proceso
+                exige <span className="font-semibold text-blue-900">CUR DEVENGADO</span> (adquisiciones/servicios),{" "}
+                <span className="font-semibold text-purple-900">CUR CONTABLE</span> (fondos, viáticos, pólizas, cauciones) o{" "}
+                <span className="font-semibold text-slate-900">AMBOS</span>, así como la exigibilidad de Ítem Presupuestario.
+              </div>
+
+              <div className="overflow-x-auto">
+                <table className="min-w-[750px] w-full text-left border-collapse text-xs">
+                  <thead>
+                    <tr className="border-b border-slate-200 bg-slate-50/70 text-[11px] font-bold text-slate-700 uppercase">
+                      <th className="py-2.5 px-4 w-12">#</th>
+                      <th className="py-2.5 px-4">Proceso Normativo (SENAE)</th>
+                      <th className="py-2.5 px-4 w-44">CUR Exigido en Contabilidad</th>
+                      <th className="py-2.5 px-4 w-40">Ítem Presupuestario</th>
+                      <th className="py-2.5 px-4 w-28 text-center">Estado</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {procesos.map((p, idx) => (
+                      <tr key={p.id_tipo_tramite} className="hover:bg-slate-50 transition-colors">
+                        <td className="py-2.5 px-4 font-mono font-bold text-slate-500">{idx + 1}</td>
+                        <td className="py-2.5 px-4">
+                          <div className="font-semibold text-slate-900 uppercase">{p.nombre}</div>
+                          <div className="text-[10px] font-mono text-slate-500">CÓDIGO: {p.codigo}</div>
+                        </td>
+                        <td className="py-2.5 px-4">
+                          <select
+                            value={p.tipo_cur_permitido || "DEVENGADO"}
+                            onChange={(e) =>
+                              handleUpdateProcesoCur(
+                                p.id_tipo_tramite,
+                                e.target.value,
+                                p.requiere_item_presupuestario ?? true
+                              )
+                            }
+                            className="text-xs bg-slate-50 border border-slate-300 rounded p-1.5 font-bold uppercase focus:ring-2 focus:ring-blue-500"
+                          >
+                            <option value="DEVENGADO">CUR DEVENGADO</option>
+                            <option value="CONTABLE">CUR CONTABLE</option>
+                            <option value="AMBOS">AMBOS (OPCIONAL)</option>
+                          </select>
+                        </td>
+                        <td className="py-2.5 px-4">
+                          <label className="inline-flex items-center gap-2 cursor-pointer">
+                            <input
+                              type="checkbox"
+                              checked={p.requiere_item_presupuestario ?? true}
+                              onChange={(e) =>
+                                handleUpdateProcesoCur(
+                                  p.id_tipo_tramite,
+                                  p.tipo_cur_permitido || "DEVENGADO",
+                                  e.target.checked
+                                )
+                              }
+                              className="rounded text-blue-600"
+                            />
+                            <span className="text-[11px] font-semibold text-slate-700 uppercase">
+                              {p.requiere_item_presupuestario ?? true ? "Aplica Ítem" : "Sin Ítem"}
+                            </span>
+                          </label>
+                        </td>
+                        <td className="py-2.5 px-4 text-center">
+                          <span className="inline-block px-2 py-0.5 rounded text-[10px] bg-emerald-50 text-emerald-700 border border-emerald-200 font-bold uppercase">
+                            ACTIVO
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+        </div>
       )}
 
-      {/* TAB 7: MIGRACIÓN HISTÓRICA BITÁCORA EXCEL 2026 */}
-      {activeTab === "migracion" && <SeccionMigracionExcel />}
+      {/* ------------------------------------------------------------------- */}
+      {/* VISTA 4: AUDITORÍA FORENSE Y MIGRACIÓN MASIVA                       */}
+      {/* ------------------------------------------------------------------- */}
+      {activeTab === "auditoria" && (
+        <div className="space-y-4">
+          {/* Sub-selector */}
+          <div className="flex items-center gap-2 border-b border-slate-200 pb-2">
+            <button
+              onClick={() => setAuditSubTab("bitacora")}
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold uppercase transition-all flex items-center gap-1.5 ${
+                auditSubTab === "bitacora"
+                  ? "bg-blue-600 text-white shadow-2xs"
+                  : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+              }`}
+            >
+              <History className="w-3.5 h-3.5" />
+              Bitácora Inmutable de Eventos
+            </button>
+            <button
+              onClick={() => setAuditSubTab("migracion")}
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold uppercase transition-all flex items-center gap-1.5 ${
+                auditSubTab === "migracion"
+                  ? "bg-blue-600 text-white shadow-2xs"
+                  : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+              }`}
+            >
+              <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-600" />
+              Migración Masiva de Bitácora (Excel 2026)
+            </button>
+          </div>
 
-      {/* Modal Crear / Editar Usuario */}
+          {/* Sub-vista 4.1: Bitácora de Eventos */}
+          {auditSubTab === "bitacora" && (
+            <div className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-2xs space-y-4">
+              <div className="p-4 bg-slate-50 border-b border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+                <div className="flex items-center gap-2">
+                  <History className="w-4 h-4 text-blue-600" />
+                  <span className="font-bold text-slate-800 uppercase">
+                    Registro Cronológico de Acciones y Movimientos Institucionales
+                  </span>
+                </div>
+
+                <div className="relative w-full sm:w-80">
+                  <Search className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
+                  <input
+                    type="text"
+                    value={auditSearch}
+                    onChange={(e) => setAuditSearch(e.target.value)}
+                    placeholder="BUSCAR POR QUIPUX, ACCIÓN, USUARIO..."
+                    className="w-full pl-9 pr-3 py-1.5 text-xs bg-white border border-slate-300 rounded-lg font-medium uppercase focus:ring-2 focus:ring-blue-500 shadow-2xs"
+                  />
+                </div>
+              </div>
+
+              <div className="overflow-x-auto">
+                <table className="min-w-[850px] w-full text-left border-collapse text-xs">
+                  <thead>
+                    <tr className="border-b border-slate-200 bg-slate-50 text-[11px] font-bold text-slate-700 uppercase">
+                      <th className="py-2.5 px-4 w-36">Fecha / Hora</th>
+                      <th className="py-2.5 px-4 w-44">Número Quipux</th>
+                      <th className="py-2.5 px-4 w-44">Acción Ejecutada</th>
+                      <th className="py-2.5 px-4 w-48">Servidor Responsable</th>
+                      <th className="py-2.5 px-4">Detalle / Justificación</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {filteredAuditoria.map((mov) => (
+                      <tr key={mov.id_movimiento} className="hover:bg-slate-50">
+                        <td className="py-2.5 px-4 font-mono text-[11px] text-slate-500">
+                          {formatDate(mov.fecha_hora)}
+                        </td>
+                        <td className="py-2.5 px-4 font-mono font-bold text-blue-900">
+                          {mov.tramites?.numero_quipux}
+                        </td>
+                        <td className="py-2.5 px-4">
+                          <span className="inline-block px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-slate-100 text-slate-800 border border-slate-200 uppercase">
+                            {mov.tipo_accion}
+                          </span>
+                        </td>
+                        <td className="py-2.5 px-4">
+                          <div className="font-semibold text-slate-800 uppercase">
+                            {mov.usuarios_historial_movimientos_id_usuario_entregaTousuarios
+                              ?.nombre_completo || "SISTEMA"}
+                          </div>
+                          <div className="text-[10px] text-slate-500 uppercase">
+                            {mov.areas_historial_movimientos_id_area_origenToareas?.nombre ||
+                              "DFI"}
+                          </div>
+                        </td>
+                        <td className="py-2.5 px-4 text-slate-700 uppercase text-[11px] leading-snug">
+                          {mov.comentarios || "Sin comentarios"}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
+          {/* Sub-vista 4.2: Migración Masiva Excel */}
+          {auditSubTab === "migracion" && <SeccionMigracionExcel />}
+        </div>
+      )}
+
+      {/* ------------------------------------------------------------------- */}
+      {/* MODAL CREAR / EDITAR USUARIO                                        */}
+      {/* ------------------------------------------------------------------- */}
       {modalUsuarioOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs">
           <div className="bg-white rounded-xl shadow-xl w-full max-w-md p-6 space-y-4 text-xs">
@@ -1059,14 +869,19 @@ export default function AdministracionPage() {
               <h3 className="font-bold text-slate-900 uppercase">
                 {editingUser ? "Modificar Servidor Público" : "Registrar Nuevo Servidor"}
               </h3>
-              <button onClick={() => setModalUsuarioOpen(false)} className="text-slate-400 hover:text-slate-600">
+              <button
+                onClick={() => setModalUsuarioOpen(false)}
+                className="text-slate-400 hover:text-slate-600"
+              >
                 <X className="w-4 h-4" />
               </button>
             </div>
 
             <form onSubmit={handleSaveUsuario} className="space-y-3">
               <div>
-                <label className="block font-semibold text-slate-700 mb-1 uppercase">Nombre Completo *</label>
+                <label className="block font-semibold text-slate-700 mb-1 uppercase">
+                  Nombre Completo *
+                </label>
                 <input
                   type="text"
                   value={userNombre}
@@ -1078,7 +893,9 @@ export default function AdministracionPage() {
               </div>
 
               <div>
-                <label className="block font-semibold text-slate-700 mb-1 uppercase">Correo Institucional *</label>
+                <label className="block font-semibold text-slate-700 mb-1 uppercase">
+                  Correo Institucional *
+                </label>
                 <input
                   type="email"
                   value={userCorreo}
@@ -1090,7 +907,9 @@ export default function AdministracionPage() {
               </div>
 
               <div>
-                <label className="block font-semibold text-slate-700 mb-1 uppercase">Cargo Institucional *</label>
+                <label className="block font-semibold text-slate-700 mb-1 uppercase">
+                  Cargo Nominal *
+                </label>
                 <input
                   type="text"
                   value={userCargo}
@@ -1103,47 +922,54 @@ export default function AdministracionPage() {
 
               <div className="grid grid-cols-2 gap-2">
                 <div>
-                  <label className="block font-semibold text-slate-700 mb-1 uppercase">Departamento</label>
+                  <label className="block font-semibold text-slate-700 mb-1 uppercase">
+                    Departamento Orgánico
+                  </label>
                   <select
                     value={userArea}
                     onChange={(e) => setUserArea(e.target.value)}
                     className="w-full p-2 border border-slate-300 rounded-lg uppercase font-semibold"
                   >
-                    <option value="1">DFI</option>
-                    <option value="2">PRESUPUESTO</option>
-                    <option value="3">CONTABILIDAD</option>
-                    <option value="4">TESORERÍA</option>
-                    <option value="5">COBRANZAS</option>
-                    <option value="6">ARCHIVO</option>
+                    <option value="1">1. DIRECCIÓN FINANCIERA (DFI)</option>
+                    <option value="2">2. PRESUPUESTO</option>
+                    <option value="3">3. CONTABILIDAD</option>
+                    <option value="4">4. TESORERÍA / CAJA</option>
+                    <option value="5">5. COBRANZAS</option>
+                    <option value="6">6. ARCHIVO CENTRAL</option>
                   </select>
                 </div>
                 <div>
-                  <label className="block font-semibold text-slate-700 mb-1 uppercase">Rol del Sistema</label>
+                  <label className="block font-semibold text-slate-700 mb-1 uppercase">
+                    Rol Institucional
+                  </label>
                   <select
                     value={userRol}
                     onChange={(e) => setUserRol(e.target.value)}
                     className="w-full p-2 border border-slate-300 rounded-lg uppercase font-semibold"
                   >
+                    <option value="SECRETARIA">SECRETARIA DFI</option>
+                    <option value="JEFE">JEFE DE ÁREA</option>
                     <option value="ANALISTA">ANALISTA</option>
-                    <option value="JEFE">JEFE</option>
-                    <option value="SECRETARIA">SECRETARIA</option>
-                    <option value="DIRECTORA">DIRECTORA</option>
-                    <option value="ADMIN">ADMIN</option>
+                    <option value="TECNICO_COBRANZA">TÉCNICO DE COBRANZA</option>
+                    <option value="DIRECTORA">DIRECTORA FINANCIERA</option>
+                    <option value="ADMIN">ADMINISTRADOR UNIVERSAL</option>
                   </select>
                 </div>
               </div>
 
               <div>
-                <label className="block font-semibold text-slate-700 mb-1 uppercase">Disponibilidad Operativa</label>
+                <label className="block font-semibold text-slate-700 mb-1 uppercase">
+                  Disponibilidad Operativa
+                </label>
                 <select
                   value={userDisp}
                   onChange={(e) => setUserDisp(e.target.value)}
                   className="w-full p-2 border border-slate-300 rounded-lg uppercase font-semibold"
                 >
-                  <option value="DISPONIBLE">DISPONIBLE (Participa en Turno)</option>
-                  <option value="VACACIONES">VACACIONES (Excluido de Turno)</option>
-                  <option value="PERMISO">PERMISO (Excluido de Turno)</option>
-                  <option value="INACTIVO">INACTIVO (Desactivado)</option>
+                  <option value="DISPONIBLE">DISPONIBLE (Habilitado para Despacho)</option>
+                  <option value="EN_COMISION">EN COMISIÓN DE SERVICIOS</option>
+                  <option value="VACACIONES">VACACIONES (Pausado)</option>
+                  <option value="INACTIVO">INACTIVO (Bloqueo de Login)</option>
                 </select>
               </div>
 
@@ -1158,7 +984,7 @@ export default function AdministracionPage() {
                 <button
                   type="submit"
                   disabled={saving}
-                  className="px-4 py-1.5 font-bold uppercase text-white bg-blue-600 hover:bg-blue-700 rounded-lg shadow-xs"
+                  className="px-4 py-1.5 font-bold uppercase text-white bg-blue-600 hover:bg-blue-700 rounded-lg shadow-2xs"
                 >
                   {saving ? "Guardando..." : "Guardar Servidor"}
                 </button>

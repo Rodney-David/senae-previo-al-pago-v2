@@ -52,8 +52,11 @@ export async function GET(request: NextRequest) {
   }
 }
 
+import path from "path";
+import fs from "fs";
+
 /**
- * POST: Ejecuta la importación masiva de expedientes históricos a la base de datos institucional.
+ * POST: Procesa subidas de archivos Excel de bitácora (multipart/form-data) o ejecuta la migración masiva.
  */
 export async function POST(request: NextRequest) {
   try {
@@ -78,9 +81,58 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    const contentType = request.headers.get("content-type") || "";
+
+    // 1. CARGA MANUAL DE ARCHIVO EXCEL (multipart/form-data)
+    if (contentType.includes("multipart/form-data")) {
+      const formData = await request.formData();
+      const file = formData.get("file") as File | null;
+
+      if (!file) {
+        return NextResponse.json(
+          { error: "No se proporcionó ningún archivo Excel para analizar." },
+          { status: 400 }
+        );
+      }
+
+      const bytes = await file.arrayBuffer();
+      const buffer = Buffer.from(bytes);
+
+      const uploadsDir = path.join(process.cwd(), "uploads");
+      if (!fs.existsSync(uploadsDir)) {
+        fs.mkdirSync(uploadsDir, { recursive: true });
+      }
+
+      const cleanFileName = file.name.replace(/[^a-zA-Z0-9._-]/g, "_");
+      const filePath = path.join(uploadsDir, `bitacora_${Date.now()}_${cleanFileName}`);
+      fs.writeFileSync(filePath, buffer);
+
+      // Analizar el archivo recién subido
+      const analisis = await MigracionExcelService.analizarArchivo(filePath);
+
+      return NextResponse.json({
+        success: true,
+        analisis,
+        ruta_archivo: filePath,
+        nombre_archivo: file.name,
+      });
+    }
+
+    // 2. EJECUCIÓN O ANÁLISIS VÍA JSON
     const body = await request.json().catch(() => ({}));
+    const accion = body.accion || "MIGRAR";
     const ruta = body.ruta || RUTA_DEFAULT_EXCEL_2026;
 
+    if (accion === "ANALIZAR") {
+      const analisis = await MigracionExcelService.analizarArchivo(ruta);
+      return NextResponse.json({
+        success: true,
+        analisis,
+        ruta_archivo: ruta,
+      });
+    }
+
+    // Ejecutar migración masiva
     const resultado = await MigracionExcelService.ejecutarMigracion(
       ruta,
       user.id_usuario
@@ -91,9 +143,9 @@ export async function POST(request: NextRequest) {
       resultado,
     });
   } catch (error: any) {
-    console.error("Error ejecutando migración Excel:", error);
+    console.error("Error en endpoint de migración Excel:", error);
     return NextResponse.json(
-      { error: error.message || "Error crítico al ejecutar la migración" },
+      { error: error.message || "Error al procesar la solicitud de migración" },
       { status: 500 }
     );
   }

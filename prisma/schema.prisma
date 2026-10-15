@@ -228,7 +228,6 @@ model tramites {
   item_presupuestario               String?
   numero_factura                    String?
   anexos                            String?
-  fojas_fisicas                     Int?                    @default(1)
   id_area_actual                    Int
   id_custodio_actual                Int
   estado_general                    String                  @default("INGRESADO")
@@ -262,7 +261,7 @@ model tramites {
   observaciones                     observaciones[]
   tramite_referencias               tramite_referencias[]
   id_caja                           Int?
-  numero_hojas                      Int?                    @default(1)
+  numero_hojas                      Int?
   caja                              cajas?                  @relation(fields: [id_caja], references: [id_caja], onUpdate: Restrict, onDelete: SetNull)
   areas                             areas                   @relation(fields: [id_area_actual], references: [id_area], onUpdate: Restrict)
   usuarios                          usuarios                @relation(fields: [id_custodio_actual], references: [id_usuario], onUpdate: Restrict)
@@ -347,3 +346,4 @@ model items_presupuestarios {
   @@index([codigo])
   @@index([nombre])
 }
+

@@ -25,6 +25,8 @@ export const SemaforoSLA: React.FC<SemaforoSLAProps> = ({
     icon: <Clock className="w-3.5 h-3.5 text-emerald-600 shrink-0" />,
   };
 
+  const limite = sla.limiteDias || 6;
+
   if (sla.estado === "NO_INICIADO") {
     config = {
       label: "Pendiente",
@@ -52,7 +54,7 @@ export const SemaforoSLA: React.FC<SemaforoSLAProps> = ({
   } else if (sla.estado === "FINALIZADO") {
     config = {
       label: `${sla.diasHabilesTranscurridos}d`,
-      title: `SLA Finalizado (Pago autorizado / Archivado): ${sla.diasHabilesTranscurridos} días hábiles`,
+      title: `SLA Finalizado (Pago autorizado / Archivado): ${sla.diasHabilesTranscurridos} días hábiles (Límite normativo: ${limite} días)`,
       containerStyle: "bg-slate-50 text-slate-700 border-slate-300",
       dotStyle: "bg-slate-400 ring-slate-200",
       icon: <Clock className="w-3.5 h-3.5 text-slate-500 shrink-0" />,
@@ -60,7 +62,7 @@ export const SemaforoSLA: React.FC<SemaforoSLAProps> = ({
   } else if (sla.estado === "POR_VENCER") {
     config = {
       label: `${sla.diasHabilesTranscurridos}d`,
-      title: `Por vencer: ${sla.diasHabilesTranscurridos} de 6 días hábiles transcurridos`,
+      title: `Por vencer: ${sla.diasHabilesTranscurridos} de ${limite} días hábiles transcurridos`,
       containerStyle: "bg-amber-50 text-amber-800 border-amber-300",
       dotStyle: "bg-amber-500 ring-amber-200",
       icon: <Clock className="w-3.5 h-3.5 text-amber-600 shrink-0" />,
@@ -68,7 +70,7 @@ export const SemaforoSLA: React.FC<SemaforoSLAProps> = ({
   } else if (sla.estado === "VENCIDO") {
     config = {
       label: `${sla.diasHabilesTranscurridos}d`,
-      title: `Vencido / Fuera de SLA: ${sla.diasHabilesTranscurridos} días hábiles transcurridos (Límite normativo: 6 días)`,
+      title: `Vencido / Fuera de SLA: ${sla.diasHabilesTranscurridos} días hábiles transcurridos (Límite normativo: ${limite} días)`,
       containerStyle: "bg-rose-50 text-rose-800 border-rose-300",
       dotStyle: "bg-rose-500 ring-rose-200",
       icon: <Clock className="w-3.5 h-3.5 text-rose-600 shrink-0" />,

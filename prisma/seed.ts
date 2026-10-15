@@ -80,8 +80,7 @@ async function main() {
       id_custodio_actual: 2, // Lorena Zambrano
       estado_general: "INGRESADO",
       sub_estado: "RECEPCIONADO_DFI",
-      fojas_fisicas: 35,
-      numero_hojas: 35,
+            numero_hojas: 35,
       fecha_ultimo_movimiento: dMenos1,
       movimientos: [
         { fecha: dMenos1, deUser: 2, aUser: 2, deArea: 1, aArea: 1, accion: "INGRESO_EXPEDIENTE", nota: "Ingreso en ventanilla física y registro en Quipux" },
@@ -110,8 +109,7 @@ async function main() {
       id_custodio_actual: 2,
       estado_general: "INGRESADO",
       sub_estado: "RECEPCIONADO_DFI",
-      fojas_fisicas: 22,
-      numero_hojas: 22,
+            numero_hojas: 22,
       fecha_ultimo_movimiento: dMenos1,
       movimientos: [
         { fecha: dMenos1, deUser: 2, aUser: 2, deArea: 1, aArea: 1, accion: "INGRESO_EXPEDIENTE", nota: "Recepción de expediente físico con orden de compra" },
@@ -140,8 +138,7 @@ async function main() {
       id_custodio_actual: 2,
       estado_general: "INGRESADO",
       sub_estado: "RECEPCIONADO_DFI",
-      fojas_fisicas: 18,
-      numero_hojas: 18,
+            numero_hojas: 18,
       fecha_ultimo_movimiento: dMenos2,
       movimientos: [
         { fecha: dMenos2, deUser: 2, aUser: 2, deArea: 1, aArea: 1, accion: "INGRESO_EXPEDIENTE", nota: "Informe de comisión y pasajes remitidos" },
@@ -170,8 +167,7 @@ async function main() {
       id_custodio_actual: 2,
       estado_general: "INGRESADO",
       sub_estado: "RECEPCIONADO_DFI",
-      fojas_fisicas: 14,
-      numero_hojas: 14,
+            numero_hojas: 14,
       fecha_ultimo_movimiento: dMenos2,
       movimientos: [
         { fecha: dMenos2, deUser: 2, aUser: 2, deArea: 1, aArea: 1, accion: "INGRESO_EXPEDIENTE", nota: "Factura y planillas de consumo recibidas" },
@@ -206,8 +202,7 @@ async function main() {
       id_custodio_actual: 3, // Carlos Mendoza (Jefe)
       estado_general: "PRESUPUESTO",
       sub_estado: "PENDIENTE_ASIGNACION_ANALISTA",
-      fojas_fisicas: 48,
-      numero_hojas: 48,
+            numero_hojas: 48,
       fecha_ultimo_movimiento: dMenos2,
       movimientos: [
         { fecha: dMenos3, deUser: 2, aUser: 2, deArea: 1, aArea: 1, accion: "INGRESO_EXPEDIENTE", nota: "Ingreso DFI" },
@@ -237,8 +232,7 @@ async function main() {
       id_custodio_actual: 3,
       estado_general: "PRESUPUESTO",
       sub_estado: "PENDIENTE_ASIGNACION_ANALISTA",
-      fojas_fisicas: 62,
-      numero_hojas: 62,
+            numero_hojas: 62,
       fecha_ultimo_movimiento: dMenos2,
       movimientos: [
         { fecha: dMenos3, deUser: 2, aUser: 2, deArea: 1, aArea: 1, accion: "INGRESO_EXPEDIENTE", nota: "Ingreso en DFI" },
@@ -270,8 +264,7 @@ async function main() {
       sub_estado: "PENDIENTE_VISTO_BUENO_JEFE",
       id_analista_presupuesto_previo: 4, // Ana Belén revisó
       aprobado_presupuesto: false,
-      fojas_fisicas: 20,
-      numero_hojas: 20,
+            numero_hojas: 20,
       numero_cur_compromiso: "CUR-COMP-2026-0712",
       certificacion_presupuestaria: "CERT-PRES-2026-0089",
       item_presupuestario: "530805 - Materiales de Aseo",
@@ -307,8 +300,7 @@ async function main() {
       sub_estado: "PENDIENTE_VISTO_BUENO_JEFE",
       id_analista_presupuesto_previo: 5, // David Paredes revisó
       aprobado_presupuesto: false,
-      fojas_fisicas: 16,
-      numero_hojas: 16,
+            numero_hojas: 16,
       numero_cur_compromiso: "CUR-COMP-2026-0713",
       certificacion_presupuestaria: "CERT-PRES-2026-0091",
       item_presupuestario: "530101 - Agua Potable",
@@ -347,8 +339,7 @@ async function main() {
       id_custodio_actual: 4, // Ana Belén Gómez
       estado_general: "REVISION",
       sub_estado: "EN_CONTROL_PREVIO",
-      fojas_fisicas: 32,
-      numero_hojas: 32,
+            numero_hojas: 32,
       fecha_ultimo_movimiento: dMenos2,
       movimientos: [
         { fecha: dMenos3, deUser: 2, aUser: 3, deArea: 1, aArea: 2, accion: "DESPACHO_LOTE_PRESUPUESTO", nota: "Despacho lote" },
@@ -378,8 +369,7 @@ async function main() {
       id_custodio_actual: 4,
       estado_general: "REVISION",
       sub_estado: "EN_CONTROL_PREVIO",
-      fojas_fisicas: 24,
-      numero_hojas: 24,
+            numero_hojas: 24,
       fecha_ultimo_movimiento: dMenos2,
       movimientos: [
         { fecha: dMenos3, deUser: 2, aUser: 3, deArea: 1, aArea: 2, accion: "DESPACHO_LOTE_PRESUPUESTO", nota: "Despacho a Presupuesto" },
@@ -413,8 +403,7 @@ async function main() {
       motivo_pausa: "Esperando emisión y validación de Factura Electrónica en portal SRI",
       fecha_pausa: dMenos3,
       dias_pausa_acumulados: 2,
-      fojas_fisicas: 45,
-      numero_hojas: 45,
+            numero_hojas: 45,
       fecha_ultimo_movimiento: dMenos3,
       movimientos: [
         { fecha: dMenos5, deUser: 2, aUser: 3, deArea: 1, aArea: 2, accion: "DESPACHO_LOTE_PRESUPUESTO", nota: "Despacho lote" },
@@ -450,8 +439,7 @@ async function main() {
       id_custodio_actual: 5, // David Paredes
       estado_general: "REVISION",
       sub_estado: "EN_CONTROL_PREVIO",
-      fojas_fisicas: 19,
-      numero_hojas: 19,
+            numero_hojas: 19,
       fecha_ultimo_movimiento: dMenos2,
       movimientos: [
         { fecha: dMenos3, deUser: 2, aUser: 3, deArea: 1, aArea: 2, accion: "DESPACHO_LOTE_PRESUPUESTO", nota: "Despacho a Presupuesto" },
@@ -481,8 +469,7 @@ async function main() {
       id_custodio_actual: 5,
       estado_general: "REVISION",
       sub_estado: "EN_CONTROL_PREVIO",
-      fojas_fisicas: 28,
-      numero_hojas: 28,
+            numero_hojas: 28,
       fecha_ultimo_movimiento: dMenos1,
       movimientos: [
         { fecha: dMenos2, deUser: 2, aUser: 3, deArea: 1, aArea: 2, accion: "DESPACHO_LOTE_PRESUPUESTO", nota: "Despacho lote" },
@@ -518,8 +505,7 @@ async function main() {
       motivo_pausa: "Observación técnica de 72 horas remitida a requirente",
       fecha_pausa: dMenos3,
       dias_pausa_acumulados: 2,
-      fojas_fisicas: 38,
-      numero_hojas: 38,
+            numero_hojas: 38,
       fecha_ultimo_movimiento: dMenos3,
       movimientos: [
         { fecha: dMenos5, deUser: 2, aUser: 3, deArea: 1, aArea: 2, accion: "DESPACHO_LOTE_PRESUPUESTO", nota: "Despacho lote" },
@@ -560,8 +546,7 @@ async function main() {
       numero_cur_compromiso: "CUR-COMP-2026-0701",
       certificacion_presupuestaria: "CERT-PRES-2026-0078",
       item_presupuestario: "530209 - Servicio de Aseo",
-      fojas_fisicas: 30,
-      numero_hojas: 30,
+            numero_hojas: 30,
       fecha_ultimo_movimiento: dMenos1,
       movimientos: [
         { fecha: dMenos5, deUser: 2, aUser: 3, deArea: 1, aArea: 2, accion: "DESPACHO_LOTE_PRESUPUESTO", nota: "Ingreso inicial" },
@@ -601,8 +586,7 @@ async function main() {
       item_presupuestario: "530403 - Mantenimiento de Maquinaria",
       numero_factura: "001-002-00049210",
       fecha_factura: dMenos3,
-      fojas_fisicas: 26,
-      numero_hojas: 26,
+            numero_hojas: 26,
       fecha_ultimo_movimiento: dMenos1,
       movimientos: [
         { fecha: dMenos5, deUser: 2, aUser: 3, deArea: 1, aArea: 2, accion: "DESPACHO_LOTE_PRESUPUESTO", nota: "Pasa a presupuesto" },
@@ -642,8 +626,7 @@ async function main() {
       numero_cur_devengado: "CUR-DEV-2026-0512",
       certificacion_presupuestaria: "CERT-PRES-2026-0065",
       item_presupuestario: "530801 - Alimentos y Bebidas",
-      fojas_fisicas: 50,
-      numero_hojas: 50,
+            numero_hojas: 50,
       fecha_ultimo_movimiento: dMenos1,
       movimientos: [
         { fecha: dMenos7, deUser: 2, aUser: 3, deArea: 1, aArea: 2, accion: "DESPACHO_LOTE_PRESUPUESTO", nota: "Inicio" },
@@ -690,8 +673,7 @@ async function main() {
       numero_cur_devengado: "CUR-DEV-2026-0498",
       certificacion_presupuestaria: "CERT-PRES-2026-0054",
       item_presupuestario: "530601 - Seguros",
-      fojas_fisicas: 55,
-      numero_hojas: 55,
+            numero_hojas: 55,
       fecha_ultimo_movimiento: dMenos1,
       movimientos: [
         { fecha: dMenos7, deUser: 2, aUser: 3, deArea: 1, aArea: 2, accion: "DESPACHO_LOTE_PRESUPUESTO", nota: "Pasa a Presupuesto" },
@@ -732,8 +714,7 @@ async function main() {
       numero_cur_devengado: "CUR-DEV-2026-0504",
       certificacion_presupuestaria: "CERT-PRES-2026-0060",
       item_presupuestario: "530804 - Materiales de Oficina",
-      fojas_fisicas: 42,
-      numero_hojas: 42,
+            numero_hojas: 42,
       fecha_ultimo_movimiento: dMenos1,
       movimientos: [
         { fecha: dMenos7, deUser: 2, aUser: 3, deArea: 1, aArea: 2, accion: "DESPACHO_LOTE_PRESUPUESTO", nota: "Ingreso DFI" },
@@ -777,8 +758,7 @@ async function main() {
       numero_cur_compromiso: "CUR-COMP-2026-0610",
       numero_cur_devengado: "CUR-DEV-2026-0450",
       lote_mef: "LOTE-MEF-2026-0145",
-      fojas_fisicas: 34,
-      numero_hojas: 34,
+            numero_hojas: 34,
       fecha_ultimo_movimiento: dMenos1,
       movimientos: [
         { fecha: dMenos10, deUser: 2, aUser: 3, deArea: 1, aArea: 2, accion: "DESPACHO_LOTE_PRESUPUESTO", nota: "Flujo regular" },
@@ -818,8 +798,7 @@ async function main() {
       numero_cur_compromiso: "CUR-COMP-2026-0615",
       numero_cur_devengado: "CUR-DEV-2026-0458",
       lote_mef: "LOTE-MEF-2026-0146",
-      fojas_fisicas: 20,
-      numero_hojas: 20,
+            numero_hojas: 20,
       fecha_ultimo_movimiento: dMenos1,
       movimientos: [
         { fecha: dMenos10, deUser: 2, aUser: 3, deArea: 1, aArea: 2, accion: "DESPACHO_LOTE_PRESUPUESTO", nota: "Flujo" },
@@ -857,8 +836,7 @@ async function main() {
       spi_bce_referencia: "SPI-BCE-2026-889102",
       comprobante_pago: "COMP-PAG-2026-0412",
       numero_cur_devengado: "CUR-DEV-2026-0430",
-      fojas_fisicas: 28,
-      numero_hojas: 28,
+            numero_hojas: 28,
       fecha_ultimo_movimiento: dMenos1,
       movimientos: [
         { fecha: dMenos10, deUser: 2, aUser: 3, deArea: 1, aArea: 2, accion: "DESPACHO_LOTE_PRESUPUESTO", nota: "Trámite ingresado" },
@@ -896,8 +874,7 @@ async function main() {
       spi_bce_referencia: "SPI-BCE-2026-889103",
       comprobante_pago: "COMP-PAG-2026-0413",
       numero_cur_devengado: "CUR-DEV-2026-0435",
-      fojas_fisicas: 22,
-      numero_hojas: 22,
+            numero_hojas: 22,
       fecha_ultimo_movimiento: dMenos1,
       movimientos: [
         { fecha: dMenos1, deUser: 8, aUser: 8, deArea: 4, aArea: 4, accion: "PROGRAMAR_Y_PAGAR_MEF_BCE", nota: "Pago concluido en Banco Central." },
@@ -928,8 +905,7 @@ async function main() {
       sub_estado: "EN_CAJA",
       id_caja: caja1.id_caja,
       numero_hojas: 40,
-      fojas_fisicas: 40,
-      aprobado_presupuesto: true,
+            aprobado_presupuesto: true,
       aprobado_contabilidad: true,
       autorizado_pago: true,
       fecha_pago: dMenos2,
@@ -965,8 +941,7 @@ async function main() {
       sub_estado: "EN_CAJA",
       id_caja: caja1.id_caja,
       numero_hojas: 25,
-      fojas_fisicas: 25,
-      aprobado_presupuesto: true,
+            aprobado_presupuesto: true,
       aprobado_contabilidad: true,
       autorizado_pago: true,
       fecha_pago: dMenos2,
@@ -1012,8 +987,7 @@ async function main() {
       fecha_pago: dMenos5,
       spi_bce_referencia: "SPI-BCE-2026-778901",
       comprobante_pago: "COMP-PAG-2026-0301",
-      fojas_fisicas: 52,
-      numero_hojas: 52,
+            numero_hojas: 52,
       codigo_tomo_caja: "TOMO-2026-TELC-01",
       estanteria: "EST-A2-NIVEL3",
       ubicacion_archivo: "Archivo Contable Bloque 2 - Estantería A2 Nivel 3",
@@ -1054,8 +1028,7 @@ async function main() {
       fecha_pago: dMenos5,
       spi_bce_referencia: "SPI-BCE-2026-778902",
       comprobante_pago: "COMP-PAG-2026-0302",
-      fojas_fisicas: 24,
-      numero_hojas: 24,
+            numero_hojas: 24,
       codigo_tomo_caja: "TOMO-2026-HIDR-01",
       estanteria: "EST-A2-NIVEL3",
       ubicacion_archivo: "Archivo Contable Bloque 2 - Estantería A2 Nivel 3",
@@ -1093,8 +1066,7 @@ async function main() {
       estado_general: "INSUBSISTENTE",
       sub_estado: "DECLARADO_INSUBSISTENTE",
       justificacion_insubsistencia: "Declaratoria formal de insubsistencia por rescisión bilateral del contrato por mutuo acuerdo y falta de entrega del bien.",
-      fojas_fisicas: 30,
-      numero_hojas: 30,
+            numero_hojas: 30,
       fecha_ultimo_movimiento: dMenos2,
       movimientos: [
         { fecha: dMenos7, deUser: 2, aUser: 3, deArea: 1, aArea: 2, accion: "DESPACHO_LOTE_PRESUPUESTO", nota: "Ingreso inicial" },
@@ -1126,8 +1098,7 @@ async function main() {
       sub_estado: "DEVUELTO_FORMALMENTE",
       es_devuelto: true,
       motivo_devolucion: "Devolución a requirente por vicio en la orden de compra y falta de firma de recepción a entera satisfacción.",
-      fojas_fisicas: 20,
-      numero_hojas: 20,
+            numero_hojas: 20,
       fecha_ultimo_movimiento: dMenos2,
       movimientos: [
         { fecha: dMenos5, deUser: 2, aUser: 3, deArea: 1, aArea: 2, accion: "DESPACHO_LOTE_PRESUPUESTO", nota: "Ingreso" },

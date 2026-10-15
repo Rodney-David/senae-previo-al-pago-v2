@@ -8,7 +8,6 @@ export interface TramiteParaDocumentoCaja {
   asunto?: string | null;
   monto_total: number | string | any;
   numero_hojas?: number | null;
-  fojas_fisicas?: number | null;
   numero_cur_devengado?: string | null;
   numero_cur_contable?: string | null;
   numero_cur_compromiso?: string | null;
@@ -172,7 +171,7 @@ export async function generarDocumentoCajaExcel(caja: CajaParaDocumento): Promis
       const curDisplay = curParts.length > 0 ? curParts.join(", ") : "-";
 
       // Col 4: Hojas
-      const hojas = Number(t.numero_hojas || t.fojas_fisicas || 1);
+      const hojas = t.numero_hojas !== null && t.numero_hojas !== undefined ? Number(t.numero_hojas) : "-";
 
       // Col 6: Monto Valor
       const monto = Number(t.monto_total || 0);

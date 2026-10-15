@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
   FileSpreadsheet,
   RefreshCw,
@@ -14,6 +14,9 @@ import {
   ExternalLink,
   ShieldAlert,
   FileCheck2,
+  Upload,
+  FolderOpen,
+  FileUp,
 } from "lucide-react";
 import { formatCurrency } from "@/lib/utils";
 import Link from "next/link";
@@ -51,10 +54,16 @@ interface AnalisisData {
 export const SeccionMigracionExcel: React.FC = () => {
   const [analisis, setAnalisis] = useState<AnalisisData | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
+  const [subiendoArchivo, setSubiendoArchivo] = useState<boolean>(false);
+  const [rutaActiva, setRutaActiva] = useState<string | null>(null);
+  const [nombreArchivoManual, setNombreArchivoManual] = useState<string | null>(null);
+
   const [tabMuestra, setTabMuestra] = useState<"pago" | "garantia" | "resumen">("pago");
   const [migrando, setMigrando] = useState<boolean>(false);
   const [resultadoMigracion, setResultadoMigracion] = useState<any>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   const cargarAnalisis = async () => {
     setLoading(true);
@@ -66,6 +75,9 @@ export const SeccionMigracionExcel: React.FC = () => {
         throw new Error(data.error || "Error al analizar el archivo de bitácora");
       }
       setAnalisis(data.analisis);
+      if (data.analisis?.ruta_archivo) {
+        setRutaActiva(data.analisis.ruta_archivo);
+      }
     } catch (err: any) {
       setErrorMsg(err.message || "Error al comunicarse con el servidor");
     } finally {
@@ -77,11 +89,54 @@ export const SeccionMigracionExcel: React.FC = () => {
     cargarAnalisis();
   }, []);
 
+  // Manejo de Selección Manual de Archivo (.xlsx / .xls)
+  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setSubiendoArchivo(true);
+    setErrorMsg(null);
+    setResultadoMigracion(null);
+
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+
+      const res = await fetch("/api/admin/migracion", {
+        method: "POST",
+        body: formData,
+      });
+
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        throw new Error(data.error || "Error al procesar el archivo seleccionado");
+      }
+
+      setAnalisis(data.analisis);
+      setRutaActiva(data.ruta_archivo);
+      setNombreArchivoManual(data.nombre_archivo);
+    } catch (err: any) {
+      setErrorMsg(err.message || "Error al cargar y analizar el archivo Excel seleccionado");
+    } finally {
+      setSubiendoArchivo(false);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = "";
+      }
+    }
+  };
+
   const handleEjecutarMigracion = async () => {
+    const totalExpedientes = analisis?.total_general || 1636;
+    const origenTexto = nombreArchivoManual
+      ? `el archivo cargado «${nombreArchivoManual}»`
+      : "la bitácora oficial detectada en el servidor";
+
     const confirmar = window.confirm(
-      `¿Está seguro de iniciar la migración masiva de la bitácora histórica 2026?\n\nSe insertarán ${
-        analisis?.total_general || 1636
-      } expedientes (1.099 Pagos + 537 Garantías) en la base de datos institucional vinculando Quipux secundarios e historial de movimientos.`
+      `¿Está seguro de iniciar la migración masiva de la bitácora 2026?\n\nArchivo: ${origenTexto}\nTotal Expedientes a Migrar: ${totalExpedientes} (${
+        analisis?.total_filas_pago || 0
+      } Pagos + ${
+        analisis?.total_filas_garantia || 0
+      } Garantías).\n\nSe insertarán en la base de datos institucional vinculando Quipux secundarios e historial de movimientos.`
     );
     if (!confirmar) return;
 
@@ -93,7 +148,10 @@ export const SeccionMigracionExcel: React.FC = () => {
       const res = await fetch("/api/admin/migracion", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({}),
+        body: JSON.stringify({
+          accion: "MIGRAR",
+          ruta: rutaActiva || analisis?.ruta_archivo,
+        }),
       });
       const data = await res.json();
       if (!res.ok || !data.success) {
@@ -110,8 +168,17 @@ export const SeccionMigracionExcel: React.FC = () => {
 
   return (
     <div className="space-y-6">
+      {/* Input oculto de archivo para selección manual */}
+      <input
+        type="file"
+        ref={fileInputRef}
+        onChange={handleFileSelect}
+        accept=".xlsx,.xls"
+        className="hidden"
+      />
+
       {/* Encabezado de la Sección */}
-      <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4">
+      <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-2xs flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <div className="flex items-center gap-2.5">
             <div className="p-2.5 bg-emerald-50 text-emerald-700 rounded-xl">
@@ -122,20 +189,34 @@ export const SeccionMigracionExcel: React.FC = () => {
                 Migración y Carga de Bitácora Histórica en Excel (Año 2026)
               </h2>
               <p className="text-xs text-slate-500 mt-0.5">
-                Importación automatizada de bitácoras oficiales de Presupuesto (Hojas PAGO y GARANTÍA) con trazabilidad Quipux.
+                Importación masiva automatizada de bitácoras institucionales (Hojas PAGO y GARANTÍA) con trazabilidad Quipux e inmunidad de SLA.
               </p>
             </div>
           </div>
         </div>
 
-        <button
-          onClick={cargarAnalisis}
-          disabled={loading || migrando}
-          className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-semibold text-slate-700 bg-slate-50 hover:bg-slate-100 rounded-lg transition-colors border border-slate-200 self-start md:self-auto cursor-pointer"
-        >
-          <RefreshCw className={`w-3.5 h-3.5 ${loading ? "animate-spin text-blue-600" : ""}`} />
-          Volver a Analizar
-        </button>
+        <div className="flex flex-wrap items-center gap-2 self-start md:self-auto">
+          {/* Botón para Seleccionar Manualmente el Archivo */}
+          <button
+            onClick={() => fileInputRef.current?.click()}
+            disabled={subiendoArchivo || migrando}
+            className="inline-flex items-center gap-2 px-3.5 py-2 text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 rounded-lg shadow-2xs transition-colors cursor-pointer disabled:opacity-50"
+            title="Seleccionar un archivo Excel (.xlsx / .xls) de su computadora"
+          >
+            <Upload className={`w-4 h-4 ${subiendoArchivo ? "animate-bounce" : ""}`} />
+            {subiendoArchivo ? "Cargando Archivo..." : "Seleccionar Archivo Manualmente"}
+          </button>
+
+          <button
+            onClick={cargarAnalisis}
+            disabled={loading || migrando || subiendoArchivo}
+            className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-semibold text-slate-700 bg-slate-50 hover:bg-slate-100 rounded-lg transition-colors border border-slate-200 cursor-pointer"
+            title="Re-analizar ruta predeterminada"
+          >
+            <RefreshCw className={`w-3.5 h-3.5 ${loading ? "animate-spin text-blue-600" : ""}`} />
+            Actualizar
+          </button>
+        </div>
       </div>
 
       {errorMsg && (
@@ -148,27 +229,45 @@ export const SeccionMigracionExcel: React.FC = () => {
         </div>
       )}
 
-      {/* Tarjeta de Estado del Archivo Excel en Disco */}
-      <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-xs space-y-4">
+      {/* Tarjeta de Origen y Estado del Archivo Excel */}
+      <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-2xs space-y-4">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-slate-100">
-          <div>
-            <div className="text-[11px] font-bold uppercase text-slate-500 tracking-wider">
-              Ruta del Archivo Fuente
+          <div className="space-y-1">
+            <div className="text-[11px] font-bold uppercase text-slate-500 tracking-wider flex items-center gap-2">
+              <span>Archivo de Bitácora Activo</span>
+              {nombreArchivoManual ? (
+                <span className="px-2 py-0.5 text-[10px] font-bold rounded bg-blue-100 text-blue-800 border border-blue-200 uppercase">
+                  Carga Manual
+                </span>
+              ) : (
+                <span className="px-2 py-0.5 text-[10px] font-bold rounded bg-slate-100 text-slate-700 border border-slate-200 uppercase">
+                  Detección en Servidor
+                </span>
+              )}
             </div>
-            <div className="font-mono text-xs font-semibold text-slate-800 mt-1 break-all bg-slate-50 p-2 rounded-lg border border-slate-200">
-              {analisis?.ruta_archivo || "C:/Users/PC/Documents/RODNEY SENAE/APLICATIVO PARA BUSQUEDA EN BASES PRESUPUESTO/Enero-Junio-2026.xlsx"}
+            <div className="font-mono text-xs font-semibold text-slate-800 break-all bg-slate-50 p-2.5 rounded-lg border border-slate-200 flex items-center justify-between gap-3">
+              <span className="truncate">
+                {nombreArchivoManual || analisis?.ruta_archivo || "Enero-Junio-2026.xlsx"}
+              </span>
+              <button
+                onClick={() => fileInputRef.current?.click()}
+                className="text-[11px] font-bold text-blue-600 hover:text-blue-800 shrink-0 underline cursor-pointer"
+              >
+                Cambiar Archivo
+              </button>
             </div>
           </div>
 
-          <div className="flex items-center gap-2 self-start md:self-auto">
-            {loading ? (
-              <span className="px-3 py-1 text-xs font-semibold bg-slate-100 text-slate-600 rounded-full animate-pulse">
+          <div className="flex items-center gap-2 self-start md:self-auto shrink-0">
+            {loading || subiendoArchivo ? (
+              <span className="px-3 py-1.5 text-xs font-semibold bg-slate-100 text-slate-600 rounded-full animate-pulse flex items-center gap-1.5">
+                <RefreshCw className="w-3.5 h-3.5 animate-spin text-blue-600" />
                 Analizando estructura...
               </span>
             ) : analisis?.existe ? (
               <span className="inline-flex items-center gap-1.5 px-3 py-1 text-xs font-bold bg-emerald-100 text-emerald-800 rounded-full border border-emerald-200">
                 <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
-                Archivo Verificado en Servidor
+                Archivo Verificado y Válido
               </span>
             ) : (
               <span className="inline-flex items-center gap-1.5 px-3 py-1 text-xs font-bold bg-rose-100 text-rose-800 rounded-full border border-rose-200">
@@ -183,7 +282,7 @@ export const SeccionMigracionExcel: React.FC = () => {
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           <div className="bg-blue-50/40 p-4 rounded-xl border border-blue-200/80">
             <div className="text-[11px] font-bold text-blue-700 uppercase">
-              Hoja PAGO (Fila 5 a 1.103)
+              Hoja PAGO
             </div>
             <div className="text-2xl font-bold font-mono text-blue-900 mt-1">
               {loading ? "..." : (analisis?.total_filas_pago || 0).toLocaleString()}
@@ -195,7 +294,7 @@ export const SeccionMigracionExcel: React.FC = () => {
 
           <div className="bg-purple-50/40 p-4 rounded-xl border border-purple-200/80">
             <div className="text-[11px] font-bold text-purple-700 uppercase">
-              Hoja GARANTÍA (Fila 4 a 540)
+              Hoja GARANTÍA
             </div>
             <div className="text-2xl font-bold font-mono text-purple-900 mt-1">
               {loading ? "..." : (analisis?.total_filas_garantia || 0).toLocaleString()}
@@ -207,7 +306,7 @@ export const SeccionMigracionExcel: React.FC = () => {
 
           <div className="bg-emerald-50/40 p-4 rounded-xl border border-emerald-200/80">
             <div className="text-[11px] font-bold text-emerald-700 uppercase">
-              Total Expedientes en Bitácora
+              Total Expedientes en Archivo
             </div>
             <div className="text-2xl font-bold font-mono text-emerald-900 mt-1">
               {loading ? "..." : (analisis?.total_general || 0).toLocaleString()}
@@ -232,23 +331,23 @@ export const SeccionMigracionExcel: React.FC = () => {
       </div>
 
       {/* Botón de Ejecución de la Migración */}
-      <div className="bg-gradient-to-r from-blue-900 to-indigo-900 text-white p-6 rounded-xl shadow-md flex flex-col md:flex-row md:items-center justify-between gap-5">
+      <div className="bg-gradient-to-r from-blue-900 via-slate-900 to-indigo-950 text-white p-6 rounded-xl shadow-md flex flex-col md:flex-row md:items-center justify-between gap-5 border border-slate-700">
         <div className="space-y-1.5 max-w-2xl">
           <div className="flex items-center gap-2">
-            <Database className="w-5 h-5 text-blue-300" />
-            <h3 className="text-base font-bold uppercase tracking-wide">
+            <Database className="w-5 h-5 text-blue-400" />
+            <h3 className="text-base font-bold uppercase tracking-wide text-white">
               Ejecutar Carga Masiva a la Base de Datos Institucional
             </h3>
           </div>
-          <p className="text-xs text-blue-100/90 leading-relaxed">
-            Esta acción insertará los 1.636 trámites en la base de datos de control previo, asociará automáticamente las referencias Quipux múltiples en <code className="bg-blue-950/60 px-1 py-0.5 rounded text-amber-300">tramite_referencias</code>, registrará la bitácora inmutable en <code className="bg-blue-950/60 px-1 py-0.5 rounded text-amber-300">historial_movimientos</code> y respetará los estados históricos (DFI, Archivo, Devuelto, Observado).
+          <p className="text-xs text-slate-300 leading-relaxed">
+            Esta acción insertará los <strong className="text-white">{analisis?.total_general || 0} trámites</strong> del archivo seleccionado en la base de datos de control previo, asociará automáticamente las referencias Quipux múltiples en <code className="bg-slate-800 px-1 py-0.5 rounded text-amber-300 font-mono">tramite_referencias</code>, registrará la trazabilidad inmutable en <code className="bg-slate-800 px-1 py-0.5 rounded text-amber-300 font-mono">historial_movimientos</code> y no afectará negativamente el semáforo SLA de los trámites cerrados.
           </p>
         </div>
 
         <button
           onClick={handleEjecutarMigracion}
-          disabled={migrando || loading || !analisis?.existe}
-          className="inline-flex items-center justify-center gap-2 px-5 py-3 text-xs font-bold uppercase tracking-wider rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white shadow-lg transition-all transform active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed shrink-0 cursor-pointer"
+          disabled={migrando || loading || subiendoArchivo || !analisis?.existe || (analisis?.total_general || 0) === 0}
+          className="inline-flex items-center justify-center gap-2 px-6 py-3.5 text-xs font-bold uppercase tracking-wider rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white shadow-lg transition-all transform active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed shrink-0 cursor-pointer"
         >
           {migrando ? (
             <>
@@ -258,7 +357,7 @@ export const SeccionMigracionExcel: React.FC = () => {
           ) : (
             <>
               <Play className="w-4 h-4 fill-white" />
-              Iniciar Migración (1.636 Trámites)
+              Iniciar Migración ({analisis?.total_general || 0} Trámites)
             </>
           )}
         </button>
@@ -266,10 +365,10 @@ export const SeccionMigracionExcel: React.FC = () => {
 
       {/* Resultados de Migración Exitosa */}
       {resultadoMigracion && (
-        <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-5 space-y-4 animate-fadeIn">
+        <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-5 space-y-4">
           <div className="flex items-center gap-2 text-emerald-900 font-bold text-sm uppercase">
             <CheckCircle2 className="w-5 h-5 text-emerald-600" />
-            Migración Completada Exitosamente
+            Migración Masiva Completada Exitosamente
           </div>
 
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
@@ -309,7 +408,7 @@ export const SeccionMigracionExcel: React.FC = () => {
               href="/tramites"
               className="inline-flex items-center gap-1 font-bold text-blue-700 hover:text-blue-900 underline"
             >
-              Ver expedientes en el Catálogo Institucional
+              Consultar expedientes migrados en el Catálogo
               <ArrowRight className="w-3.5 h-3.5" />
             </Link>
           </div>
@@ -317,7 +416,7 @@ export const SeccionMigracionExcel: React.FC = () => {
       )}
 
       {/* Pestañas de Vista Previa y Diagnóstico */}
-      <div className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-xs">
+      <div className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-2xs">
         <div className="flex border-b border-slate-200 bg-slate-50/80 px-4 pt-3 gap-2 text-xs font-semibold">
           <button
             onClick={() => setTabMuestra("pago")}
@@ -327,7 +426,7 @@ export const SeccionMigracionExcel: React.FC = () => {
                 : "border-transparent text-slate-500 hover:text-slate-800"
             }`}
           >
-            Vista Previa Hoja PAGO ({analisis?.total_filas_pago || 1099})
+            Vista Previa Hoja PAGO ({analisis?.total_filas_pago || 0})
           </button>
           <button
             onClick={() => setTabMuestra("garantia")}
@@ -337,7 +436,7 @@ export const SeccionMigracionExcel: React.FC = () => {
                 : "border-transparent text-slate-500 hover:text-slate-800"
             }`}
           >
-            Vista Previa Hoja GARANTÍA ({analisis?.total_filas_garantia || 537})
+            Vista Previa Hoja GARANTÍA ({analisis?.total_filas_garantia || 0})
           </button>
           <button
             onClick={() => setTabMuestra("resumen")}
@@ -372,29 +471,37 @@ export const SeccionMigracionExcel: React.FC = () => {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
-                    {analisis?.muestras_pago?.map((m) => (
-                      <tr key={m.fila} className="hover:bg-slate-50/60">
-                        <td className="py-2.5 px-3 text-center font-mono text-slate-500">#{m.fila}</td>
-                        <td className="py-2.5 px-3 font-mono font-bold text-blue-700">{m.quipux}</td>
-                        <td className="py-2.5 px-3 text-center">
-                          <span className="px-2 py-0.5 text-[10px] font-bold rounded bg-slate-100 text-slate-700 border border-slate-200 uppercase">
-                            {m.ciudad}
-                          </span>
-                        </td>
-                        <td className="py-2.5 px-3 font-medium text-slate-800 uppercase">{m.proveedor}</td>
-                        <td className="py-2.5 px-3 text-right font-mono font-bold text-slate-900">
-                          {formatCurrency(m.valor)}
-                        </td>
-                        <td className="py-2.5 px-3 text-center">
-                          <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-blue-100 text-blue-800">
-                            {m.estado}
-                          </span>
-                        </td>
-                        <td className="py-2.5 px-3 text-center font-mono font-semibold text-slate-600">
-                          {m.analista}
+                    {analisis?.muestras_pago && analisis.muestras_pago.length > 0 ? (
+                      analisis.muestras_pago.map((m) => (
+                        <tr key={m.fila} className="hover:bg-slate-50/60">
+                          <td className="py-2.5 px-3 text-center font-mono text-slate-500">#{m.fila}</td>
+                          <td className="py-2.5 px-3 font-mono font-bold text-blue-700">{m.quipux}</td>
+                          <td className="py-2.5 px-3 text-center">
+                            <span className="px-2 py-0.5 text-[10px] font-bold rounded bg-slate-100 text-slate-700 border border-slate-200 uppercase">
+                              {m.ciudad}
+                            </span>
+                          </td>
+                          <td className="py-2.5 px-3 font-medium text-slate-800 uppercase">{m.proveedor}</td>
+                          <td className="py-2.5 px-3 text-right font-mono font-bold text-slate-900">
+                            {formatCurrency(m.valor)}
+                          </td>
+                          <td className="py-2.5 px-3 text-center">
+                            <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-blue-100 text-blue-800">
+                              {m.estado}
+                            </span>
+                          </td>
+                          <td className="py-2.5 px-3 text-center font-mono font-semibold text-slate-600">
+                            {m.analista}
+                          </td>
+                        </tr>
+                      ))
+                    ) : (
+                      <tr>
+                        <td colSpan={7} className="py-6 text-center text-slate-400">
+                          No se encontraron filas con datos en la hoja PAGO
                         </td>
                       </tr>
-                    ))}
+                    )}
                   </tbody>
                 </table>
               </div>
@@ -421,29 +528,37 @@ export const SeccionMigracionExcel: React.FC = () => {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
-                    {analisis?.muestras_garantia?.map((m) => (
-                      <tr key={m.fila} className="hover:bg-slate-50/60">
-                        <td className="py-2.5 px-3 text-center font-mono text-slate-500">#{m.fila}</td>
-                        <td className="py-2.5 px-3 font-mono font-bold text-purple-700">{m.quipux}</td>
-                        <td className="py-2.5 px-3 text-center">
-                          <span className="px-2 py-0.5 text-[10px] font-bold rounded bg-slate-100 text-slate-700 border border-slate-200 uppercase">
-                            {m.ciudad}
-                          </span>
-                        </td>
-                        <td className="py-2.5 px-3 font-medium text-slate-800 uppercase">{m.beneficiario}</td>
-                        <td className="py-2.5 px-3 text-right font-mono font-bold text-slate-900">
-                          {formatCurrency(m.valor)}
-                        </td>
-                        <td className="py-2.5 px-3 text-center">
-                          <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-purple-100 text-purple-800">
-                            {m.estado}
-                          </span>
-                        </td>
-                        <td className="py-2.5 px-3 text-center font-mono font-semibold text-slate-600">
-                          {m.analista}
+                    {analisis?.muestras_garantia && analisis.muestras_garantia.length > 0 ? (
+                      analisis.muestras_garantia.map((m) => (
+                        <tr key={m.fila} className="hover:bg-slate-50/60">
+                          <td className="py-2.5 px-3 text-center font-mono text-slate-500">#{m.fila}</td>
+                          <td className="py-2.5 px-3 font-mono font-bold text-purple-700">{m.quipux}</td>
+                          <td className="py-2.5 px-3 text-center">
+                            <span className="px-2 py-0.5 text-[10px] font-bold rounded bg-slate-100 text-slate-700 border border-slate-200 uppercase">
+                              {m.ciudad}
+                            </span>
+                          </td>
+                          <td className="py-2.5 px-3 font-medium text-slate-800 uppercase">{m.beneficiario}</td>
+                          <td className="py-2.5 px-3 text-right font-mono font-bold text-slate-900">
+                            {formatCurrency(m.valor)}
+                          </td>
+                          <td className="py-2.5 px-3 text-center">
+                            <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-purple-100 text-purple-800">
+                              {m.estado}
+                            </span>
+                          </td>
+                          <td className="py-2.5 px-3 text-center font-mono font-semibold text-slate-600">
+                            {m.analista}
+                          </td>
+                        </tr>
+                      ))
+                    ) : (
+                      <tr>
+                        <td colSpan={7} className="py-6 text-center text-slate-400">
+                          No se encontraron filas con datos en la hoja GARANTÍA
                         </td>
                       </tr>
-                    ))}
+                    )}
                   </tbody>
                 </table>
               </div>

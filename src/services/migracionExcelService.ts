@@ -2,8 +2,16 @@ import fs from "fs";
 import ExcelJS from "exceljs";
 import { prisma } from "@/lib/prisma";
 
+const RUTA_CANDIDATAS_EXCEL = [
+  "C:/Users/ADMIN/Documents/RODNEY SENAE/BUSQUEDA ENTRE BASES DE GARANTIAS PRESUPUESTO/Prueba de bitacoras/Enero-Junio-2026.xlsx",
+  "C:/Users/ADMIN/Documents/RODNEY SENAE/CONSOLIDADO SENAE/BUSQUEDA GARANTIAS-PRESUPUESTO/BITACORAS DE PRUEBA/Enero-Junio-2026.xlsx",
+  "C:/Users/ADMIN/Documents/RODNEY SENAE/APLICATIVO PARA BUSQUEDA EN BASES PRESUPUESTO/Enero-Junio-2026.xlsx",
+  "C:/Users/PC/Documents/RODNEY SENAE/APLICATIVO PARA BUSQUEDA EN BASES PRESUPUESTO/Enero-Junio-2026.xlsx",
+  "./Enero-Junio-2026.xlsx",
+];
+
 export const RUTA_DEFAULT_EXCEL_2026 =
-  "C:/Users/PC/Documents/RODNEY SENAE/APLICATIVO PARA BUSQUEDA EN BASES PRESUPUESTO/Enero-Junio-2026.xlsx";
+  RUTA_CANDIDATAS_EXCEL.find((p) => fs.existsSync(p)) || RUTA_CANDIDATAS_EXCEL[0];
 
 // Mapeo institucional de iniciales de analistas a IDs de usuario
 const MAPA_ANALISTAS: Record<string, number> = {
@@ -69,6 +77,20 @@ function parseDecimal(val: any): number {
     return isNaN(parsed) ? 0 : Math.round(parsed * 100) / 100;
   }
   return 0;
+}
+
+function obtenerHoja(wb: ExcelJS.Workbook, tipo: "PAGO" | "GARANTIA"): ExcelJS.Worksheet | undefined {
+  if (tipo === "PAGO") {
+    return wb.worksheets.find((ws) => {
+      const n = ws.name.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase().trim();
+      return n.startsWith("PAGO");
+    });
+  } else {
+    return wb.worksheets.find((ws) => {
+      const n = ws.name.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase().trim();
+      return n.startsWith("GARANTIA");
+    });
+  }
 }
 
 function extraerQuipux(texto: string): string[] {
@@ -191,7 +213,7 @@ export class MigracionExcelService {
     });
 
     // 1. Hoja PAGO
-    const wsPago = wb.getWorksheet("PAGO");
+    const wsPago = obtenerHoja(wb, "PAGO");
     let totalPago = 0;
     const estadosPago: Record<string, number> = {};
     const ciudades: Record<string, number> = {};
@@ -227,7 +249,7 @@ export class MigracionExcelService {
     }
 
     // 2. Hoja GARANTÍA
-    const wsGarantia = wb.getWorksheet("GARANTÍA");
+    const wsGarantia = obtenerHoja(wb, "GARANTIA");
     let totalGarantia = 0;
     const estadosGarantia: Record<string, number> = {};
     const muestrasGarantia: AnalisisExcelResult["muestras_garantia"] = [];
@@ -305,9 +327,9 @@ export class MigracionExcelService {
     );
 
     // =========================================================================
-    // 1. PROCESAR HOJA PAGO (1.099 registros)
+    // 1. PROCESAR HOJA PAGO
     // =========================================================================
-    const wsPago = wb.getWorksheet("PAGO");
+    const wsPago = obtenerHoja(wb, "PAGO");
     if (wsPago) {
       for (let r = 5; r <= wsPago.rowCount; r++) {
         const row = wsPago.getRow(r);
@@ -496,9 +518,9 @@ export class MigracionExcelService {
     }
 
     // =========================================================================
-    // 2. PROCESAR HOJA GARANTÍA (537 registros)
+    // 2. PROCESAR HOJA GARANTÍA
     // =========================================================================
-    const wsGarantia = wb.getWorksheet("GARANTÍA");
+    const wsGarantia = obtenerHoja(wb, "GARANTIA");
     if (wsGarantia) {
       for (let r = 4; r <= wsGarantia.rowCount; r++) {
         const row = wsGarantia.getRow(r);

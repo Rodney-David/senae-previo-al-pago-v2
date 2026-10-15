@@ -223,7 +223,7 @@ model tramites {
   item_presupuestario               String?
   numero_factura                    String?
   anexos                            String?
-  fojas_fisicas                     Int?                    @default(1)
+  numero_hojas                      Int?
   id_area_actual                    Int
   id_custodio_actual                Int
   estado_general                    String                  @default("EN_RECEPCION")

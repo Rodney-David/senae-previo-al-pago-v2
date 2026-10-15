@@ -59,6 +59,7 @@ export const Sidebar: React.FC = () => {
       icon: Inbox,
       badge: "Prioridad",
       description: "Trámites en mi gestión",
+      hideForAdmin: true,
     },
     {
       label: "Gestión de Cajas",
@@ -78,7 +79,7 @@ export const Sidebar: React.FC = () => {
       label: "Trámites",
       href: "/tramites",
       icon: FileText,
-      description: "Catálogo institucional completo",
+      description: "Monitor institucional y consulta de expedientes",
     },
     {
       label: "Reportes e Indicadores",
@@ -90,7 +91,7 @@ export const Sidebar: React.FC = () => {
       label: "Administración",
       href: "/administracion",
       icon: ShieldCheck,
-      description: "Campos, feriados y roles",
+      description: "Usuarios, SLA, catálogos y auditoría",
       adminOnly: true,
     },
   ];
@@ -144,6 +145,10 @@ export const Sidebar: React.FC = () => {
               pathname === item.href ||
               (item.href !== "/escritorio" && pathname.startsWith(item.href));
 
+            if (item.hideForAdmin && isAdmin) {
+              return null;
+            }
+
             if (item.adminOnly && !isAdmin) {
               return null;
             }
@@ -156,12 +161,16 @@ export const Sidebar: React.FC = () => {
               const canAccess =
                 isAdmin ||
                 currentUser?.id_area === 4 ||
+                currentUser?.id_area === 5 ||
                 currentUser?.id_area === 6 ||
                 userRole.includes("CAJA") ||
                 userRole.includes("TESORERIA") ||
+                userRole.includes("COBRANZA") ||
                 userRole.includes("ARCHIVO") ||
                 userRole.includes("CUSTODIO") ||
                 userCargo.includes("CAJA") ||
+                userCargo.includes("COBRANZA") ||
+                userCargo.includes("TESOR") ||
                 userCargo.includes("ARCHIVO") ||
                 userCargo.includes("CUSTODIO");
               if (!canAccess) {

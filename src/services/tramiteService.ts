@@ -61,6 +61,7 @@ export class TramiteService {
         subtotal: sub,
         monto_total: sub,
         es_alta_cuantia: esAltaCuantia,
+        numero_hojas: null,
         id_area_actual: 1, // DFI
         id_custodio_actual: input.id_usuario_creador, // Secretaría creadora en Mi Escritorio
         estado_general: "INGRESADO",
@@ -338,3 +339,4 @@ export class TramiteService {
     return tramiteActualizado;
   }
 }
+

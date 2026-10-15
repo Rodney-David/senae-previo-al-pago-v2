@@ -41,7 +41,7 @@ export async function GET(
 
     const totalTramites = caja.tramites.length;
     const totalHojas = caja.tramites.reduce(
-      (acc, t) => acc + (t.numero_hojas || t.fojas_fisicas || 1),
+      (acc, t) => acc + (t.numero_hojas || 0),
       0
     );
     const totalMonto = caja.tramites.reduce(
@@ -82,12 +82,21 @@ export async function DELETE(
     }
 
     const userRole = (currentUser.rol || "").toUpperCase();
+    const userCargo = (currentUser.cargo || "").toUpperCase();
     const isAdminOrDFI = currentUser.id_area === 1 || userRole === "ADMIN" || userRole === "DIRECTORA";
-    const isAdmCaja = currentUser.id_area === 4 || userRole.includes("TESOR") || userRole.includes("CAJA") || isAdminOrDFI;
+    const isAdmCaja =
+      currentUser.id_area === 4 ||
+      currentUser.id_area === 5 ||
+      userRole.includes("TESOR") ||
+      userRole.includes("COBRANZA") ||
+      userRole.includes("CAJA") ||
+      userCargo.includes("COBRANZA") ||
+      userCargo.includes("TESOR") ||
+      isAdminOrDFI;
 
     if (!isAdmCaja) {
       return NextResponse.json(
-        { error: "La eliminación de cajas es una función exclusiva de Administración de Caja." },
+        { error: "La eliminación de cajas es una función exclusiva de Administración de Caja / Tesorería y Cobranzas." },
         { status: 403 }
       );
     }

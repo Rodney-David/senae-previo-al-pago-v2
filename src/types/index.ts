@@ -41,6 +41,7 @@ export interface SLAResult {
   estaPausado: boolean;
   motivoPausa?: string | null;
   porcentajeConsumido: number;
+  limiteDias?: number;
 }
 
 export interface TramiteReferenciaDTO {
@@ -212,7 +213,6 @@ export interface TramiteCompletoDTO {
   fecha_pago?: string | Date | null;
 
   // Archivo y Cajas
-  fojas_fisicas?: number | null;
   numero_hojas?: number | null;
   id_caja?: number | null;
   caja?: CajaDTO | null;

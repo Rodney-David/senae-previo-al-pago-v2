@@ -33,8 +33,17 @@ export async function POST(
 
     const userArea = currentUser.id_area;
     const userRole = (currentUser.rol || "").toUpperCase();
+    const userCargo = (currentUser.cargo || "").toUpperCase();
     const isAdmin = userRole === "ADMIN" || userRole === "ADMINISTRADOR" || userRole === "DIRECTORA";
-    const isAdmCaja = userArea === 4 || userRole.includes("TESOR") || userRole.includes("CAJA") || isAdmin;
+    const isAdmCaja =
+      userArea === 4 ||
+      userArea === 5 ||
+      userRole.includes("TESOR") ||
+      userRole.includes("COBRANZA") ||
+      userRole.includes("CAJA") ||
+      userCargo.includes("COBRANZA") ||
+      userCargo.includes("TESOR") ||
+      isAdmin;
     const isCustodio = userArea === 6 || userRole.includes("ARCHIVO") || isAdmin;
 
     const now = new Date();
@@ -283,6 +292,74 @@ export async function POST(
       return NextResponse.json({
         success: true,
         message: `Caja "${caja.codigo_caja}" devuelta a Administración de Caja para subsanación.`,
+        caja: cajaActualizada,
+      });
+    }
+
+    // 6. ACCION: DESARCHIVAR CAJA (Custodio de Archivo / Admin con Justificacion Obligatoria)
+    if (accion === "DESARCHIVAR") {
+      if (!isCustodio) {
+        return NextResponse.json(
+          { error: "Solo el Custodio de Archivo o Administrador puede desarchivar una caja." },
+          { status: 403 }
+        );
+      }
+      if (caja.estado !== "ARCHIVADA") {
+        return NextResponse.json(
+          { error: `Solo se pueden desarchivar cajas en estado ARCHIVADA (estado actual: ${caja.estado})` },
+          { status: 400 }
+        );
+      }
+
+      const motivoDesarchivo = body.motivo_desarchivo || body.justificacion || motivo_devolucion;
+      if (!motivoDesarchivo?.trim()) {
+        return NextResponse.json(
+          { error: "La justificacion / motivo del desarchivo es obligatoria para la auditoria institucional." },
+          { status: 400 }
+        );
+      }
+
+      // La caja regresa a estado ENVIADA en Archivo (para permitir re-inspeccion, subsanacion o devolucion)
+      const cajaActualizada = await prisma.cajas.update({
+        where: { id_caja: idCaja },
+        data: {
+          estado: "ENVIADA",
+          observaciones: `[DESARCHIVADA - ${now.toLocaleDateString("es-EC")}]: ${motivoDesarchivo.trim()} | Ant: ${caja.observaciones || "N/A"}`,
+        },
+      });
+
+      // Revertir los tramites de estado ARCHIVO a PAGADO en custodia de Archivo
+      await prisma.tramites.updateMany({
+        where: { id_caja: idCaja },
+        data: {
+          estado_general: "PAGADO",
+          sub_estado: "PAGADO_EN_CUSTODIA_CAJA",
+          id_area_actual: 6, // Permanece en Archivo Central
+          id_custodio_actual: currentUser.id_usuario,
+          justificacion_desarchivo: motivoDesarchivo.trim(),
+          fecha_ultimo_movimiento: now,
+          fecha_ultima_modificacion: now,
+        },
+      });
+
+      // Registrar en bitacora inmutable
+      for (const t of caja.tramites) {
+        await prisma.historial_movimientos.create({
+          data: {
+            id_tramite: t.id_tramite,
+            id_usuario_entrega: currentUser.id_usuario,
+            id_usuario_recibe: currentUser.id_usuario,
+            id_area_origen: 6,
+            id_area_destino: 6,
+            tipo_accion: "CAJA_DESARCHIVADA_EXPEDIENTE",
+            comentarios: `Caja "${caja.codigo_caja}" desarchivada en Archivo Central. Justificacion: ${motivoDesarchivo.trim()}`,
+          },
+        });
+      }
+
+      return NextResponse.json({
+        success: true,
+        message: `Caja "${caja.codigo_caja}" desarchivada exitosamente con justificacion inmutable.`,
         caja: cajaActualizada,
       });
     }

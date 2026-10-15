@@ -23,31 +23,101 @@ function toLocalMidnight(d: Date | string | null | undefined): Date {
   return new Date(dt.getFullYear(), dt.getMonth(), dt.getDate(), 0, 0, 0, 0);
 }
 
+export interface SLAConfig {
+  limite_dias: number;
+  punto_inicio: "RECEPCION_PRESUPUESTO" | "INGRESO_VENTANILLA" | "ENTREGA_CONTROL_PREVIO" | string;
+  punto_fin: "AUTORIZACION_PAGO" | "PAGO_EFECTIVO" | "APROBACION_CONTABILIDAD" | "ARCHIVO_CAJA" | string;
+}
+
+let cachedSLAConfig: { data: SLAConfig; timestamp: number } | null = null;
+const CACHE_TTL_MS = 10000; // 10 segundos de TTL para rápida respuesta tras cambio en admin
+
 /**
- * Motor de cálculo de SLA institucional (6 días hábiles normativos).
- * - Mientras el trámite está en Secretaría (INGRESADO / Área 1 sin entregar), el SLA NO ha iniciado (NO_INICIADO).
- * - El conteo arranca exactamente cuando Secretaría entrega a Control Previo Presupuesto (fecha_entrega_control_previo).
- * - Descuenta fines de semana y días feriados activos de la base de datos.
- * - Descuenta días de pausa acumulados (espera de factura u observaciones).
+ * Consulta la configuración vigente del semáforo SLA en `parametros_sistema`.
  */
-export async function calculateTramiteSLA(tramite: {
-  fecha_ingreso: Date | string | null;
-  fecha_entrega_control_previo?: Date | string | null;
-  fecha_recepcion_fisica?: Date | string | null;
-  esta_pausado?: boolean | null;
-  motivo_pausa?: string | null;
-  fecha_pausa?: Date | string | null;
-  dias_pausa_acumulados?: number | null;
-  estado_general?: string | null;
-  sub_estado?: string | null;
-  fecha_pago?: Date | string | null;
-  autorizado_pago?: boolean | null;
-  fecha_autorizacion_pago?: Date | string | null;
-  fecha_ultimo_movimiento?: Date | string | null;
-  id_area_actual?: number | null;
-  es_devuelto?: boolean | null;
-}): Promise<SLAResult> {
-  const TERM_DAYS = 6;
+export async function getSLAConfig(): Promise<SLAConfig> {
+  const now = Date.now();
+  if (cachedSLAConfig && now - cachedSLAConfig.timestamp < CACHE_TTL_MS) {
+    return cachedSLAConfig.data;
+  }
+
+  try {
+    const params = await prisma.parametros_sistema.findMany({
+      where: {
+        clave: {
+          in: ["sla_limite_dias", "sla_punto_inicio", "sla_punto_fin"],
+        },
+      },
+    });
+
+    const map: Record<string, string> = {};
+    params.forEach((p) => {
+      map[p.clave] = p.valor;
+    });
+
+    const parsedDias = parseInt(map["sla_limite_dias"] || "6", 10);
+    const data: SLAConfig = {
+      limite_dias: isNaN(parsedDias) || parsedDias < 1 ? 6 : parsedDias,
+      punto_inicio: map["sla_punto_inicio"] || "RECEPCION_PRESUPUESTO",
+      punto_fin: map["sla_punto_fin"] || "AUTORIZACION_PAGO",
+    };
+
+    cachedSLAConfig = { data, timestamp: now };
+    return data;
+  } catch (error) {
+    console.error("Error al obtener parametros_sistema para SLA, usando defaults:", error);
+    return {
+      limite_dias: 6,
+      punto_inicio: "RECEPCION_PRESUPUESTO",
+      punto_fin: "AUTORIZACION_PAGO",
+    };
+  }
+}
+
+export function invalidateSLAConfigCache() {
+  cachedSLAConfig = null;
+}
+
+/**
+ * Motor de cálculo de SLA institucional parametrizable.
+ * - Límite de días configurable (default 6 días hábiles).
+ * - Punto de inicio configurable:
+ *    * RECEPCION_PRESUPUESTO (Default): Inicia cuando Presupuesto lo recibe físicamente (REVISION).
+ *    * ENTREGA_CONTROL_PREVIO: Inicia cuando DFI entrega formalmente en lote.
+ *    * INGRESO_VENTANILLA: Inicia en fecha_ingreso.
+ * - Punto de fin configurable:
+ *    * AUTORIZACION_PAGO (Default): Muerte formal al autorizar el pago en Tesorería.
+ *    * PAGO_EFECTIVO: Muerte al pagarse en banco.
+ *    * APROBACION_CONTABILIDAD: Muerte al aprobar contabilidad.
+ *    * ARCHIVO_CAJA: Muerte al ingresar a Archivo Central.
+ * - Descuenta fines de semana y feriados activos.
+ * - Descuenta pausas acumuladas (factura u observación).
+ * - Conteo de totalidad de días de vida sin excepciones (días calendario continuos desde ingreso).
+ */
+export async function calculateTramiteSLA(
+  tramite: {
+    fecha_ingreso: Date | string | null;
+    fecha_entrega_control_previo?: Date | string | null;
+    fecha_recepcion_fisica?: Date | string | null;
+    esta_pausado?: boolean | null;
+    motivo_pausa?: string | null;
+    fecha_pausa?: Date | string | null;
+    dias_pausa_acumulados?: number | null;
+    estado_general?: string | null;
+    sub_estado?: string | null;
+    fecha_pago?: Date | string | null;
+    autorizado_pago?: boolean | null;
+    fecha_autorizacion_pago?: Date | string | null;
+    fecha_aprobacion_contabilidad?: Date | string | null;
+    fecha_ultimo_movimiento?: Date | string | null;
+    id_area_actual?: number | null;
+    es_devuelto?: boolean | null;
+  },
+  customConfig?: SLAConfig,
+  customFeriadosSet?: Set<string>
+): Promise<SLAResult> {
+  const config = customConfig || (await getSLAConfig());
+  const TERM_DAYS = config.limite_dias || 6;
   const estadoGeneral = (tramite.estado_general || "").toUpperCase();
 
   // 1. Trámites devueltos formalmente o insubsistentes: EXENTOS de cómputo de SLA
@@ -63,76 +133,121 @@ export async function calculateTramiteSLA(tramite: {
       estaPausado: false,
       motivoPausa: null,
       porcentajeConsumido: 0,
+      limiteDias: TERM_DAYS,
     };
   }
 
-  // 2. REGLA SENAE: Mientras esté en INGRESADO (ventanilla o despacho sin recibir físicamente por Presupuesto), SLA NO ha iniciado
-  if (estadoGeneral === "INGRESADO") {
-    return {
-      diasHabilesTranscurridos: 0,
-      diasRestantes: TERM_DAYS,
-      estado: "NO_INICIADO",
-      estaPausado: false,
-      motivoPausa: null,
-      porcentajeConsumido: 0,
-    };
+  // 2. Comprobar Punto de Inicio
+  let rawStartDate: Date | string | null = null;
+  if (config.punto_inicio === "INGRESO_VENTANILLA") {
+    rawStartDate = tramite.fecha_ingreso || new Date();
+  } else if (config.punto_inicio === "ENTREGA_CONTROL_PREVIO") {
+    if (estadoGeneral === "INGRESADO" && !tramite.fecha_entrega_control_previo) {
+      return {
+        diasHabilesTranscurridos: 0,
+        diasRestantes: TERM_DAYS,
+        estado: "NO_INICIADO",
+        estaPausado: false,
+        motivoPausa: null,
+        porcentajeConsumido: 0,
+        limiteDias: TERM_DAYS,
+      };
+    }
+    rawStartDate = tramite.fecha_entrega_control_previo || tramite.fecha_ingreso || new Date();
+  } else {
+    // RECEPCION_PRESUPUESTO (Default institucional SENAE)
+    if (estadoGeneral === "INGRESADO") {
+      return {
+        diasHabilesTranscurridos: 0,
+        diasRestantes: TERM_DAYS,
+        estado: "NO_INICIADO",
+        estaPausado: false,
+        motivoPausa: null,
+        porcentajeConsumido: 0,
+        limiteDias: TERM_DAYS,
+      };
+    }
+    rawStartDate =
+      tramite.fecha_recepcion_fisica ||
+      tramite.fecha_entrega_control_previo ||
+      tramite.fecha_ingreso ||
+      new Date();
   }
-
-  // 3. Determinar la fecha de inicio del SLA (momento exacto de recepción física en Presupuesto / REVISION)
-  const rawStartDate =
-    tramite.fecha_recepcion_fisica ||
-    tramite.fecha_entrega_control_previo ||
-    tramite.fecha_ingreso ||
-    new Date();
 
   const startDate = toLocalMidnight(rawStartDate);
 
-  // 4. Muerte formal de SLA: Ocurre al momento de autorizar el pago (o estados posteriores)
-  const isFinalized =
-    estadoGeneral === "AUTORIZADO_PAGO" ||
-    estadoGeneral === "PAGADO" ||
-    estadoGeneral === "CAJA" ||
-    estadoGeneral === "ARCHIVO" ||
-    estadoGeneral === "FINALIZADO_ARCHIVADO" ||
-    tramite.sub_estado === "EN_CAJA" ||
-    Boolean(tramite.autorizado_pago) ||
-    Boolean(tramite.fecha_autorizacion_pago);
+  // 3. Comprobar Punto de Término / Muerte del SLA
+  let isFinalized = false;
+  let finalEndDate: Date | string | null = null;
 
-  const isCurrentlyPaused = Boolean(tramite.esta_pausado);
-
-  // 5. Feriados activos
-  let feriadosFechas: Set<string> = new Set();
-  try {
-    const feriadosList = await prisma.feriados.findMany({
-      where: { activo: true },
-      select: { fecha: true },
-    });
-    feriadosFechas = new Set(
-      feriadosList.map((f) => {
-        const d = toLocalMidnight(f.fecha);
-        return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(
-          d.getDate()
-        ).padStart(2, "0")}`;
-      })
-    );
-  } catch (error) {
-    console.error("Error fetching feriados for SLA:", error);
-  }
-
-  // 6. Determinar fecha fin de cálculo (muerte de SLA al autorizar el pago)
-  let endDate = toLocalMidnight(new Date());
-  if (isFinalized) {
-    endDate = toLocalMidnight(
+  if (config.punto_fin === "PAGO_EFECTIVO") {
+    isFinalized =
+      estadoGeneral === "PAGADO" ||
+      estadoGeneral === "CAJA" ||
+      estadoGeneral === "ARCHIVO" ||
+      estadoGeneral === "FINALIZADO_ARCHIVADO" ||
+      tramite.sub_estado === "EN_CAJA" ||
+      Boolean(tramite.fecha_pago);
+    finalEndDate = tramite.fecha_pago || tramite.fecha_ultimo_movimiento || new Date();
+  } else if (config.punto_fin === "APROBACION_CONTABILIDAD") {
+    isFinalized =
+      Boolean(tramite.fecha_aprobacion_contabilidad) ||
+      ["AUTORIZADO_PAGO", "PAGADO", "CAJA", "ARCHIVO", "FINALIZADO_ARCHIVADO"].includes(estadoGeneral);
+    finalEndDate = tramite.fecha_aprobacion_contabilidad || tramite.fecha_ultimo_movimiento || new Date();
+  } else if (config.punto_fin === "ARCHIVO_CAJA") {
+    isFinalized =
+      estadoGeneral === "ARCHIVO" || estadoGeneral === "FINALIZADO_ARCHIVADO";
+    finalEndDate = tramite.fecha_ultimo_movimiento || new Date();
+  } else {
+    // AUTORIZACION_PAGO (Default institucional SENAE)
+    isFinalized =
+      estadoGeneral === "AUTORIZADO_PAGO" ||
+      estadoGeneral === "PAGADO" ||
+      estadoGeneral === "CAJA" ||
+      estadoGeneral === "ARCHIVO" ||
+      estadoGeneral === "FINALIZADO_ARCHIVADO" ||
+      tramite.sub_estado === "EN_CAJA" ||
+      Boolean(tramite.autorizado_pago) ||
+      Boolean(tramite.fecha_autorizacion_pago);
+    finalEndDate =
       tramite.fecha_autorizacion_pago ||
       tramite.fecha_pago ||
       tramite.fecha_ultimo_movimiento ||
-      new Date()
-    );
+      new Date();
+  }
+
+  const isCurrentlyPaused = Boolean(tramite.esta_pausado);
+
+  // 4. Feriados activos
+  let feriadosFechas: Set<string> = customFeriadosSet || new Set();
+  if (!customFeriadosSet) {
+    try {
+      const feriadosList = await prisma.feriados.findMany({
+        where: { activo: true },
+        select: { fecha: true },
+      });
+      feriadosFechas = new Set(
+        feriadosList.map((f) => {
+          const d = toLocalMidnight(f.fecha);
+          return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(
+            d.getDate()
+          ).padStart(2, "0")}`;
+        })
+      );
+    } catch (error) {
+      console.error("Error fetching feriados for SLA:", error);
+    }
+  }
+
+  // 5. Determinar fecha fin de cálculo
+  let endDate = toLocalMidnight(new Date());
+  if (isFinalized) {
+    endDate = toLocalMidnight(finalEndDate);
   } else if (isCurrentlyPaused && tramite.fecha_pausa) {
     endDate = toLocalMidnight(tramite.fecha_pausa);
   }
 
-  // 5. Conteo de días hábiles entre startDate y endDate
+  // 6. Conteo de días hábiles entre startDate y endDate
   let elapsedBusinessDays = 0;
   const current = new Date(startDate.getTime());
 
@@ -150,18 +265,22 @@ export async function calculateTramiteSLA(tramite: {
     current.setDate(current.getDate() + 1);
   }
 
-  // 6. Restar pausas acumuladas
+  // 7. Restar pausas acumuladas
   const pauseDays = tramite.dias_pausa_acumulados || 0;
   const netElapsedDays = Math.max(1, elapsedBusinessDays - pauseDays);
+
+  // 8. Umbrales dinámicos según el límite configurado (TERM_DAYS)
+  const greenThreshold = Math.ceil(TERM_DAYS * 0.5); // Para 6 días: hasta 3 días
+  const yellowThreshold = TERM_DAYS; // Para 6 días: 4 a 6 días
 
   let estado: SLAResult["estado"];
   if (isFinalized) {
     estado = "FINALIZADO";
   } else if (isCurrentlyPaused) {
     estado = "PAUSADO";
-  } else if (netElapsedDays <= 3) {
+  } else if (netElapsedDays <= greenThreshold) {
     estado = "EN_PLAZO";
-  } else if (netElapsedDays <= 5) {
+  } else if (netElapsedDays <= yellowThreshold) {
     estado = "POR_VENCER";
   } else {
     estado = "VENCIDO";
@@ -177,5 +296,6 @@ export async function calculateTramiteSLA(tramite: {
     estaPausado: isCurrentlyPaused,
     motivoPausa: tramite.motivo_pausa,
     porcentajeConsumido,
+    limiteDias: TERM_DAYS,
   };
 }

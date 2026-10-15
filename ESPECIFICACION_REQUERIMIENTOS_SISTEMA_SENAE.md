@@ -618,7 +618,74 @@ El análisis técnico del archivo oficial arrojó la existencia de **1.634 trám
 
 ---
 
-## 10. MATRIZ DE REQUERIMIENTOS CONSOLIDADOS (ESTADO FINAL INTEGRAL)
+## 10. MÓDULO DE ADMINISTRACIÓN Y GOBERNANZA INSTITUCIONAL (`/administracion`)
+
+### 10.1. Naturaleza y Principio de Separación: "Operación vs. Gobernanza"
+1. **Ausencia de Bandeja Personal ("Mi Escritorio"):**
+   - El Administrador del Sistema (`ADMIN`) es un rol de gobernanza técnica, seguridad y supervisión; **no es un analista operativo**.
+   - No tiene custodia física de carpetas ni despacha lotes en su día a día. Por ende, **el Administrador no posee la vista «Mi Escritorio»** en su menú principal.
+   - Su punto de acceso al flujo de expedientes es el **Monitor Global de Trámites** y la **Consola de Administración**.
+
+2. **Facultades de Superusuario Universal sobre Trámites:**
+   El rol `ADMIN` está investido de super-facultades transversales e irrestrictas sobre cualquier expediente del sistema, permitiéndole:
+   - **Crear Trámites:** Radicar expedientes nuevos directamente desde cualquier módulo o vista.
+   - **Visualizar el Universo de Trámites:** Acceso completo a todos los expedientes de todas las áreas y estados.
+   - **Edición Maestra e Irrestricta:** Modificar cualquier campo (Quipux, montos, CURs, proveedor, fechas, hojas) en cualquier etapa del flujo sin bloqueos de estado.
+   - **Reasignación de Custodio y Área:** Transferir la custodia de uno o múltiples expedientes a otro funcionario de forma directa (útil ante ausencias, licencias médicas o redistribución de cargas).
+   - **Acciones Resolutivas:** Observar, levantar observaciones, declarar o revocar insubsistencias y devolver trámites.
+   - **Eliminación Controlada:** Anular o eliminar trámites erróneos con ventana de confirmación de seguridad y registro obligatorio de justificación en el historial de auditoría forense.
+
+---
+
+### 10.2. Arquitectura de las 4 Vistas Maestras del Módulo Administrador
+
+El módulo `/administracion` se estructura de manera limpia en **cuatro vistas ejecutivas**:
+
+#### A. Vista 1: Gestión de Talento Humano y Accesos
+- **Catálogo de Funcionarios Institucionales:**
+  - Identificación (Cédula o Código Institucional), Nombres y Apellidos completos.
+  - Correo institucional oficial (`@aduana.gob.ec`).
+  - Cargo nominal y Área orgánica asignada (DFI, Presupuesto, Contabilidad, Tesorería, Archivo, etc.).
+  - Rol de Seguridad y Permisos: `SECRETARIA_DFI`, `JEFE_PRESUPUESTO`, `ANALISTA_PRESUPUESTO`, `JEFE_CONTABILIDAD`, `ANALISTA_CONTABILIDAD`, `ANALISTA_TESORERIA`, `TECNICO_COBRANZA`, `RESPONSABLE_ARCHIVO`, `DIRECTORA_FINANCIERA`, `ADMIN`.
+- **Estados Operativos:**
+  - `DISPONIBLE` (habilitado para recibir asignaciones y custodias).
+  - `EN_COMISION` / `LICENCIA` (inhabilitado temporalmente para no saturar su mesa en pases masivos).
+  - `INACTIVO` (bloqueo total de login).
+- **Acciones:**
+  - Alta de nuevos servidores públicos.
+  - Edición de perfiles y reasignación de áreas/roles.
+  - Reseteo seguro de credenciales de acceso.
+
+#### B. Vista 2: Parámetros del Sistema y Reglas de Negocio
+- **Motor Normativo de SLA:**
+  - Límite de Días Hábiles reglamentarios (Parámetro configurable, predeterminado en **6 días**).
+  - Punto de Inicio del Cómputo (Predeterminado: *Recepción física en Presupuesto / `REVISION`*).
+  - Punto de Fin / Muerte del SLA (Predeterminado: *Autorización de Pago en Tesorería / `AUTORIZADO_PAGO`*).
+  - Configuración de umbrales del semáforo: Verde (cumplimiento normal), Ámbar (preventivo de alerta) y Rojo (vencido).
+- **Calendario Laboral de Feriados:**
+  - Registro de feriados nacionales obligatorios y feriados locales/decretos ejecutivos especiales.
+  - Descuento automático en el motor de cálculo de días hábiles.
+- **Parámetros Financieros Generales:**
+  - Umbral monetario para la clasificación automática de **Alta Cuantía** (expedientes prioritarios).
+  - Año fiscal activo para control presupuestario y numeración.
+
+#### C. Vista 3: Catálogos Maestros (Sin Campos Dinámicos)
+- **Eliminación de Campos Dinámicos:** Se prohíbe la creación arbitraria de campos libres en caliente por pantalla para resguardar la integridad del modelo relacional y la consistencia de los reportes. Los expedientes se rigen estrictamente por su naturaleza de proceso.
+- **Catálogos Estandarizados Gestionables:**
+  - **Tipos de Trámite:** Clasificación formal por Categoría Padre (`PAGO` o `GARANTIA`), código institucional, nombre oficial y criticidad.
+  - **Áreas y Departamentos Institucionales:** Mantenimiento de las direcciones y unidades operativas de la DFI.
+  - **Motivos Estandarizados de Observación y Devolución:** Frases y causales reglamentarias predefinidas para agilizar el trabajo de los analistas y homologar la reportería.
+
+#### D. Vista 4: Auditoría Forense y Mantenimiento de Datos
+- **Log de Trazabilidad y Seguridad:**
+  - Visualización cronológica de cada evento registrado en el sistema: fecha/hora exacta, usuario ejecutor, dirección IP, acción ejecutada, trámite afectado y justificación.
+  - Filtros por N° Quipux, Funcionario y Rango de Fechas.
+- **Módulo de Migración Masiva de Datos:**
+  - Herramienta de importación y homologación de la bitácora histórica Excel 2026 hacia la base de datos PostgreSQL, con validación transaccional e inmunidad de SLA.
+
+---
+
+## 11. MATRIZ DE REQUERIMIENTOS CONSOLIDADOS (ESTADO FINAL INTEGRAL)
 
 | Fase / Módulo del Sistema | Estado de Definición | Reglas Principales Incorporadas |
 | :--- | :---: | :--- |
@@ -627,10 +694,12 @@ El análisis técnico del archivo oficial arrojó la existencia de **1.634 trám
 | **3. Control Previo (Presupuesto)** | **100% Definida** | Rectificación plena de datos generales, campos presupuestarios oficiales (Nro/Cód Proceso, ítem, CUR compromiso), visto bueno de Jefa y regla de continuidad de retorno al analista para envío a contabilidad. |
 | **4. Observaciones y Devolución** | **100% Definida** | Observación universal con plazo de 72h y pausa de SLA, subsanación por el mismo usuario, devolución formal con Quipux (`DEVUELTO`), insubsistencia exclusiva de Presupuesto y reversible excepcionalmente. Insubsistentes y devueltos desaparecen del SLA. |
 | **5. Contabilidad** | **100% Definida** | Llegada a Jefatura de Contabilidad, visto bueno formal de jefatura, CUR DEV y CUR CON opcionales, derivación digital a DFI. |
-| **6. Autorización y Tesorería** | **100% Definida** | Directora Financiera autoriza o devuelve. Roles equivalentes de Tesorería y Cobranzas. Registro de Referencia, Número de Hojas (oficial) y Fecha Autorización. **Muerte formal de SLA al autorizar el pago**. Registro posterior de Fecha Pago Efectivo (`PAGADO`). |
+| **6. Autorización y Tesorería** | **100% Definida** | Directora Financiera autoriza o devuelve. Roles equivalentes de Tesorería y Cobranzas. Registro de Referencia, Número de Hojas (oficial) y Fecha Autorización. **Muerte formal de SLA al autorizar el pago**. Prohibición de fechas automáticas; estado `AUTORIZADO_PAGO` vs `PAGADO`. Edición continua en Tesorería. |
 | **7. Cajas y Archivo Central** | **100% Definida** | Cajas creadas, cerradas y con documento emitido en Tesorería/Cobranzas. Archivo no digita: archiva caja completa o la devuelve si hay novedades. Desarchivo con justificación inmutable. |
-| **8. Reportes e Indicadores Unificados** | **100% Definida** | SLA 6 días (desde `REVISION` hasta `AUTORIZADO_PAGO`) vs. Tiempo Global. Indicadores integrados dentro de `/reportes`. Filtros modulares, exportación selectiva a Excel, auditoría desplegable, `/tramites` en solo lectura y superusuario `ADMIN` con facultades universales. |
+| **8. Reportes e Indicadores Unificados** | **100% Definida** | SLA 6 días (desde `REVISION` hasta `AUTORIZADO_PAGO`) vs. Tiempo Global. 3 vistas limpias (Trámites Generales, Tiempos, Desempeño forense). Exportación individual en Excel con filtros activos. |
 | **9. Migración de Bitácoras Legacy** | **100% Definida** | Importación masiva desde Excel 2026 (1.097 Pagos, 537 Garantías, 1.634 totales), mapeo columna por columna, división de memorandos múltiples en referencias y deduplicación por Quipux. |
+| **10. Módulo de Administración y Gobernanza** | **100% Definida** | Rol `ADMIN` no operativo (sin "Mi Escritorio"). 4 vistas maestras (Usuarios, Parámetros SLA/Feriados, Catálogos sin campos dinámicos, Auditoría/Migración). Superusuario Universal con facultades plenas de creación, edición irrestricta, reasignación, observación, insubsistencia, devolución y eliminación controlada. |
+
 
 
 

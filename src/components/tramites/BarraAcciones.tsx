@@ -145,7 +145,7 @@ export const BarraAcciones: React.FC<BarraAccionesProps> = ({
   const isIngresado = estado === "INGRESADO";
   const isRevision = estado === "REVISION" && !tramite.esta_pausado;
   const isRevisado = estado === "REVISADO" && !tramite.esta_pausado;
-  const isFactura = estado === "FACTURA" || Boolean(tramite.esta_pausado);
+  const isFactura = estado === "FACTURA" && !isObservado;
   const isContabilidad = estado === "CONTABILIDAD";
   const isDFI = estado === "DFI";
   const isPagado = estado === "PAGADO";
@@ -490,8 +490,8 @@ export const BarraAcciones: React.FC<BarraAccionesProps> = ({
               </button>
             )}
 
-            {/* 7. EN TESORERIA (Se mantiene en DFI o pasa a PAGADO) */}
-            {tramite.id_area_actual === 4 && (
+            {/* 7. EN TESORERIA O COBRANZAS (Se mantiene en DFI o pasa a PAGADO) */}
+            {(tramite.id_area_actual === 4 || tramite.id_area_actual === 5) && (
               <>
                 {onOpenEditTesoreria && (
                   <button
@@ -499,7 +499,7 @@ export const BarraAcciones: React.FC<BarraAccionesProps> = ({
                     className="px-3.5 py-1.5 text-xs font-bold bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors flex items-center gap-1.5 shadow-xs"
                   >
                     <CreditCard className="w-3.5 h-3.5" />
-                    Registrar Pago
+                    Registrar Pago / Cobranza
                   </button>
                 )}
               </>
@@ -654,3 +654,4 @@ export const BarraAcciones: React.FC<BarraAccionesProps> = ({
     </div>
   );
 };
+

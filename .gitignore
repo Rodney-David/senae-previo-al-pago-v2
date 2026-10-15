@@ -47,6 +47,7 @@ prisma/dev.db-journal
 .DS_Store
 Thumbs.db
 *.zip
+/uploads/
 
 # IDEs
 .idea/

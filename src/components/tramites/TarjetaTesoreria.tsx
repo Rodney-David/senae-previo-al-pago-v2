@@ -27,15 +27,15 @@ export const TarjetaTesoreria: React.FC<TarjetaTesoreriaProps> = ({
   const [fechaPago, setFechaPago] = useState(
     tramite.fecha_pago
       ? new Date(tramite.fecha_pago).toISOString().split("T")[0]
-      : new Date().toISOString().split("T")[0]
+      : ""
   );
   const [numeroHojas, setNumeroHojas] = useState(
-    tramite.numero_hojas ? String(tramite.numero_hojas) : (tramite.fojas_fisicas ? String(tramite.fojas_fisicas) : "1")
+    tramite.numero_hojas ? String(tramite.numero_hojas) : ""
   );
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Modal para asignar a caja física
+  // Modal para asignar a caja fisica
   const [modalCajaOpen, setModalCajaOpen] = useState(false);
   const [cajasAbiertas, setCajasAbiertas] = useState<any[]>([]);
   const [loadingCajas, setLoadingCajas] = useState(false);
@@ -96,10 +96,10 @@ export const TarjetaTesoreria: React.FC<TarjetaTesoreriaProps> = ({
     setFechaPago(
       tramite.fecha_pago
         ? new Date(tramite.fecha_pago).toISOString().split("T")[0]
-        : new Date().toISOString().split("T")[0]
+        : ""
     );
     setNumeroHojas(
-      tramite.numero_hojas ? String(tramite.numero_hojas) : (tramite.fojas_fisicas ? String(tramite.fojas_fisicas) : "1")
+      tramite.numero_hojas ? String(tramite.numero_hojas) : ""
     );
   }, [tramite]);
 
@@ -155,14 +155,14 @@ export const TarjetaTesoreria: React.FC<TarjetaTesoreriaProps> = ({
           accion: "PROGRAMAR_Y_PAGAR_MEF_BCE",
           datos: {
             spi_bce_referencia: spiBce.trim() || null,
-            fecha_autorizacion_pago: fechaAutorizacionPago ? new Date(fechaAutorizacionPago).toISOString() : undefined,
-            fecha_pago: fechaPago ? new Date(fechaPago).toISOString() : undefined,
-            numero_hojas: Number(numeroHojas) || 1,
+            fecha_autorizacion_pago: fechaAutorizacionPago ? new Date(fechaAutorizacionPago).toISOString() : null,
+            fecha_pago: fechaPago ? new Date(fechaPago).toISOString() : null,
+            numero_hojas: numeroHojas ? Number(numeroHojas) : null,
           },
         }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Error al procesar pago en tesorería");
+      if (!res.ok) throw new Error(data.error || "Error al procesar datos en tesorería");
       setIsEditing(false);
       onRefresh();
     } catch (err: any) {
@@ -181,7 +181,7 @@ export const TarjetaTesoreria: React.FC<TarjetaTesoreriaProps> = ({
         <div className="flex items-center gap-2.5">
           <CreditCard className="w-4 h-4 text-blue-400" />
           <h3 className="text-xs font-bold uppercase tracking-wider">
-            ADMINISTRACION DE CAJA
+            ADMINISTRACIÓN DE CAJA / TESORERÍA Y COBRANZAS
           </h3>
           <ChevronDown
             className={`w-4 h-4 text-slate-400 transition-transform duration-200 ${
@@ -194,14 +194,18 @@ export const TarjetaTesoreria: React.FC<TarjetaTesoreriaProps> = ({
             <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
               <CheckCircle2 className="w-3 h-3" /> Pago Confirmado
             </span>
+          ) : tramite.fecha_autorizacion_pago || tramite.autorizado_pago || tramite.estado_general === "AUTORIZADO_PAGO" ? (
+            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-500/20 text-blue-300 border border-blue-500/30">
+              <CheckCircle2 className="w-3 h-3" /> Autorizado para Pago (Fin SLA)
+            </span>
           ) : (
             <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium bg-amber-500/20 text-amber-300 border border-amber-500/30">
-              <AlertCircle className="w-3.5 h-3.5" /> Pendiente de Transferencia
+              <AlertCircle className="w-3.5 h-3.5" /> Pendiente de Autorización / Pago
             </span>
           )}
 
-          {/* Si NO está pagado: mostrar botón para Registrar Pago */}
-          {!(tramite.fecha_pago || tramite.estado_general === "PAGADO") && canEdit && !isEditing && (
+          {/* Botón para Editar Datos de Tesorería y Cobranzas (Siempre accesible para Tesorería/Cobranzas/Admin) */}
+          {canEdit && !isEditing && (
             <button
               onClick={() => {
                 setIsOpen(true);
@@ -209,7 +213,7 @@ export const TarjetaTesoreria: React.FC<TarjetaTesoreriaProps> = ({
               }}
               className="px-2.5 py-1 text-xs font-medium bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-md border border-slate-700 flex items-center gap-1 transition-colors"
             >
-              <Edit3 className="w-3 h-3" /> Registrar Pago
+              <Edit3 className="w-3 h-3" /> {tramite.fecha_pago || tramite.estado_general === "PAGADO" || tramite.fecha_autorizacion_pago ? "Editar Datos Pago/Cobranzas" : "Registrar Datos Pago/Cobranzas"}
             </button>
           )}
 
@@ -263,7 +267,7 @@ export const TarjetaTesoreria: React.FC<TarjetaTesoreriaProps> = ({
 
                 <div>
                   <label className="block text-xs font-semibold text-slate-700 mb-1">
-                    Número de Hojas *
+                    Número de Hojas <span className="text-slate-400 font-normal">(Conteo físico)</span>
                   </label>
                   <input
                     type="number"
@@ -271,14 +275,13 @@ export const TarjetaTesoreria: React.FC<TarjetaTesoreriaProps> = ({
                     value={numeroHojas}
                     onChange={(e) => setNumeroHojas(e.target.value)}
                     placeholder="ej. 35"
-                    required
                     className="w-full text-xs bg-white border border-slate-300 rounded-lg p-2.5 font-mono focus:ring-2 focus:ring-blue-500 focus:outline-none font-bold"
                   />
                 </div>
 
                 <div>
                   <label className="block text-xs font-semibold text-slate-700 mb-1">
-                    Fecha Autorización de Pago
+                    Fecha Autorización de Pago <span className="text-slate-400 font-normal">(Fin SLA)</span>
                   </label>
                   <input
                     type="date"
@@ -290,7 +293,7 @@ export const TarjetaTesoreria: React.FC<TarjetaTesoreriaProps> = ({
 
                 <div>
                   <label className="block text-xs font-semibold text-slate-700 mb-1">
-                    Fecha Pago Efectivo
+                    Fecha Pago Efectivo <span className="text-slate-400 font-normal">(BCE / Transferencia)</span>
                   </label>
                   <input
                     type="date"
@@ -313,9 +316,9 @@ export const TarjetaTesoreria: React.FC<TarjetaTesoreriaProps> = ({
                 <button
                   type="submit"
                   disabled={loading}
-                  className="px-4 py-1.5 text-xs font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors shadow-xs"
+                  className="px-4 py-1.5 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors shadow-xs"
                 >
-                  {loading ? "Confirmando..." : "Confirmar Pago (Pasa a Custodia de Adm. Caja)"}
+                  {loading ? "Guardando..." : "Guardar Cambios de Tesorería / Cobranzas"}
                 </button>
               </div>
             </form>
@@ -335,7 +338,7 @@ export const TarjetaTesoreria: React.FC<TarjetaTesoreriaProps> = ({
                   Número de Hojas:
                 </span>
                 <span className="text-xs font-bold text-slate-900 font-mono">
-                  {tramite.numero_hojas || tramite.fojas_fisicas || 1} hojas
+                  {tramite.numero_hojas ? `${tramite.numero_hojas} hojas` : "Sin registrar"}
                 </span>
               </div>
 
@@ -386,7 +389,7 @@ export const TarjetaTesoreria: React.FC<TarjetaTesoreriaProps> = ({
                   Beneficiario: {tramite.proveedor_beneficiario}
                 </div>
                 <div className="text-[11px] text-blue-700">
-                  Hojas: {tramite.numero_hojas || tramite.fojas_fisicas || 1} fojas
+                  Hojas: {tramite.numero_hojas || "Pendiente"}
                 </div>
               </div>
 
@@ -452,7 +455,7 @@ export const TarjetaTesoreria: React.FC<TarjetaTesoreriaProps> = ({
                     type="button"
                     onClick={() => setModalCajaOpen(false)}
                     disabled={guardandoEnCaja}
-                    className="px-3.5 py-1.5 text-xs font-medium text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors"
+                    className="px-3.5 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
                   >
                     Cancelar
                   </button>
@@ -462,7 +465,8 @@ export const TarjetaTesoreria: React.FC<TarjetaTesoreriaProps> = ({
                     disabled={guardandoEnCaja || !selectedCajaId}
                     className="px-4 py-1.5 text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors shadow-xs flex items-center gap-1.5 disabled:opacity-50"
                   >
-                    {guardandoEnCaja ? "Asignando..." : "Guardar en Caja"}
+                    <PackagePlus className="w-3.5 h-3.5" />
+                    {guardandoEnCaja ? "Asignando..." : "Confirmar Asignación a Caja"}
                   </button>
                 </div>
               )}

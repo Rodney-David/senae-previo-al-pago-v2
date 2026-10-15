@@ -592,7 +592,6 @@ async function main() {
         comprobante_pago: fechaPago ? `COMP-SPI-2026-${String(5000 + i)}` : null,
         spi_bce_referencia: fechaPago ? `SPI-BCE-2026-${String(90000 + i)}` : null,
         lote_mef: fechaPago ? "LOTE-MEF-2026-084" : null,
-        fojas_fisicas: fojas,
         numero_hojas: fojas,
         id_area_actual: idAreaActual,
         id_custodio_actual: idCustodioActual,

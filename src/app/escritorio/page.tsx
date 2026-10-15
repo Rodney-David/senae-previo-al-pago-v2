@@ -19,6 +19,7 @@ import {
   CheckCircle2,
   Filter,
   Package,
+  User,
 } from "lucide-react";
 
 export default function EscritorioPage() {
@@ -63,7 +64,13 @@ export default function EscritorioPage() {
       try {
         const res = await fetch("/api/auth/session");
         const data = await res.json();
-        if (data.user) setCurrentUser(data.user);
+        if (data.user) {
+          setCurrentUser(data.user);
+          if (data.user.rol === "ADMIN" || data.user.rol === "ADMINISTRADOR") {
+            router.replace("/tramites");
+            return;
+          }
+        }
       } catch (err) {
         console.error(err);
       }
@@ -180,6 +187,18 @@ export default function EscritorioPage() {
       setDeliveringBatch(false);
     }
   };
+
+  const isJefeOrAdmin = useMemo(() => {
+    if (!currentUser) return false;
+    const rol = (currentUser.rol || "").toUpperCase();
+    return (
+      rol === "JEFE" ||
+      rol === "DIRECTORA" ||
+      rol === "DIRECTORA_FINANCIERA" ||
+      rol === "ADMIN" ||
+      rol === "ADMINISTRADOR"
+    );
+  }, [currentUser]);
 
   const isDFIOrAdmin = useMemo(() => {
     if (!currentUser) return false;
@@ -459,6 +478,7 @@ export default function EscritorioPage() {
       {/* Tabs & Search */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div className="flex flex-wrap p-1 bg-slate-200/80 rounded-lg border border-slate-300 text-xs font-medium self-start gap-1">
+          {/* 1. En Mi Escritorio: únicamente lo que tengo físicamente en mi poder */}
           <button
             onClick={() => {
               setActiveTab("escritorio");
@@ -469,10 +489,12 @@ export default function EscritorioPage() {
                 ? "bg-white text-blue-900 shadow-xs font-bold"
                 : "text-slate-600 hover:text-slate-900"
             }`}
+            title="Trámites que están bajo su custodia física directa en este momento"
           >
             En Mi Escritorio
           </button>
 
+          {/* 2. Reasignados / Derivados: trámites en mi misma área en custodia de otros compañeros */}
           <button
             onClick={() => {
               setActiveTab("reasignados");
@@ -483,38 +505,12 @@ export default function EscritorioPage() {
                 ? "bg-white text-blue-900 shadow-xs font-bold"
                 : "text-slate-600 hover:text-slate-900"
             }`}
+            title="Trámites de su área reasignados o derivados a otros funcionarios del equipo"
           >
             Reasignados
           </button>
 
-          <button
-            onClick={() => {
-              setActiveTab("aprobacion");
-              setSelectedIds([]);
-            }}
-            className={`px-3 py-1.5 rounded-md transition-all ${
-              activeTab === "aprobacion"
-                ? "bg-white text-blue-900 shadow-xs font-bold"
-                : "text-slate-600 hover:text-slate-900"
-            }`}
-          >
-            En Aprobación
-          </button>
-
-          <button
-            onClick={() => {
-              setActiveTab("observados");
-              setSelectedIds([]);
-            }}
-            className={`px-3 py-1.5 rounded-md transition-all ${
-              activeTab === "observados"
-                ? "bg-white text-amber-900 shadow-xs font-bold"
-                : "text-slate-600 hover:text-slate-900"
-            }`}
-          >
-            Observados
-          </button>
-
+          {/* 3. Todos: la totalidad de trámites activos en el área */}
           <button
             onClick={() => {
               setActiveTab("todos_area");
@@ -525,10 +521,46 @@ export default function EscritorioPage() {
                 ? "bg-white text-blue-900 shadow-xs font-bold"
                 : "text-slate-600 hover:text-slate-900"
             }`}
+            title="Totalidad de expedientes activos dentro de su departamento"
           >
             Todos del Área
           </button>
 
+          {/* 4. En Aprobación: SOLO para Jefaturas, Directora y Admin */}
+          {isJefeOrAdmin && (
+            <button
+              onClick={() => {
+                setActiveTab("aprobacion");
+                setSelectedIds([]);
+              }}
+              className={`px-3 py-1.5 rounded-md transition-all ${
+                activeTab === "aprobacion"
+                  ? "bg-white text-blue-900 shadow-xs font-bold"
+                  : "text-slate-600 hover:text-slate-900"
+              }`}
+              title="Expedientes pendientes de visto bueno formal de jefatura"
+            >
+              En Aprobación
+            </button>
+          )}
+
+          {/* 5. Observados: trámites con novedad u observación activa en el área */}
+          <button
+            onClick={() => {
+              setActiveTab("observados");
+              setSelectedIds([]);
+            }}
+            className={`px-3 py-1.5 rounded-md transition-all ${
+              activeTab === "observados"
+                ? "bg-white text-amber-900 shadow-xs font-bold"
+                : "text-slate-600 hover:text-slate-900"
+            }`}
+            title="Trámites observados en seguimiento o subsanación (72h)"
+          >
+            Observados
+          </button>
+
+          {/* 6. Por Entregar: SOLO para Secretaría DFI y Admin */}
           {isDFIOrAdmin && (
             <button
               onClick={() => {
@@ -540,11 +572,13 @@ export default function EscritorioPage() {
                   ? "bg-white text-blue-900 shadow-xs font-bold"
                   : "text-slate-600 hover:text-slate-900"
               }`}
+              title="Expedientes ingresados en ventanilla listos para despachar a Control Previo"
             >
               Por Entregar
             </button>
           )}
 
+          {/* 7. En Caja: SOLO para Tesorería, Adm. Caja, Archivo o Admin */}
           {canManageCajas && (
             <button
               onClick={() => {
@@ -556,6 +590,7 @@ export default function EscritorioPage() {
                   ? "bg-white text-blue-900 shadow-xs font-bold"
                   : "text-slate-600 hover:text-slate-900"
               }`}
+              title="Expedientes pagados o en proceso de almacenamiento en cajas"
             >
               En Caja
             </button>
@@ -613,6 +648,7 @@ export default function EscritorioPage() {
                 <th className="py-3 px-4 text-left whitespace-nowrap">GESTIÓN</th>
                 <th className="py-3 px-4 text-left w-64 min-w-[210px]">BENEFICIARIO / RUC</th>
                 <th className="py-3 px-4 text-left w-56 min-w-[190px]">TIPO DE PROCESO</th>
+                <th className="py-3 px-4 text-left w-48 min-w-[160px]">FUNCIONARIO</th>
                 <th className="py-3 px-4 text-center w-32 min-w-[120px]">SUBTOTAL / NETO</th>
                 <th className="py-3 px-3 text-center w-28 min-w-[100px]">TIEMPO SLA</th>
                 <th className="py-3 px-4 text-center w-48 min-w-[160px]">ESTADO</th>
@@ -700,6 +736,22 @@ export default function EscritorioPage() {
                       >
                         {t.tipos_tramite?.nombre || "CONTRATACIÓN"}
                       </div>
+                    </td>
+
+                    {/* Funcionario (Custodio Actual del Trámite) */}
+                    <td className="py-3.5 px-4 align-middle whitespace-nowrap">
+                      <div
+                        className="font-bold text-slate-800 text-[11px] truncate uppercase flex items-center gap-1.5"
+                        title={t.usuarios?.nombre_completo || "Sin Asignar"}
+                      >
+                        <User className="w-3.5 h-3.5 text-blue-600 shrink-0" />
+                        <span className="truncate">{t.usuarios?.nombre_completo || "Sin Asignar"}</span>
+                      </div>
+                      {t.usuarios?.cargo && (
+                        <div className="text-[10px] text-slate-400 font-medium truncate uppercase pl-5">
+                          {t.usuarios.cargo}
+                        </div>
+                      )}
                     </td>
 
                     {/* Subtotal / Monto Total */}

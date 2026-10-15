@@ -270,6 +270,92 @@ export default function LoginPage() {
               )}
             </button>
           </form>
+
+          {/* Acceso Rápido por Perfil Institucional (Para pruebas y alternancia de roles) */}
+          <div className="pt-3 border-t border-slate-100">
+            <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-2 text-center">
+              Perfiles Institucionales para Pruebas (Clic para autocompletar)
+            </span>
+            <div className="grid grid-cols-2 gap-1.5 text-[11px]">
+              <button
+                type="button"
+                onClick={() => {
+                  setEmailOrUser("tecnico.cobranzas@aduana.gob.ec");
+                  setPassword("senae2026");
+                }}
+                className="p-1.5 text-left rounded-lg bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 transition-colors text-emerald-950 flex flex-col cursor-pointer"
+                title="Técnico de Cobranzas y Garantías (Abg. Roberto Intriago)"
+              >
+                <span className="font-bold text-[10px] uppercase text-emerald-700">Cobranzas</span>
+                <span className="font-medium truncate">Abg. Roberto Intriago</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setEmailOrUser("tesorero.general@aduana.gob.ec");
+                  setPassword("senae2026");
+                }}
+                className="p-1.5 text-left rounded-lg bg-blue-50 hover:bg-blue-100 border border-blue-200 transition-colors text-blue-950 flex flex-col cursor-pointer"
+                title="Tesorero General (Econ. Margarita Alarcón)"
+              >
+                <span className="font-bold text-[10px] uppercase text-blue-700">Tesorería</span>
+                <span className="font-medium truncate">Econ. Margarita Alarcón</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setEmailOrUser("custodio.archivo@aduana.gob.ec");
+                  setPassword("senae2026");
+                }}
+                className="p-1.5 text-left rounded-lg bg-slate-100 hover:bg-slate-200 border border-slate-300 transition-colors text-slate-800 flex flex-col cursor-pointer"
+                title="Custodio de Archivo Contable (Sr. Manuel Ramos)"
+              >
+                <span className="font-bold text-[10px] uppercase text-slate-600">Archivo</span>
+                <span className="font-medium truncate">Sr. Manuel Ramos</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setEmailOrUser("directora.dfi@aduana.gob.ec");
+                  setPassword("senae2026");
+                }}
+                className="p-1.5 text-left rounded-lg bg-purple-50 hover:bg-purple-100 border border-purple-200 transition-colors text-purple-950 flex flex-col cursor-pointer"
+                title="Directora Financiera (Dra. Patricia Morales)"
+              >
+                <span className="font-bold text-[10px] uppercase text-purple-700">Directora DFI</span>
+                <span className="font-medium truncate">Dra. Patricia Morales</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setEmailOrUser("jefe.presupuesto@aduana.gob.ec");
+                  setPassword("senae2026");
+                }}
+                className="p-1.5 text-left rounded-lg bg-slate-100 hover:bg-slate-200 border border-slate-300 transition-colors text-slate-800 flex flex-col cursor-pointer"
+                title="Jefe de Presupuesto (Ing. Carlos Mendoza)"
+              >
+                <span className="font-bold text-[10px] uppercase text-slate-600">Presupuesto</span>
+                <span className="font-medium truncate">Ing. Carlos Mendoza</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setEmailOrUser("admin@aduana.gob.ec");
+                  setPassword("senae2026");
+                }}
+                className="p-1.5 text-left rounded-lg bg-slate-900 text-white hover:bg-slate-800 transition-colors flex flex-col cursor-pointer"
+                title="Administrador General del Sistema"
+              >
+                <span className="font-bold text-[10px] uppercase text-blue-400">Admin General</span>
+                <span className="font-medium truncate">Superusuario Admin</span>
+              </button>
+            </div>
+          </div>
         </div>
 
         {/* Footer */}

@@ -52,7 +52,6 @@ export async function GET(request: NextRequest) {
             asunto: true,
             monto_total: true,
             numero_hojas: true,
-            fojas_fisicas: true,
             numero_cur_devengado: true,
             numero_cur_contable: true,
             numero_cur_compromiso: true,
@@ -69,7 +68,7 @@ export async function GET(request: NextRequest) {
     const cajasFormateadas = cajas.map((c) => {
       const totalTramites = c.tramites.length;
       const totalHojas = c.tramites.reduce(
-        (acc, t) => acc + (t.numero_hojas || t.fojas_fisicas || 1),
+        (acc, t) => acc + (t.numero_hojas || 0),
         0
       );
       const totalMonto = c.tramites.reduce(
@@ -103,12 +102,21 @@ export async function POST(request: NextRequest) {
     }
 
     const userRole = (currentUser.rol || "").toUpperCase();
+    const userCargo = (currentUser.cargo || "").toUpperCase();
     const isAdminOrDFI = currentUser.id_area === 1 || userRole === "ADMIN" || userRole === "DIRECTORA";
-    const isAdmCaja = currentUser.id_area === 4 || userRole.includes("TESOR") || userRole.includes("CAJA") || isAdminOrDFI;
+    const isAdmCaja =
+      currentUser.id_area === 4 ||
+      currentUser.id_area === 5 ||
+      userRole.includes("TESOR") ||
+      userRole.includes("COBRANZA") ||
+      userRole.includes("CAJA") ||
+      userCargo.includes("COBRANZA") ||
+      userCargo.includes("TESOR") ||
+      isAdminOrDFI;
 
     if (!isAdmCaja) {
       return NextResponse.json(
-        { error: "La creación de cajas físicas es una función exclusiva de Administración de Caja." },
+        { error: "La creación de cajas físicas es una función exclusiva de Administración de Caja / Tesorería y Cobranzas." },
         { status: 403 }
       );
     }

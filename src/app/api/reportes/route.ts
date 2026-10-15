@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { getSLAConfig } from "@/lib/slaCalculator";
 
 export const dynamic = "force-dynamic";
 
@@ -38,6 +39,9 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const fechaDesdeParam = searchParams.get("fecha_desde");
     const fechaHastaParam = searchParams.get("fecha_hasta");
+
+    const slaConfig = await getSLAConfig();
+    const SLA_LIMITE = slaConfig.limite_dias || 6;
 
     // Rango de fechas por defecto: últimos 60 días
     const now = new Date();
@@ -140,25 +144,53 @@ export async function GET(request: NextRequest) {
         totalEnProceso++;
       }
 
-      // Cálculo de días hábiles consumidos
-      const fInicio = t.fecha_recepcion_fisica || t.fecha_ingreso || now;
-      const fFin = estado === "PAGADO" && t.fecha_pago ? t.fecha_pago : now;
+      // Cálculo de días hábiles consumidos según configuración SLA
+      let fInicio = t.fecha_ingreso || now;
+      if (slaConfig.punto_inicio === "RECEPCION_PRESUPUESTO") {
+        fInicio = t.fecha_recepcion_fisica || t.fecha_entrega_control_previo || t.fecha_ingreso || now;
+      } else if (slaConfig.punto_inicio === "ENTREGA_CONTROL_PREVIO") {
+        fInicio = t.fecha_entrega_control_previo || t.fecha_ingreso || now;
+      }
 
-      let diasHabilesNetos = calcularDiasHabilesRango(
-        new Date(fInicio),
-        new Date(fFin),
-        feriadosSet
-      );
+      let fFin = now;
+      if (slaConfig.punto_fin === "PAGO_EFECTIVO") {
+        fFin = estado === "PAGADO" && t.fecha_pago ? t.fecha_pago : now;
+      } else {
+        // AUTORIZACION_PAGO (default SENAE)
+        const isAuthOrAfter =
+          Boolean(t.autorizado_pago) ||
+          Boolean(t.fecha_autorizacion_pago) ||
+          ["AUTORIZADO_PAGO", "PAGADO", "CAJA", "ARCHIVO", "FINALIZADO_ARCHIVADO"].includes(estado);
+        fFin = isAuthOrAfter
+          ? t.fecha_autorizacion_pago || t.fecha_pago || now
+          : now;
+      }
 
-      // Descontar días de pausa acumulados (factura SRI)
+      const esExento =
+        estado === "INSUBSISTENTE" || estado === "DEVUELTO" || Boolean(t.es_devuelto);
+
+      let diasHabilesNetos = 0;
+      if (!esExento && !(estado === "INGRESADO" && slaConfig.punto_inicio === "RECEPCION_PRESUPUESTO")) {
+        diasHabilesNetos = calcularDiasHabilesRango(
+          new Date(fInicio),
+          new Date(fFin),
+          feriadosSet
+        );
+      }
+
+      // Descontar días de pausa acumulados (factura SRI / observaciones)
       const diasPausa = t.dias_pausa_acumulados || 0;
       const diasEfectivos = Math.max(0, diasHabilesNetos - diasPausa);
 
-      // Semáforo SLA (norma 6 días hábiles)
+      // Semáforo SLA dinámico
       let alerta = "VERDE";
-      if (diasEfectivos > 6) {
+      if (esExento) {
+        alerta = "EXENTO";
+      } else if (estado === "INGRESADO" && slaConfig.punto_inicio === "RECEPCION_PRESUPUESTO") {
+        alerta = "PENDIENTE";
+      } else if (diasEfectivos > SLA_LIMITE) {
         alerta = "ROJO"; // Vencido
-      } else if (diasEfectivos >= 5) {
+      } else if (diasEfectivos >= Math.ceil(SLA_LIMITE * 0.7)) {
         alerta = "AMBAR"; // Riesgo
       }
 
@@ -180,7 +212,7 @@ export async function GET(request: NextRequest) {
         mapaCustodios[cId].total_tramites++;
         if (alerta === "ROJO") mapaCustodios[cId].vencidos++;
         else if (alerta === "AMBAR") mapaCustodios[cId].en_riesgo++;
-        else mapaCustodios[cId].en_plazo++;
+        else if (alerta === "VERDE") mapaCustodios[cId].en_plazo++;
       }
 
       // Agrupar por Área
@@ -202,6 +234,9 @@ export async function GET(request: NextRequest) {
 
       return {
         id_tramite: t.id_tramite,
+        id_area_actual: t.id_area_actual,
+        id_custodio_actual: t.id_custodio_actual,
+        id_tipo_tramite: t.id_tipo_tramite,
         numero_tramite: t.numero_quipux,
         numero_quipux: t.numero_quipux,
         proveedor_nombre: t.proveedor_beneficiario || "No especificado",
@@ -833,12 +868,27 @@ export async function GET(request: NextRequest) {
       (a, b) => b.total_tramites_actuales - a.total_tramites_actuales
     );
 
+    const [areasCatalogo, usuariosCatalogo] = await Promise.all([
+      prisma.areas.findMany({
+        select: { id_area: true, nombre: true, codigo: true },
+        orderBy: { id_area: "asc" },
+      }),
+      prisma.usuarios.findMany({
+        where: { activo: true },
+        select: { id_usuario: true, nombre_completo: true, cargo: true, id_area: true },
+        orderBy: { nombre_completo: "asc" },
+      }),
+    ]);
+
     return NextResponse.json({
       success: true,
       rango: {
         fecha_desde: fechaDesde.toISOString().split("T")[0],
         fecha_hasta: fechaHasta.toISOString().split("T")[0],
       },
+      catalogo_areas: areasCatalogo,
+      catalogo_usuarios: usuariosCatalogo,
+      sla_config: slaConfig,
       reporte_ingresos_custodia: {
         resumen: {
           total_ingresados: totalIngresados,

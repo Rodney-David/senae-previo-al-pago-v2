@@ -53,6 +53,12 @@ export default function CajasPage() {
   const [motivoDevolucion, setMotivoDevolucion] = useState("");
   const [devolviendoCaja, setDevolviendoCaja] = useState(false);
 
+  // Modal para desarchivar caja (Custodio de Archivo / Admin)
+  const [modalDesarchivarCajaOpen, setModalDesarchivarCajaOpen] = useState(false);
+  const [cajaADesarchivar, setCajaADesarchivar] = useState<CajaDTO | null>(null);
+  const [motivoDesarchivo, setMotivoDesarchivo] = useState("");
+  const [desarchivandoCaja, setDesarchivandoCaja] = useState(false);
+
   // Modal para agregar trámites pagados a la caja
   const [modalAgregarTramitesOpen, setModalAgregarTramitesOpen] = useState(false);
   const [tramitesPagadosDisponibles, setTramitesPagadosDisponibles] = useState<TramiteCompletoDTO[]>([]);
@@ -84,14 +90,18 @@ export default function CajasPage() {
           const area = data.user.id_area;
           const allowed =
             area === 4 ||
+            area === 5 ||
             area === 6 ||
             rol === "ADMIN" ||
             rol === "ADMINISTRADOR" ||
             rol.includes("CAJA") ||
             rol.includes("TESOR") ||
+            rol.includes("COBRANZA") ||
             rol.includes("ARCHIVO") ||
             rol.includes("CUSTODIO") ||
             cargo.includes("CAJA") ||
+            cargo.includes("COBRANZA") ||
+            cargo.includes("TESOR") ||
             cargo.includes("ARCHIVO") ||
             cargo.includes("CUSTODIO");
           if (!allowed) {
@@ -260,7 +270,16 @@ export default function CajasPage() {
   const userRole = (currentUser?.rol || "").toUpperCase();
   const userCargo = (currentUser?.cargo || "").toUpperCase();
   const isAdmin = userRole === "ADMIN" || userRole === "ADMINISTRADOR";
-  const isAdmCaja = userArea === 4 || userRole.includes("TESOR") || userRole.includes("CAJA") || userCargo.includes("CAJA") || isAdmin;
+  const isAdmCaja =
+    userArea === 4 ||
+    userArea === 5 ||
+    userRole.includes("TESOR") ||
+    userRole.includes("COBRANZA") ||
+    userRole.includes("CAJA") ||
+    userCargo.includes("COBRANZA") ||
+    userCargo.includes("TESOR") ||
+    userCargo.includes("CAJA") ||
+    isAdmin;
   const isCustodio = userArea === 6 || userRole.includes("ARCHIVO") || userRole.includes("CUSTODIO") || userCargo.includes("ARCHIVO") || userCargo.includes("CUSTODIO") || isAdmin;
   const isCustodioOnly = (userArea === 6 || userRole.includes("ARCHIVO") || userRole.includes("CUSTODIO") || userCargo.includes("ARCHIVO") || userCargo.includes("CUSTODIO")) && !isAdmin && !isAdmCaja;
 
@@ -377,6 +396,39 @@ export default function CajasPage() {
       }
     } catch (err: any) {
       setErrorMsg(err.message);
+    }
+  };
+
+  // Confirmar desarchivo de caja completa (Custodio de Archivo / Admin)
+  const handleConfirmarDesarchivo = async () => {
+    if (!cajaADesarchivar || !motivoDesarchivo.trim()) {
+      setErrorMsg("La justificación para desarchivar la caja es obligatoria.");
+      return;
+    }
+    setDesarchivandoCaja(true);
+    setErrorMsg(null);
+    try {
+      const res = await fetch(`/api/cajas/${cajaADesarchivar.id_caja}/estado`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          accion: "DESARCHIVAR",
+          motivo_desarchivo: motivoDesarchivo.trim(),
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Error al desarchivar la caja");
+
+      setSuccessMsg(data.message || `Caja "${cajaADesarchivar.codigo_caja}" desarchivada exitosamente.`);
+      setModalDesarchivarCajaOpen(false);
+      fetchCajas();
+      if (selectedCaja?.id_caja === cajaADesarchivar.id_caja) {
+        fetchCajaDetail(cajaADesarchivar.id_caja);
+      }
+    } catch (err: any) {
+      setErrorMsg(err.message);
+    } finally {
+      setDesarchivandoCaja(false);
     }
   };
 
@@ -802,6 +854,21 @@ export default function CajasPage() {
                         </button>
                       </>
                     )}
+
+                    {/* Acciones Custodio en caja ARCHIVADA */}
+                    {c.estado === "ARCHIVADA" && (isCustodio || isAdmin) && (
+                      <button
+                        onClick={() => {
+                          setCajaADesarchivar(c);
+                          setMotivoDesarchivo("");
+                          setModalDesarchivarCajaOpen(true);
+                        }}
+                        className="px-2 py-1 text-xs font-bold text-amber-800 bg-amber-100 hover:bg-amber-200 rounded-lg transition-colors border border-amber-300 flex items-center gap-1 shadow-2xs"
+                        title="Desarchivar caja completa con justificación"
+                      >
+                        <FolderOpen className="w-3.5 h-3.5" /> Desarchivar
+                      </button>
+                    )}
                   </div>
                 </div>
               </div>
@@ -912,6 +979,20 @@ export default function CajasPage() {
                   </>
                 )}
 
+                {/* Acciones Custodio en ARCHIVADA */}
+                {selectedCaja.estado === "ARCHIVADA" && (isCustodio || isAdmin) && (
+                  <button
+                    onClick={() => {
+                      setCajaADesarchivar(selectedCaja);
+                      setMotivoDesarchivo("");
+                      setModalDesarchivarCajaOpen(true);
+                    }}
+                    className="px-3 py-1.5 text-xs font-bold text-amber-800 bg-amber-100 hover:bg-amber-200 border border-amber-300 rounded-lg transition-colors shadow-2xs flex items-center gap-1.5"
+                  >
+                    <FolderOpen className="w-3.5 h-3.5" /> Desarchivar Caja
+                  </button>
+                )}
+
                 {/* Acciones Custodio en ENVIADA */}
                 {selectedCaja.estado === "ENVIADA" && (isCustodio || isAdmin) && (
                   <>
@@ -1010,7 +1091,7 @@ export default function CajasPage() {
                               {curDisplay}
                             </td>
                             <td className="py-3 px-3 text-center font-mono font-bold text-slate-900">
-                              {t.numero_hojas || t.fojas_fisicas || 1}
+                              {t.numero_hojas ?? "-"}
                             </td>
                             <td className="py-3 px-3">
                               <div className="font-semibold text-slate-800 uppercase line-clamp-1">
@@ -1316,7 +1397,7 @@ export default function CajasPage() {
                             )}
                           </td>
                           <td className="py-2.5 px-3 text-center font-mono font-bold text-slate-800">
-                            {t.numero_hojas || t.fojas_fisicas || 1}
+                            {t.numero_hojas ?? "-"}
                           </td>
                           <td className="py-2.5 px-3 text-right font-mono font-bold text-slate-900 whitespace-nowrap">
                             {formatCurrency(t.monto_total || 0)}
@@ -1463,7 +1544,7 @@ export default function CajasPage() {
                               {curDisplay}
                             </td>
                             <td className="border border-slate-900 py-3.5 px-2 text-center">
-                              {t.numero_hojas || t.fojas_fisicas || 1}
+                              {t.numero_hojas ?? "-"}
                             </td>
                             <td className="border border-slate-900 py-3.5 px-3.5 text-left leading-relaxed">
                               <span className="font-semibold text-slate-900">{t.proveedor_beneficiario}</span>

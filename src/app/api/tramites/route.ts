@@ -41,32 +41,32 @@ export async function GET(request: NextRequest) {
       const userArea = currentUser.id_area;
 
       if (tipo === "escritorio") {
-        // En Mi Escritorio: trámites asignados a mi persona como custodio activo
-        if (userRole === "ADMIN" || userRole === "ADMINISTRADOR") {
-          conditions.push({
-            NOT: {
-              estado_general: { in: ["ARCHIVO", "FINALIZADO_ARCHIVADO", "ANULADO"] },
-            },
-          });
-        } else {
-          conditions.push({
-            id_custodio_actual: currentUser.id_usuario,
-            NOT: {
-              estado_general: { in: ["ARCHIVO", "FINALIZADO_ARCHIVADO", "ANULADO"] },
-            },
-          });
-        }
+        // En Mi Escritorio: estrictamente los trámites que tengo físicamente bajo mi custodia personal
+        conditions.push({
+          id_custodio_actual: currentUser.id_usuario,
+          NOT: {
+            estado_general: { in: ["ARCHIVO", "FINALIZADO_ARCHIVADO", "ANULADO"] },
+          },
+        });
       } else if (tipo === "reasignados") {
-        // Trámites reasignados por jefatura dentro del área
+        // Reasignados / Derivados: trámites dentro de mi misma área que están en manos de otros funcionarios de mi área
         conditions.push({
           id_area_actual: userArea,
-          sub_estado: { contains: "ASIGNADO_A_" },
+          id_custodio_actual: { not: currentUser.id_usuario },
+          NOT: {
+            estado_general: { in: ["ARCHIVO", "FINALIZADO_ARCHIVADO", "ANULADO"] },
+          },
+        });
+      } else if (tipo === "todos_area" || tipo === "area") {
+        // Todos: la totalidad de los trámites activos que pertenecen a mi área institucional
+        conditions.push({
+          id_area_actual: userArea,
           NOT: {
             estado_general: { in: ["ARCHIVO", "FINALIZADO_ARCHIVADO", "ANULADO"] },
           },
         });
       } else if (tipo === "aprobacion") {
-        // Trámites enviados a jefatura para revisión / visto bueno
+        // En Aprobación: trámites enviados a jefatura para visto bueno / revisión de jefatura
         conditions.push({
           id_area_actual: userArea,
           sub_estado: "PENDIENTE_VISTO_BUENO_JEFE",
@@ -75,7 +75,7 @@ export async function GET(request: NextRequest) {
           },
         });
       } else if (tipo === "observados") {
-        // Trámites observados o pausados en el área del usuario
+        // Observados: trámites con novedad u observación activa en mi área
         conditions.push({
           id_area_actual: userArea,
           OR: [
@@ -83,14 +83,6 @@ export async function GET(request: NextRequest) {
             { estado_general: "OBSERVADO_72H" },
             { esta_pausado: true },
           ],
-        });
-      } else if (tipo === "todos_area" || tipo === "area") {
-        // Todos los trámites activos que están actualmente en el área del usuario
-        conditions.push({
-          id_area_actual: userArea,
-          NOT: {
-            estado_general: { in: ["ARCHIVO", "FINALIZADO_ARCHIVADO", "ANULADO"] },
-          },
         });
       } else if (tipo === "ingresados") {
         // Exclusivo para DFI / Secretaría: trámites en estado INGRESADO para despacho por lote
