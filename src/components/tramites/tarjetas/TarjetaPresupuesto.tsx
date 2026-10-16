@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { TramiteCompletoDTO, UsuarioInstitucional } from "@/types";
 import { formatDate } from "@/lib/utils";
-import { PieChart, CheckCircle2, AlertCircle, Edit3, Plus, Trash2, Tag, FileText, ChevronDown, Receipt } from "lucide-react";
+import { PieChart, CheckCircle2, AlertCircle, Edit3, Plus, Trash2, Tag, FileText, ChevronDown, Receipt, Send } from "lucide-react";
 import { SearchableSelect, OptionItem } from "@/components/ui";
 
 interface TarjetaPresupuestoProps {
@@ -211,7 +211,7 @@ export const TarjetaPresupuesto: React.FC<TarjetaPresupuestoProps> = ({
     setIsEditing(true);
   };
 
-  const handleSave = async (e: React.FormEvent) => {
+  const handleSave = async (e: React.FormEvent, enviarJefe: boolean = false) => {
     e.preventDefault();
     setLoading(true);
     setError(null);
@@ -240,11 +240,12 @@ export const TarjetaPresupuesto: React.FC<TarjetaPresupuestoProps> = ({
       curCompromisoClean.length === 0 ? null : curCompromisoClean.join(", ");
 
     try {
+      const accion = enviarJefe ? "ENVIAR_A_JEFATURA_PRESUPUESTO" : "GUARDAR_DATOS_PRESUPUESTO";
       const res = await fetch(`/api/tramites/${tramite.id_tramite}/flujo`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          accion: "GUARDAR_DATOS_PRESUPUESTO",
+          accion,
           datos: {
             certificacion_presupuestaria: certificacion.trim(),
             item_presupuestario: requiereItem ? item.trim() : null,
@@ -257,7 +258,7 @@ export const TarjetaPresupuesto: React.FC<TarjetaPresupuestoProps> = ({
         }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Error al guardar datos presupuestarios");
+      if (!res.ok) throw new Error(data.error || "Error al procesar datos presupuestarios");
       setIsEditing(false);
       onRefresh();
     } catch (err: any) {
@@ -579,8 +580,20 @@ export const TarjetaPresupuesto: React.FC<TarjetaPresupuestoProps> = ({
                 disabled={loading}
                 className="px-4 py-1.5 text-xs font-bold uppercase text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors shadow-xs"
               >
-                {loading ? "Guardando..." : "Guardar Datos Presupuesto"}
+                {loading ? "Guardando..." : "Guardar Datos"}
               </button>
+              {currentUser?.rol === "ANALISTA" && tramite.estado_general === "REVISION" && (
+                <button
+                  type="button"
+                  onClick={(e) => handleSave(e, true)}
+                  disabled={loading}
+                  className="px-4 py-1.5 text-xs font-bold uppercase text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg transition-colors shadow-xs flex items-center gap-1.5 cursor-pointer"
+                  title="Guardar datos y remitir automáticamente a la Jefa de Presupuesto para visto bueno"
+                >
+                  <Send className="w-3.5 h-3.5" />
+                  {loading ? "Enviando..." : "Guardar y Enviar a Jefatura"}
+                </button>
+              )}
             </div>
           </form>
         ) : (

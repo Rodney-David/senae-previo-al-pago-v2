@@ -221,6 +221,24 @@ export async function POST(
             id_custodio_actual: idJefe,
             id_analista_presupuesto_previo: currentUserId,
             sub_estado: "PENDIENTE_VISTO_BUENO_JEFE",
+            ...(datos?.certificacion_presupuestaria !== undefined && {
+              certificacion_presupuestaria: datos.certificacion_presupuestaria ? String(datos.certificacion_presupuestaria).trim() : null,
+            }),
+            ...(datos?.item_presupuestario !== undefined && {
+              item_presupuestario: datos.item_presupuestario ? String(datos.item_presupuestario).trim() : null,
+            }),
+            ...(datos?.nro_tramite !== undefined && {
+              nro_tramite: datos.nro_tramite ? String(datos.nro_tramite).trim() : null,
+            }),
+            ...(datos?.periodo_pago !== undefined && {
+              periodo_pago: datos.periodo_pago ? String(datos.periodo_pago).trim() : null,
+            }),
+            ...(datos?.numero_cur_compromiso !== undefined && {
+              numero_cur_compromiso: datos.numero_cur_compromiso ? String(datos.numero_cur_compromiso).trim() : null,
+            }),
+            ...(datos?.anexos !== undefined && {
+              anexos: datos.anexos,
+            }),
             ...(datos?.numero_factura !== undefined && {
               numero_factura: datos.numero_factura ? String(datos.numero_factura).trim() : null,
             }),
