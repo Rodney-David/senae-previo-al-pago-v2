@@ -41,8 +41,9 @@ export async function GET(request: NextRequest) {
       const userArea = currentUser.id_area;
 
       if (tipo === "escritorio") {
-        // En Mi Escritorio: estrictamente los trámites que tengo físicamente bajo mi custodia personal
+        // En Mi Escritorio: estrictamente los trámites de mi área que tengo físicamente bajo mi custodia personal
         conditions.push({
+          id_area_actual: userArea,
           id_custodio_actual: currentUser.id_usuario,
           NOT: {
             estado_general: { in: ["ARCHIVO", "FINALIZADO_ARCHIVADO", "ANULADO"] },
@@ -66,10 +67,12 @@ export async function GET(request: NextRequest) {
           },
         });
       } else if (tipo === "aprobacion") {
-        // En Aprobación: trámites enviados a jefatura para visto bueno / revisión de jefatura
+        // En Aprobación: trámites enviados a jefatura para visto bueno / revisión de jefatura (Presupuesto y Contabilidad)
         conditions.push({
           id_area_actual: userArea,
-          sub_estado: "PENDIENTE_VISTO_BUENO_JEFE",
+          sub_estado: {
+            in: ["PENDIENTE_VISTO_BUENO_JEFE", "PENDIENTE_APROBACION_CONTABLE", "ENVIADO_A_JEFATURA"],
+          },
           NOT: {
             estado_general: { in: ["ARCHIVO", "FINALIZADO_ARCHIVADO", "ANULADO"] },
           },

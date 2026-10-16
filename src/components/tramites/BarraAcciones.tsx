@@ -464,12 +464,35 @@ export const BarraAcciones: React.FC<BarraAccionesProps> = ({
                   </button>
                 )}
 
+                {/* Analista Contable: Enviar a Jefatura para Aprobación */}
+                {isAnalistaContable && (
+                  tramite.sub_estado === "PENDIENTE_VISTO_BUENO_JEFE" ||
+                  tramite.sub_estado === "PENDIENTE_APROBACION_CONTABLE" ||
+                  tramite.sub_estado === "ENVIADO_A_JEFATURA" ? (
+                    <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold bg-amber-50 text-amber-800 border border-amber-300 shadow-2xs">
+                      <UserCheck className="w-3.5 h-3.5 text-amber-600" />
+                      En Revisión de Jefatura
+                    </span>
+                  ) : (
+                    <button
+                      onClick={() => handleAction("ENVIAR_A_JEFATURA_CONTABILIDAD")}
+                      disabled={loadingAction}
+                      className="px-3.5 py-1.5 text-xs font-bold bg-indigo-50 hover:bg-indigo-100 text-indigo-800 rounded-lg transition-colors border border-indigo-300 flex items-center gap-1.5 shadow-2xs"
+                      title="Remitir expediente al Contador General para revisión y visto bueno de devengado"
+                    >
+                      <Send className="w-3.5 h-3.5" />
+                      Enviar Jefe
+                    </button>
+                  )
+                )}
+
                 {/* Contador General aprueba y deriva a DFI */}
                 {(isContadorGeneral || isAdmin) && (
                   <button
                     onClick={() => handleAction("APROBAR_Y_DERIVAR_A_DFI")}
                     disabled={loadingAction}
                     className="px-3.5 py-1.5 text-xs font-bold bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg transition-colors flex items-center gap-1.5 shadow-xs"
+                    title="Aprobar registro contable y derivar a Dirección Financiera para autorización de pago"
                   >
                     <Send className="w-3.5 h-3.5" />
                     Aprobar DFI

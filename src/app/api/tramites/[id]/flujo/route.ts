@@ -514,6 +514,47 @@ export async function POST(
         break;
       }
 
+      case "ENVIAR_A_JEFATURA_CONTABILIDAD": {
+        const curDevRaw = datos?.numero_cur_devengado;
+        const curContRaw = datos?.numero_cur_contable;
+
+        const curDev = Array.isArray(curDevRaw)
+          ? curDevRaw.map((s) => String(s).trim()).filter(Boolean).join(", ")
+          : (curDevRaw !== undefined ? (curDevRaw ? String(curDevRaw).trim() : null) : tramite.numero_cur_devengado);
+
+        const curCont = Array.isArray(curContRaw)
+          ? curContRaw.map((s) => String(s).trim()).filter(Boolean).join(", ")
+          : (curContRaw !== undefined ? (curContRaw ? String(curContRaw).trim() : null) : tramite.numero_cur_contable);
+
+        const contadorGeneral = await prisma.usuarios.findFirst({
+          where: { id_area: 3, rol: "JEFE", activo: true },
+        });
+        const idContador = contadorGeneral?.id_usuario || 6;
+
+        tramiteActualizado = await prisma.tramites.update({
+          where: { id_tramite: idTramite },
+          data: {
+            id_custodio_actual: idContador,
+            sub_estado: "PENDIENTE_VISTO_BUENO_JEFE",
+            numero_cur_devengado: curDev,
+            numero_cur_contable: curCont,
+            fecha_ultimo_movimiento: now,
+            fecha_ultima_modificacion: now,
+          },
+        });
+
+        await registrarBitacora({
+          id_tramite: idTramite,
+          id_usuario_entrega: currentUserId,
+          id_usuario_recibe: idContador,
+          id_area_origen: 3,
+          id_area_destino: 3,
+          tipo_accion: "ENVIO_A_JEFATURA_CONTABILIDAD",
+          comentarios: `Expediente contable remitido al Contador General para revisión y visto bueno de devengado por ${currentUser.nombre_completo}. CUR DEV: ${curDev || "N/A"} | CUR CON: ${curCont || "N/A"}. ${comentarios || ""}`,
+        });
+        break;
+      }
+
       case "APROBAR_Y_DERIVAR_A_DFI":
       case "DERIVAR_A_DFI_PAGO": {
         if (currentUser.rol !== "JEFE" && currentUser.rol !== "ADMIN") {

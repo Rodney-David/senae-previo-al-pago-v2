@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useMemo } from "react";
 import { TramiteCompletoDTO, UsuarioInstitucional } from "@/types";
-import { Calculator, CheckCircle2, AlertCircle, Edit3, Plus, Trash2, ChevronDown } from "lucide-react";
+import { Calculator, CheckCircle2, AlertCircle, Edit3, Plus, Trash2, ChevronDown, Send } from "lucide-react";
 
 interface TarjetaContabilidadProps {
   tramite: TramiteCompletoDTO;
@@ -113,7 +113,7 @@ export const TarjetaContabilidad: React.FC<TarjetaContabilidadProps> = ({
     setIsEditing(true);
   };
 
-  const handleSave = async (e: React.FormEvent) => {
+  const handleSave = async (e: React.FormEvent, enviarJefe: boolean = false) => {
     e.preventDefault();
     setLoading(true);
     setError(null);
@@ -122,11 +122,12 @@ export const TarjetaContabilidad: React.FC<TarjetaContabilidadProps> = ({
     const conClean = curConList.map((s) => s.trim()).filter(Boolean);
 
     try {
+      const accion = enviarJefe ? "ENVIAR_A_JEFATURA_CONTABILIDAD" : "GUARDAR_DATOS_CONTABILIDAD";
       const res = await fetch(`/api/tramites/${tramite.id_tramite}/flujo`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          accion: "GUARDAR_DATOS_CONTABILIDAD",
+          accion,
           datos: {
             numero_cur_devengado: devClean.length > 0 ? devClean.join(", ") : null,
             numero_cur_contable: conClean.length > 0 ? conClean.join(", ") : null,
@@ -134,7 +135,7 @@ export const TarjetaContabilidad: React.FC<TarjetaContabilidadProps> = ({
         }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Error al guardar datos contables");
+      if (!res.ok) throw new Error(data.error || "Error al procesar datos contables");
       setIsEditing(false);
       onRefresh();
     } catch (err: any) {
@@ -302,22 +303,34 @@ export const TarjetaContabilidad: React.FC<TarjetaContabilidadProps> = ({
                 </div>
               </div>
 
-              <div className="flex justify-end gap-2 pt-2 border-t border-slate-100">
+              <div className="flex flex-wrap justify-end gap-2 pt-2 border-t border-slate-100">
                 <button
                   type="button"
                   onClick={() => setIsEditing(false)}
                   disabled={loading}
-                  className="px-3.5 py-1.5 text-xs font-semibold uppercase text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors"
+                  className="px-3.5 py-1.5 text-xs font-semibold uppercase text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors cursor-pointer"
                 >
                   Cancelar
                 </button>
                 <button
                   type="submit"
                   disabled={loading}
-                  className="px-4 py-1.5 text-xs font-bold uppercase text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors shadow-xs"
+                  className="px-4 py-1.5 text-xs font-bold uppercase text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors shadow-xs cursor-pointer"
                 >
-                  {loading ? "Guardando..." : "Guardar Datos Contables"}
+                  {loading ? "Guardando..." : "Guardar Datos"}
                 </button>
+                {currentUser?.rol === "ANALISTA" && (
+                  <button
+                    type="button"
+                    onClick={(e) => handleSave(e, true)}
+                    disabled={loading}
+                    className="px-4 py-1.5 text-xs font-bold uppercase text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg transition-colors shadow-xs flex items-center gap-1.5 cursor-pointer"
+                    title="Guardar los números de CUR y remitir automáticamente al Contador General para visto bueno"
+                  >
+                    <Send className="w-3.5 h-3.5" />
+                    {loading ? "Enviando..." : "Guardar y Enviar a Jefatura"}
+                  </button>
+                )}
               </div>
             </form>
           ) : (
