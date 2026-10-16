@@ -14,7 +14,9 @@ export default function TramitesCatalogoPage() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [filtroArea, setFiltroArea] = useState("TODAS");
-  const [filtroCuantia, setFiltroCuantia] = useState("TODAS");
+  const [filtroFuncionario, setFiltroFuncionario] = useState("TODOS");
+  const [filtroEstado, setFiltroEstado] = useState("TODOS");
+  const [usuariosList, setUsuariosList] = useState<{ id_usuario: number; nombre_completo: string; cargo?: string | null; iniciales?: string | null }[]>([]);
   const [currentUser, setCurrentUser] = useState<UsuarioInstitucional | null>(null);
 
   const isAdmin = currentUser?.rol === "ADMIN" || currentUser?.rol === "ADMINISTRADOR";
@@ -24,12 +26,19 @@ export default function TramitesCatalogoPage() {
       .then((r) => r.json())
       .then((d) => setCurrentUser(d.user || d.usuario || null))
       .catch((err) => console.error("Error loading session:", err));
+
+    fetch("/api/admin/usuarios")
+      .then((r) => r.json())
+      .then((d) => {
+        if (d.usuarios) setUsuariosList(d.usuarios);
+      })
+      .catch((err) => console.error("Error loading usuarios:", err));
   }, []);
 
   const fetchTramites = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await fetch(`/api/tramites?tipo=todos&search=${encodeURIComponent(search)}`);
+      const res = await fetch("/api/tramites?tipo=todos");
       const data = await res.json();
       if (data.tramites) {
         setTramites(data.tramites);
@@ -39,20 +48,111 @@ export default function TramitesCatalogoPage() {
     } finally {
       setLoading(false);
     }
-  }, [search]);
+  }, []);
 
   useEffect(() => {
     fetchTramites();
   }, [fetchTramites]);
 
-  const filteredTramites = tramites.filter((t) => {
-    if (filtroArea !== "TODAS" && String(t.id_area_actual) !== filtroArea) {
-      return false;
-    }
-    if (filtroCuantia === "ALTA" && !t.es_alta_cuantia) return false;
-    if (filtroCuantia === "REGULAR" && t.es_alta_cuantia) return false;
-    return true;
-  });
+  // Lista consolidada de funcionarios para el selector de filtro
+  const funcionariosOpciones = useMemo(() => {
+    const map = new Map<string, { id: string; nombre: string; cargo?: string; iniciales?: string }>();
+    usuariosList.forEach((u) => {
+      map.set(String(u.id_usuario), {
+        id: String(u.id_usuario),
+        nombre: u.nombre_completo,
+        cargo: u.cargo || undefined,
+        iniciales: u.iniciales || undefined,
+      });
+    });
+    tramites.forEach((t) => {
+      if (t.usuarios?.id_usuario && !map.has(String(t.usuarios.id_usuario))) {
+        map.set(String(t.usuarios.id_usuario), {
+          id: String(t.usuarios.id_usuario),
+          nombre: t.usuarios.nombre_completo,
+          cargo: t.usuarios.cargo || undefined,
+          iniciales: t.usuarios.iniciales || undefined,
+        });
+      }
+    });
+    return Array.from(map.values()).sort((a, b) => a.nombre.localeCompare(b.nombre));
+  }, [usuariosList, tramites]);
+
+  const ESTADOS_LISTA = [
+    { value: "TODOS", label: "TODOS LOS ESTADOS" },
+    { value: "INGRESADO", label: "INGRESADO" },
+    { value: "REVISION", label: "REVISION" },
+    { value: "REVISADO", label: "REVISADO" },
+    { value: "FACTURA", label: "FACTURA" },
+    { value: "CONTABILIDAD", label: "CONTABILIDAD" },
+    { value: "DFI", label: "DFI" },
+    { value: "PAGADO", label: "PAGADO" },
+    { value: "ARCHIVO", label: "ARCHIVO" },
+    { value: "OBSERVADO", label: "OBSERVADO" },
+    { value: "INSUBSISTENTE", label: "INSUBSISTENTE" },
+    { value: "DEVUELTO", label: "DEVUELTO" },
+    { value: "ANULADO", label: "ANULADO" },
+  ];
+
+  // Búsqueda global (NÚMERO DE QUIPUX, GESTIÓN, BENEFICIARIO, TIPO DE PROCESO, FUNCIONARIO, ESTADO) y Filtros
+  const filteredTramites = useMemo(() => {
+    const q = search.trim().toLowerCase();
+
+    return tramites.filter((t) => {
+      // 1. Filtro por Área
+      if (filtroArea !== "TODAS" && String(t.id_area_actual) !== filtroArea) {
+        return false;
+      }
+
+      // 2. Filtro por Funcionario (Custodio Actual)
+      if (filtroFuncionario !== "TODOS") {
+        const idCustodio = String(t.id_custodio_actual);
+        if (idCustodio !== filtroFuncionario) {
+          return false;
+        }
+      }
+
+      // 3. Filtro por Estado General
+      if (filtroEstado !== "TODOS") {
+        const estadoG = (t.estado_general || "").toUpperCase();
+        if (estadoG !== filtroEstado.toUpperCase()) {
+          if (filtroEstado === "OBSERVADO" && (estadoG === "OBSERVADO" || estadoG === "OBSERVADO_72H")) {
+            // match
+          } else if (filtroEstado === "ARCHIVO" && (estadoG === "ARCHIVO" || estadoG === "FINALIZADO_ARCHIVADO")) {
+            // match
+          } else {
+            return false;
+          }
+        }
+      }
+
+      // 4. Búsqueda Global: NÚMERO DE QUIPUX, GESTION, BENEFICIARIO, TIPO DE PROCESO, FUNCIONARIO, ESTADO
+      if (q) {
+        const quipux = (t.numero_quipux || "").toLowerCase();
+        const codigo = (t.codigo_tramite || "").toLowerCase();
+        const gestion = `${t.padre_gestion || ""} ${t.tipo_gestion || ""} ${t.tipo_flujo || ""}`.toLowerCase();
+        const beneficiario = `${t.proveedor_beneficiario || ""} ${t.ruc_proveedor || ""}`.toLowerCase();
+        const tipoProceso = `${t.tipos_tramite?.nombre || ""} ${t.nro_tramite || ""}`.toLowerCase();
+        const funcionario = `${t.usuarios?.nombre_completo || ""} ${t.usuarios?.cargo || ""} ${t.usuarios?.iniciales || ""}`.toLowerCase();
+        const estado = `${t.estado_general || ""} ${t.sub_estado || ""}`.toLowerCase();
+        const factura = (t.numero_factura || "").toLowerCase();
+
+        const match =
+          quipux.includes(q) ||
+          codigo.includes(q) ||
+          gestion.includes(q) ||
+          beneficiario.includes(q) ||
+          tipoProceso.includes(q) ||
+          funcionario.includes(q) ||
+          estado.includes(q) ||
+          factura.includes(q);
+
+        if (!match) return false;
+      }
+
+      return true;
+    });
+  }, [tramites, filtroArea, filtroFuncionario, filtroEstado, search]);
 
   return (
     <div className="space-y-6">
@@ -93,48 +193,94 @@ export default function TramitesCatalogoPage() {
         </div>
       </div>
 
-      {/* Filters Bar */}
-      <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-xs flex flex-wrap items-center justify-between gap-3">
-        <div className="flex flex-wrap items-center gap-3">
-          <div className="flex items-center gap-1.5 text-xs text-slate-500 font-semibold uppercase">
+      {/* Filters Bar: AREAS, FUNCIONARIOS, ESTADOS y Búsqueda Global */}
+      <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-xs flex flex-col xl:flex-row xl:items-center justify-between gap-3">
+        <div className="flex flex-wrap items-center gap-2.5">
+          <div className="flex items-center gap-1.5 text-xs text-slate-500 font-bold uppercase tracking-wider">
             <Filter className="w-4 h-4 text-slate-400" />
             Filtros:
           </div>
 
+          {/* 1. ÁREAS */}
           <select
             value={filtroArea}
             onChange={(e) => setFiltroArea(e.target.value)}
-            className="text-xs bg-slate-50 border border-slate-300 rounded-lg p-2 focus:ring-2 focus:ring-blue-500 focus:outline-none uppercase font-medium"
+            className="text-xs bg-slate-50 hover:bg-slate-100 border border-slate-300 rounded-lg py-2 px-3 focus:ring-2 focus:ring-blue-500 focus:outline-none uppercase font-semibold text-slate-700 cursor-pointer transition-colors"
+            title="Filtrar por Área Institucional"
           >
             <option value="TODAS">TODAS LAS ÁREAS</option>
             <option value="1">DIRECCIÓN FINANCIERA (DFI)</option>
             <option value="2">PRESUPUESTO</option>
             <option value="3">CONTABILIDAD</option>
             <option value="4">TESORERÍA / PAGOS</option>
+            <option value="5">COBRANZAS</option>
             <option value="6">ARCHIVO</option>
           </select>
 
+          {/* 2. FUNCIONARIOS */}
           <select
-            value={filtroCuantia}
-            onChange={(e) => setFiltroCuantia(e.target.value)}
-            className="text-xs bg-slate-50 border border-slate-300 rounded-lg p-2 focus:ring-2 focus:ring-blue-500 focus:outline-none uppercase font-medium"
+            value={filtroFuncionario}
+            onChange={(e) => setFiltroFuncionario(e.target.value)}
+            className="text-xs bg-slate-50 hover:bg-slate-100 border border-slate-300 rounded-lg py-2 px-3 focus:ring-2 focus:ring-blue-500 focus:outline-none uppercase font-semibold text-slate-700 cursor-pointer transition-colors max-w-[240px] truncate"
+            title="Filtrar por Funcionario Custodio"
           >
-            <option value="TODAS">TODAS LAS CUANTÍAS</option>
-            <option value="ALTA">ALTA CUANTÍA (≥ $10K)</option>
-            <option value="REGULAR">MENOR A $10.000</option>
+            <option value="TODOS">TODOS LOS FUNCIONARIOS</option>
+            {funcionariosOpciones.map((f) => (
+              <option key={f.id} value={f.id}>
+                {f.nombre} {f.iniciales ? `(${f.iniciales})` : ""}
+              </option>
+            ))}
           </select>
+
+          {/* 3. ESTADOS */}
+          <select
+            value={filtroEstado}
+            onChange={(e) => setFiltroEstado(e.target.value)}
+            className="text-xs bg-slate-50 hover:bg-slate-100 border border-slate-300 rounded-lg py-2 px-3 focus:ring-2 focus:ring-blue-500 focus:outline-none uppercase font-semibold text-slate-700 cursor-pointer transition-colors"
+            title="Filtrar por Estado General del Trámite"
+          >
+            {ESTADOS_LISTA.map((est) => (
+              <option key={est.value} value={est.value}>
+                {est.label}
+              </option>
+            ))}
+          </select>
+
+          {/* Botón para restablecer filtros si hay alguno activo */}
+          {(filtroArea !== "TODAS" || filtroFuncionario !== "TODOS" || filtroEstado !== "TODOS" || search.trim() !== "") && (
+            <button
+              onClick={() => {
+                setFiltroArea("TODAS");
+                setFiltroFuncionario("TODOS");
+                setFiltroEstado("TODOS");
+                setSearch("");
+              }}
+              className="px-2.5 py-1.5 text-[11px] font-bold text-slate-500 hover:text-slate-800 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors uppercase tracking-wider"
+              title="Restablecer todos los filtros"
+            >
+              Limpiar
+            </button>
+          )}
         </div>
 
-        <div className="relative w-full sm:w-72">
+        {/* Búsqueda Global */}
+        <div className="relative w-full xl:w-96">
           <Search className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
           <input
             type="text"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="BUSCAR POR QUIPUX, BENEFICIARIO, RUC..."
-            className="w-full pl-9 pr-3 py-1.5 text-xs bg-white border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-xs uppercase font-medium"
+            placeholder="BUSCAR QUIPUX, GESTIÓN, BENEFICIARIO, PROCESO, FUNCIONARIO, ESTADO..."
+            className="w-full pl-9 pr-3 py-1.5 text-xs bg-white border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-xs uppercase font-medium placeholder:text-slate-400"
           />
         </div>
+      </div>
+
+      {/* Contador de resultados */}
+      <div className="flex items-center justify-between text-xs text-slate-500 px-1">
+        <span className="font-medium uppercase tracking-wider text-[11px]">
+          Mostrando <strong className="text-slate-900 font-bold">{filteredTramites.length}</strong> de <strong className="text-slate-900 font-bold">{tramites.length}</strong> trámites institucionales
+        </span>
       </div>
 
       {/* Responsive Table Container with Horizontal Scroll */}

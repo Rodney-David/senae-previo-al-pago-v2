@@ -239,6 +239,7 @@ export interface TramiteCompletoDTO {
     nombre_completo: string;
     cargo: string;
     rol: string;
+    iniciales?: string | null;
   } | null;
   custodio_actual?: UsuarioInstitucional | null;
   estado_general: string;

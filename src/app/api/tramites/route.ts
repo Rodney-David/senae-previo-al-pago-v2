@@ -21,16 +21,33 @@ export async function GET(request: NextRequest) {
     const conditions: Record<string, any>[] = [];
 
     if (search.trim()) {
+      const q = search.trim();
       conditions.push({
         OR: [
-          { codigo_tramite: { contains: search.trim() } },
-          { numero_quipux: { contains: search.trim() } },
-          { proveedor_beneficiario: { contains: search.trim() } },
-          { ruc_proveedor: { contains: search.trim() } },
-          { numero_factura: { contains: search.trim() } },
-          { area_requirente: { contains: search.trim() } },
-          { ciudad: { contains: search.trim() } },
-          { asunto: { contains: search.trim() } },
+          { numero_quipux: { contains: q } },
+          { codigo_tramite: { contains: q } },
+          { padre_gestion: { contains: q } },
+          { tipo_gestion: { contains: q } },
+          { tipo_flujo: { contains: q } },
+          { proveedor_beneficiario: { contains: q } },
+          { ruc_proveedor: { contains: q } },
+          { nro_tramite: { contains: q } },
+          { estado_general: { contains: q } },
+          { sub_estado: { contains: q } },
+          { numero_factura: { contains: q } },
+          { area_requirente: { contains: q } },
+          { ciudad: { contains: q } },
+          { asunto: { contains: q } },
+          {
+            tipos_tramite: {
+              nombre: { contains: q },
+            },
+          },
+          {
+            usuarios: {
+              nombre_completo: { contains: q },
+            },
+          },
         ],
       });
     }
