@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import "./globals.css";
-import { AppLayout } from "@/components/layout/AppLayout";
+import { AppLayout } from "@/components/layout";
 
 export const metadata: Metadata = {
   title: "SENAE - Control Financiero Previo al Pago",

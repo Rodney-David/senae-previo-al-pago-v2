@@ -910,7 +910,7 @@ const doc4Html = `
     <li><strong>Puerto de escucha:</strong> <code>5432 / TCP</code></li>
     <li><strong>Base de Datos Inicial:</strong> <code>postgres</code></li>
     <li><strong>Usuario Superadministrador:</strong> <code>postgres</code></li>
-    <li><strong>Contraseña Inicial Sugerida:</strong> <code>SenaePostgres2026!Prod</code></li>
+    <li><strong>Contraseña Inicial Sugerida:</strong> <code>[DEFINIDA_POR_ADMINISTRADOR_EN_DESPLIEGUE]</code></li>
     <li><strong>Comando de acceso local por consola:</strong> <code>sudo -u postgres psql</code></li>
   </ul>
 
@@ -918,9 +918,9 @@ const doc4Html = `
   <ul>
     <li><strong>Base de Datos Operativa:</strong> <code>senae_control_previo</code></li>
     <li><strong>Usuario de Aplicación:</strong> <code>senae_app</code></li>
-    <li><strong>Contraseña Inicial de Servicio:</strong> <code>SenaeSecureDb2026#Prod</code></li>
+    <li><strong>Contraseña Inicial de Servicio:</strong> <code>[GENERADA_EN_SECRETS_O_ENTORNO_LOCAL]</code></li>
     <li><strong>Cadena de Conexión (DATABASE_URL):</strong><br>
-      <code>postgresql://senae_app:SenaeSecureDb2026#Prod@127.0.0.1:5432/senae_control_previo?schema=public</code>
+      <code>postgresql://senae_app:&lt;PASSWORD_SEGURA_BD&gt;@127.0.0.1:5432/senae_control_previo?schema=public</code>
     </li>
   </ul>
 
@@ -942,67 +942,67 @@ const doc4Html = `
       <tr>
         <td><strong>Administrador de Sistemas</strong></td>
         <td><code>admin.financiero@aduana.gob.ec</code></td>
-        <td><code>senae2026</code></td>
+        <td><code>[CONFIDENCIAL / ASIGNADA EN PRIMER ACCESO]</code></td>
         <td>Acceso total a usuarios, feriados, campos dinámicos y configuración técnica.</td>
       </tr>
       <tr>
         <td><strong>Directora Financiera</strong></td>
         <td><code>directora.financiera@aduana.gob.ec</code></td>
-        <td><code>senae2026</code></td>
+        <td><code>[CONFIDENCIAL / ASIGNADA EN PRIMER ACCESO]</code></td>
         <td>Autorización legal de pagos, devoluciones y derivaciones especiales.</td>
       </tr>
       <tr>
         <td><strong>Secretaría DFI (Ventanilla)</strong></td>
         <td><code>secretaria.dfi@aduana.gob.ec</code></td>
-        <td><code>senae2026</code></td>
+        <td><code>[CONFIDENCIAL / ASIGNADA EN PRIMER ACCESO]</code></td>
         <td>Radicación de expedientes, registro de fojas y derivación inicial.</td>
       </tr>
       <tr>
         <td><strong>Jefe de Presupuesto</strong></td>
         <td><code>jefe.presupuesto@aduana.gob.ec</code></td>
-        <td><code>senae2026</code></td>
+        <td><code>[CONFIDENCIAL / ASIGNADA EN PRIMER ACCESO]</code></td>
         <td>Reasignación de analistas, visto bueno presupuestario y pausas de semáforo.</td>
       </tr>
       <tr>
         <td><strong>Analista de Presupuesto 1</strong></td>
         <td><code>analista.presupuesto1@aduana.gob.ec</code></td>
-        <td><code>senae2026</code></td>
+        <td><code>[CONFIDENCIAL / ASIGNADA EN PRIMER ACCESO]</code></td>
         <td>Registro de CUR Compromiso, partidas y checklist presupuestario.</td>
       </tr>
       <tr>
         <td><strong>Analista de Presupuesto 2</strong></td>
         <td><code>analista.presupuesto2@aduana.gob.ec</code></td>
-        <td><code>senae2026</code></td>
+        <td><code>[CONFIDENCIAL / ASIGNADA EN PRIMER ACCESO]</code></td>
         <td>Registro de CUR Compromiso, partidas y checklist presupuestario.</td>
       </tr>
       <tr>
         <td><strong>Contador General</strong></td>
         <td><code>contador.general@aduana.gob.ec</code></td>
-        <td><code>senae2026</code></td>
+        <td><code>[CONFIDENCIAL / ASIGNADA EN PRIMER ACCESO]</code></td>
         <td>Aprobación contable previa y asignación de analistas contables.</td>
       </tr>
       <tr>
         <td><strong>Analista Contable 1</strong></td>
         <td><code>analista.contabilidad1@aduana.gob.ec</code></td>
-        <td><code>senae2026</code></td>
+        <td><code>[CONFIDENCIAL / ASIGNADA EN PRIMER ACCESO]</code></td>
         <td>Registro de CUR Devengado, retenciones, multas y checklist contable.</td>
       </tr>
       <tr>
         <td><strong>Tesorero / Pagos</strong></td>
         <td><code>tesoreria.pagos@aduana.gob.ec</code></td>
-        <td><code>senae2026</code></td>
+        <td><code>[CONFIDENCIAL / ASIGNADA EN PRIMER ACCESO]</code></td>
         <td>Registro de lote MEF y comprobante de transferencia SPI del Banco Central.</td>
       </tr>
       <tr>
         <td><strong>Técnico de Cobranzas</strong></td>
         <td><code>cobranzas.garantias@aduana.gob.ec</code></td>
-        <td><code>senae2026</code></td>
+        <td><code>[CONFIDENCIAL / ASIGNADA EN PRIMER ACCESO]</code></td>
         <td>Validación de coactivas y garantías aduaneras.</td>
       </tr>
       <tr>
         <td><strong>Custodio de Archivo</strong></td>
         <td><code>archivo.financiero@aduana.gob.ec</code></td>
-        <td><code>senae2026</code></td>
+        <td><code>[CONFIDENCIAL / ASIGNADA EN PRIMER ACCESO]</code></td>
         <td>Recepción definitiva y asignación de estantería, balda y tomo.</td>
       </tr>
     </tbody>
@@ -1012,7 +1012,7 @@ const doc4Html = `
   <ol>
     <li>Tras el despliegue en Rocky Linux 9, ingresar a la plataforma con la cuenta de <strong>Administrador de Sistemas</strong>.</li>
     <li>Dirigirse a la opción <strong>Administración</strong> en la barra lateral izquierda y seleccionar <strong>Gestión de Usuarios</strong>.</li>
-    <li>Cambiar la contraseña inicial (<code>senae2026</code>) por una contraseña robusta que cumpla con las políticas del EGSI:
+    <li>Cambiar la contraseña inicial por defecto por una contraseña robusta que cumpla con las políticas del EGSI:
       <ul>
         <li>Mínimo 12 caracteres de longitud.</li>
         <li>Combinación obligatoria de mayúsculas, minúsculas, números y caracteres especiales.</li>

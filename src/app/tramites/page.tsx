@@ -3,10 +3,9 @@
 import React, { useEffect, useState, useCallback, useMemo } from "react";
 import { TramiteCompletoDTO, UsuarioInstitucional } from "@/types";
 import { formatCurrency, formatDate } from "@/lib/utils";
-import { BadgeEstado } from "@/components/ui/BadgeEstado";
-import { SemaforoSLA } from "@/components/ui/SemaforoSLA";
+import { BadgeEstado, SemaforoSLA } from "@/components/ui";
 import Link from "next/link";
-import { FileText, Search, ExternalLink, RefreshCw, Filter, Trash2, User, FilePlus2 } from "lucide-react";
+import { FileText, Search, RefreshCw, Filter, Trash2, User, FilePlus2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 
 export default function TramitesCatalogoPage() {
@@ -158,11 +157,9 @@ export default function TramitesCatalogoPage() {
                 <th className="py-3 px-4 text-left w-64 min-w-[210px]">BENEFICIARIO / RUC</th>
                 <th className="py-3 px-4 text-left w-56 min-w-[190px]">TIPO DE PROCESO</th>
                 <th className="py-3 px-4 text-left w-52 min-w-[160px]">FUNCIONARIO</th>
-                <th className="py-3 px-3 text-center w-28 min-w-[100px]">CIUDAD</th>
                 <th className="py-3 px-4 text-center w-32 min-w-[120px]">MONTO TOTAL</th>
                 <th className="py-3 px-3 text-center w-28 min-w-[100px]">SLA (6D)</th>
                 <th className="py-3 px-4 text-center w-48 min-w-[160px]">ESTADO</th>
-                <th className="py-3 px-3 text-center w-24 min-w-[90px]">DETALLE</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 text-xs">
@@ -170,7 +167,8 @@ export default function TramitesCatalogoPage() {
                 <tr
                   key={t.id_tramite}
                   onClick={() => router.push(isAdmin ? `/tramite/${t.id_tramite}` : `/tramite/${t.id_tramite}?readonly=true`)}
-                  title={isAdmin ? "Haga clic para gestionar o supervisar el expediente (Superusuario)" : "Haga clic para consultar el expediente institucional (modo solo lectura)"}
+                  onDoubleClick={() => router.push(isAdmin ? `/tramite/${t.id_tramite}` : `/tramite/${t.id_tramite}?readonly=true`)}
+                  title={isAdmin ? "Doble clic para gestionar o supervisar el expediente (Superusuario)" : "Doble clic para consultar el expediente institucional"}
                   className="hover:bg-blue-50/70 transition-colors cursor-pointer select-none group"
                 >
                   <td className="py-3.5 px-4 align-middle text-center whitespace-nowrap">
@@ -228,12 +226,6 @@ export default function TramitesCatalogoPage() {
                     )}
                   </td>
 
-                  <td className="py-3.5 px-3 align-middle text-center whitespace-nowrap">
-                    <span className="px-2 py-0.5 text-[10px] font-bold rounded uppercase bg-slate-100 text-slate-700 border border-slate-200">
-                      {t.ciudad || "GUAYAQUIL"}
-                    </span>
-                  </td>
-
                   <td className="py-3.5 px-4 align-middle text-center whitespace-nowrap">
                     <div className="font-mono font-bold text-slate-900 text-xs">
                       {formatCurrency(t.monto_total)}
@@ -246,19 +238,6 @@ export default function TramitesCatalogoPage() {
 
                   <td className="py-3.5 px-4 align-middle text-center whitespace-nowrap">
                     <BadgeEstado estado={t.estado_general} subEstado={t.sub_estado} />
-                  </td>
-
-                  <td className="py-3.5 px-3 align-middle text-center whitespace-nowrap">
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        router.push(isAdmin ? `/tramite/${t.id_tramite}` : `/tramite/${t.id_tramite}?readonly=true`);
-                      }}
-                      className="inline-flex items-center gap-1 px-2.5 py-1 text-[11px] font-semibold text-blue-700 bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded-lg transition-colors shadow-2xs"
-                    >
-                      <ExternalLink className="w-3 h-3" />
-                      {isAdmin ? "Gestionar" : "Ver"}
-                    </button>
                   </td>
                 </tr>
               ))}

@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { CajaDTO, TramiteCompletoDTO, UsuarioInstitucional } from "@/types";
 import { formatCurrency } from "@/lib/utils";
-import { BadgeEstado } from "@/components/ui/BadgeEstado";
+import { BadgeEstado } from "@/components/ui";
 import {
   Package,
   Plus,

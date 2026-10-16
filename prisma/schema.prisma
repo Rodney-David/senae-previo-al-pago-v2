@@ -294,6 +294,7 @@ model usuarios {
   rol                                                                      String
   password_hash                                                            String?
   activo                                                                   Boolean?                        @default(true)
+  iniciales                                                                String?                         @unique
   estado_disponibilidad                                                    String?                         @default("DISPONIBLE")
   created_at                                                               DateTime?                       @default(now())
   asignacion_turnos                                                        asignacion_turnos[]

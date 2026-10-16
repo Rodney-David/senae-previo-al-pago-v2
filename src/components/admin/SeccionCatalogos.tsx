@@ -19,7 +19,7 @@ import {
   Info,
   Coins,
 } from "lucide-react";
-import { Modal } from "@/components/ui/Modal";
+import { Modal } from "@/components/ui";
 
 type TipoCatalogo = "areas" | "procesos" | "gestion" | "items";
 

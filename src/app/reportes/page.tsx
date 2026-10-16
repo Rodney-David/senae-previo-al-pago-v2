@@ -26,7 +26,7 @@ import {
 } from "lucide-react";
 import { formatCurrency, formatDate } from "@/lib/utils";
 import Link from "next/link";
-import { SemaforoSLA } from "@/components/ui/SemaforoSLA";
+import { SemaforoSLA } from "@/components/ui";
 
 interface AreaCatalogo {
   id_area: number;

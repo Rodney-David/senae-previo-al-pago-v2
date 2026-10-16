@@ -5,8 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { TramiteCompletoDTO, UsuarioInstitucional } from "@/types";
 import { formatCurrency, formatDate } from "@/lib/utils";
-import { BadgeEstado } from "@/components/ui/BadgeEstado";
-import { SemaforoSLA } from "@/components/ui/SemaforoSLA";
+import { BadgeEstado, SemaforoSLA } from "@/components/ui";
 import {
   Inbox,
   Search,
@@ -649,8 +648,8 @@ export default function EscritorioPage() {
                 <th className="py-3 px-4 text-left w-64 min-w-[210px]">BENEFICIARIO / RUC</th>
                 <th className="py-3 px-4 text-left w-56 min-w-[190px]">TIPO DE PROCESO</th>
                 <th className="py-3 px-4 text-left w-48 min-w-[160px]">FUNCIONARIO</th>
-                <th className="py-3 px-4 text-center w-32 min-w-[120px]">SUBTOTAL / NETO</th>
-                <th className="py-3 px-3 text-center w-28 min-w-[100px]">TIEMPO SLA</th>
+                <th className="py-3 px-4 text-center w-32 min-w-[120px]">MONTO TOTAL</th>
+                <th className="py-3 px-3 text-center w-28 min-w-[100px]">SLA (6D)</th>
                 <th className="py-3 px-4 text-center w-48 min-w-[160px]">ESTADO</th>
               </tr>
             </thead>
@@ -754,10 +753,10 @@ export default function EscritorioPage() {
                       )}
                     </td>
 
-                    {/* Subtotal / Monto Total */}
+                    {/* Monto Total */}
                     <td className="py-3.5 px-4 align-middle text-center whitespace-nowrap">
                       <div className="font-mono font-bold text-slate-900 text-xs">
-                        {formatCurrency(t.subtotal || t.monto_total || 0)}
+                        {formatCurrency(t.monto_total || t.subtotal || 0)}
                       </div>
                     </td>
 

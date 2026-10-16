@@ -11,9 +11,15 @@ if (!target || !['postgres', 'mysql', 'sqlite'].includes(target)) {
 
 const root = process.cwd();
 const currentSchema = path.join(root, 'prisma', 'schema.prisma');
-const pgSchema = path.join(root, 'prisma', 'schema.postgresql.prisma');
-const mysqlSchema = path.join(root, 'prisma', 'schema.mysql.prisma');
-const sqliteSchema = path.join(root, 'prisma', 'schema.sqlite.prisma');
+const pgSchema = fs.existsSync(path.join(root, 'prisma', 'deploy_schemas', 'schema.postgresql.prisma'))
+  ? path.join(root, 'prisma', 'deploy_schemas', 'schema.postgresql.prisma')
+  : path.join(root, 'prisma', 'schema.postgresql.prisma');
+const mysqlSchema = fs.existsSync(path.join(root, 'prisma', 'deploy_schemas', 'schema.mysql.prisma'))
+  ? path.join(root, 'prisma', 'deploy_schemas', 'schema.mysql.prisma')
+  : path.join(root, 'prisma', 'schema.mysql.prisma');
+const sqliteSchema = fs.existsSync(path.join(root, 'prisma', 'deploy_schemas', 'schema.sqlite.prisma'))
+  ? path.join(root, 'prisma', 'deploy_schemas', 'schema.sqlite.prisma')
+  : path.join(root, 'prisma', 'schema.sqlite.prisma');
 
 if (target === 'postgres') {
   console.log('🔄 Cambiando proveedor de base de datos a PostgreSQL 16...');

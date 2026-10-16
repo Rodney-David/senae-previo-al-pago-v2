@@ -4,16 +4,17 @@ import React, { useEffect, useState, useCallback, useMemo } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { TramiteCompletoDTO, UsuarioInstitucional } from "@/types";
-import { BadgeEstado } from "@/components/ui/BadgeEstado";
-import { SemaforoSLA } from "@/components/ui/SemaforoSLA";
-import { BarraAcciones } from "@/components/tramites/BarraAcciones";
-import { TarjetaDatosGenerales } from "@/components/tramites/TarjetaDatosGenerales";
-import { TablaReferencias } from "@/components/referencias/TablaReferencias";
-import { TarjetaPresupuesto } from "@/components/tramites/TarjetaPresupuesto";
-import { TarjetaContabilidad } from "@/components/tramites/TarjetaContabilidad";
-import { TarjetaTesoreria } from "@/components/tramites/TarjetaTesoreria";
-import { TarjetaArchivo } from "@/components/tramites/TarjetaArchivo";
-import { TimelineBitacora } from "@/components/tramites/TimelineBitacora";
+import { BadgeEstado, SemaforoSLA } from "@/components/ui";
+import {
+  BarraAcciones,
+  TarjetaDatosGenerales,
+  TarjetaPresupuesto,
+  TarjetaContabilidad,
+  TarjetaTesoreria,
+  TarjetaArchivo,
+  TimelineBitacora,
+} from "@/components/tramites";
+import { TablaReferencias } from "@/components/referencias";
 import { ArrowLeft, RefreshCw, FileText, AlertTriangle, Eye, Building2, UserCheck } from "lucide-react";
 
 export default function TramiteDetallePage() {

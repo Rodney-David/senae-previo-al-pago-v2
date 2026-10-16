@@ -40,6 +40,14 @@ prisma/dev.db
 prisma/dev.db-journal
 /data/*.db
 
+# Hojas de cálculo y bitácoras institucionales (datos confidenciales SENAE)
+*.xlsx
+*.xls
+*.csv
+/scripts/*.xlsx
+/scripts/*.xls
+/scripts/*.csv
+
 # TypeScript build info
 *.tsbuildinfo
 

@@ -16,10 +16,10 @@ services:
       NODE_ENV: production
       PORT: 3000
       HOSTNAME: "0.0.0.0"
-      DATABASE_URL: "postgresql://${POSTGRES_USER:-senae_admin}:${POSTGRES_PASSWORD:-senae_segura_2026}@db:5432/${POSTGRES_DB:-senae_control_previo}?schema=public"
+      DATABASE_URL: "${DATABASE_URL:-postgresql://${POSTGRES_USER:-senae_admin}:${POSTGRES_PASSWORD:-}@db:5432/${POSTGRES_DB:-senae_control_previo}?schema=public}"
       NEXT_PUBLIC_APP_URL: "${APP_URL:-http://localhost:3000}"
-      CAPTCHA_SECRET: "${CAPTCHA_SECRET:-senae_captcha_secret_prod_2026}"
-      AUTH_SECRET: "${AUTH_SECRET:-senae_auth_secret_prod_2026}"
+      CAPTCHA_SECRET: "${CAPTCHA_SECRET:-}"
+      AUTH_SECRET: "${AUTH_SECRET:-}"
     depends_on:
       db:
         condition: service_healthy
@@ -30,7 +30,7 @@ services:
     restart: unless-stopped
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-senae_admin}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-senae_segura_2026}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-}
       POSTGRES_DB: ${POSTGRES_DB:-senae_control_previo}
     volumes:
       - senae_postgres_data:/var/lib/postgresql/data

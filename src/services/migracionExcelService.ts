@@ -13,17 +13,79 @@ const RUTA_CANDIDATAS_EXCEL = [
 export const RUTA_DEFAULT_EXCEL_2026 =
   RUTA_CANDIDATAS_EXCEL.find((p) => fs.existsSync(p)) || RUTA_CANDIDATAS_EXCEL[0];
 
-// Mapeo institucional de iniciales de analistas a IDs de usuario
-const MAPA_ANALISTAS: Record<string, number> = {
-  RG: 4, // Econ. Ana Belén Gómez
-  DB: 5, // Ing. David Paredes
-  NM: 4, // Econ. Ana Belén Gómez
-  MS: 4, // Econ. Ana Belén Gómez
-  MR: 10, // Sr. Manuel Ramos (Archivo)
-  HA: 9, // Abg. Roberto Intriago (Cobranzas y Garantías)
-  ID: 5, // Ing. David Paredes
-  JM: 3, // Ing. Carlos Mendoza (Jefe Presupuesto)
+// Mapeo histórico fallback de iniciales por si algún usuario aún no está registrado en la base de datos
+const MAPA_ANALISTAS_FALLBACK: Record<string, number> = {
+  RG: 4,  // Ricardo Gonzalez (Presupuesto)
+  DB: 5,  // David Barberan (Presupuesto)
+  NM: 7,  // Nandy Morales (Presupuesto)
+  MS: 12, // María Silva (Presupuesto)
+  ID: 13, // Ivonne de la Torre (Presupuesto)
+  HA: 14, // Hilda Arriaga (Cobranzas y Garantías)
+  MR: 15, // Maria Rodriguez (Presupuesto)
+  GP: 16, // Gabriela Peralta (Tesorería)
+  RL: 17, // Raúl Lindao (Contabilidad)
+  AC: 18, // Andrea Carrillo (Distrito Guayaquil)
+  RA: 19, // Roberto Armijo (Distrito Guayaquil)
+  AG: 20, // Ana García (Saliente)
+  VL: 21, // Vicente León (Saliente)
+  VP: 22, // Verónica Paguay (Saliente)
+  JM: 3,  // Ing. Carlos Mendoza (Jefe Presupuesto)
 };
+
+export interface AnalistaInfo {
+  token: string;
+  id_usuario: number;
+  nombre_completo: string;
+  id_area: number;
+}
+
+export function parseTokensAnalistas(texto: string): string[] {
+  if (!texto) return [];
+  return texto
+    .split(/[,/;\-]+/)
+    .map((s) => s.trim().toUpperCase())
+    .filter((s) => s.length > 0);
+}
+
+export function resolverCadenaAnalistas(
+  textoIniciales: string,
+  mapaUsuarios: Map<string, { id_usuario: number; nombre_completo: string; id_area: number }>,
+  idAreaDefecto: number = 2,
+  idUsuarioDefecto: number = 3
+): {
+  tokens: string[];
+  cadenaAnalistas: AnalistaInfo[];
+  ultimoAnalista: AnalistaInfo | null;
+  idAnalistaActivo: number;
+} {
+  const tokens = parseTokensAnalistas(textoIniciales);
+  const cadenaAnalistas: AnalistaInfo[] = [];
+
+  for (const tok of tokens) {
+    const user = mapaUsuarios.get(tok);
+    if (user) {
+      cadenaAnalistas.push({ token: tok, ...user });
+    } else if (MAPA_ANALISTAS_FALLBACK[tok]) {
+      cadenaAnalistas.push({
+        token: tok,
+        id_usuario: MAPA_ANALISTAS_FALLBACK[tok],
+        nombre_completo: `Analista (${tok})`,
+        id_area: idAreaDefecto,
+      });
+    }
+  }
+
+  const ultimoAnalista =
+    cadenaAnalistas.length > 0 ? cadenaAnalistas[cadenaAnalistas.length - 1] : null;
+  const idAnalistaActivo = ultimoAnalista ? ultimoAnalista.id_usuario : idUsuarioDefecto;
+
+  return {
+    tokens,
+    cadenaAnalistas,
+    ultimoAnalista,
+    idAnalistaActivo,
+  };
+}
 
 function normalizarCiudad(ciudadRaw: any): string {
   if (!ciudadRaw) return "GUAYAQUIL";
@@ -113,7 +175,7 @@ function mapearAnalista(iniciales: string): number {
   if (!iniciales) return 3; // Jefatura de Presupuesto por defecto
   const clean = iniciales.trim().toUpperCase();
   const primera = clean.split("/")[0].trim();
-  return MAPA_ANALISTAS[primera] || MAPA_ANALISTAS[clean] || 3;
+  return MAPA_ANALISTAS_FALLBACK[primera] || MAPA_ANALISTAS_FALLBACK[clean] || 3;
 }
 
 function mapearTipoTramitePago(tipoContratacion: string): number {
@@ -326,53 +388,125 @@ export class MigracionExcelService {
       )
     );
 
+    // Cargar dinámicamente el catálogo oficial de funcionarios (activos e históricos) con iniciales configuradas
+    const usuariosConIniciales = await prisma.usuarios.findMany({
+      where: { iniciales: { not: null } },
+      select: { id_usuario: true, nombre_completo: true, iniciales: true, id_area: true },
+    });
+    const mapaUsuariosPorInicial = new Map<
+      string,
+      { id_usuario: number; nombre_completo: string; id_area: number }
+    >();
+    for (const u of usuariosConIniciales) {
+      if (u.iniciales) {
+        mapaUsuariosPorInicial.set(u.iniciales.toUpperCase().trim(), {
+          id_usuario: u.id_usuario,
+          nombre_completo: u.nombre_completo,
+          id_area: u.id_area,
+        });
+      }
+    }
+
     // =========================================================================
-    // 1. PROCESAR HOJA PAGO
+    // 1. PROCESAR HOJA PAGO (Orden Cronológico Estricto)
     // =========================================================================
     const wsPago = obtenerHoja(wb, "PAGO");
     if (wsPago) {
+      const filasPago: Array<{
+        filaOriginal: number;
+        colNum: string;
+        quipuxRaw: string;
+        ciudad: string;
+        fechaRecepcion: Date;
+        fechaEntregaAnalista: Date | null;
+        fechaRecibeJco: Date | null;
+        fechaPago: Date | null;
+        tipoContratacion: string;
+        contrato: string;
+        certPresup: string;
+        item: string;
+        descripcion: string;
+        ruc: string | null;
+        proveedor: string;
+        periodo: string | null;
+        factura: string | null;
+        valor: number;
+        curDev: string | null;
+        inicialesAnalista: string;
+        estadoRaw: string;
+        novedades: string | null;
+        fechaDevolucion: Date | null;
+        memoDevolucion: string | null;
+      }> = [];
+
       for (let r = 5; r <= wsPago.rowCount; r++) {
         const row = wsPago.getRow(r);
         const colNum = (row.getCell(1).text || "").trim();
         const quipuxRaw = (row.getCell(4).text || "").trim();
         if (!colNum && !quipuxRaw) continue;
 
+        const fechaRecepcion = parseExcelDate(row.getCell(5).value) || new Date("2026-01-05");
+        filasPago.push({
+          filaOriginal: r,
+          colNum,
+          quipuxRaw,
+          ciudad: normalizarCiudad(row.getCell(3).text),
+          fechaRecepcion,
+          fechaEntregaAnalista: parseExcelDate(row.getCell(6).value),
+          fechaRecibeJco: parseExcelDate(row.getCell(18).value),
+          fechaPago: parseExcelDate(row.getCell(20).value),
+          tipoContratacion: (row.getCell(7).text || "").trim(),
+          contrato: (row.getCell(8).text || "").trim(),
+          certPresup: (row.getCell(9).text || "").trim(),
+          item: (row.getCell(10).text || "").trim(),
+          descripcion: (row.getCell(11).text || "").trim(),
+          ruc: (row.getCell(12).text || "").trim() || null,
+          proveedor: (row.getCell(13).text || "").trim() || "N/A",
+          periodo: (row.getCell(14).text || "").trim() || null,
+          factura: (row.getCell(15).text || "").trim() || null,
+          valor: parseDecimal(row.getCell(16).value),
+          curDev: (row.getCell(17).text || "").trim() || null,
+          inicialesAnalista: (row.getCell(21).text || "").trim(),
+          estadoRaw: (row.getCell(22).text || "DFI").trim(),
+          novedades: (row.getCell(23).text || "").trim() || null,
+          fechaDevolucion: parseExcelDate(row.getCell(24).value),
+          memoDevolucion: (row.getCell(25).text || "").trim() || null,
+        });
+      }
+
+      // Ordenar cronológicamente por fecha de recepción ascendente
+      filasPago.sort(
+        (a, b) =>
+          a.fechaRecepcion.getTime() - b.fechaRecepcion.getTime() ||
+          a.filaOriginal - b.filaOriginal
+      );
+
+      for (let idx = 0; idx < filasPago.length; idx++) {
+        const item = filasPago[idx];
+
         try {
-          const quipuxList = extraerQuipux(quipuxRaw);
-          let primaryQuipux = quipuxList[0] || `PAGO-2026-F${r}`;
+          const quipuxList = extraerQuipux(item.quipuxRaw);
+          let primaryQuipux = quipuxList[0] || `PAGO-2026-F${item.filaOriginal}`;
           if (existingQuipuxSet.has(primaryQuipux.toUpperCase())) {
-            primaryQuipux = `${primaryQuipux}-P${r}`;
+            primaryQuipux = `${primaryQuipux}-P${item.filaOriginal}`;
           }
           existingQuipuxSet.add(primaryQuipux.toUpperCase());
 
-          const ciudad = normalizarCiudad(row.getCell(3).text);
-          const fechaRecepcion = parseExcelDate(row.getCell(5).value) || new Date("2026-01-05");
-          const fechaEntregaAnalista = parseExcelDate(row.getCell(6).value);
-          const fechaRecibeJco = parseExcelDate(row.getCell(18).value);
-          const fechaPago = parseExcelDate(row.getCell(20).value);
+          const infoAnalistas = resolverCadenaAnalistas(
+            item.inicialesAnalista,
+            mapaUsuariosPorInicial,
+            2,
+            3
+          );
+          const idAnalista = infoAnalistas.idAnalistaActivo;
 
-          const tipoContratacion = (row.getCell(7).text || "").trim();
-          const contrato = (row.getCell(8).text || "").trim();
-          const certPresup = (row.getCell(9).text || "").trim();
-          const item = (row.getCell(10).text || "").trim();
-          const descripcion = (row.getCell(11).text || "").trim();
-          const ruc = (row.getCell(12).text || "").trim() || null;
-          const proveedor = (row.getCell(13).text || "").trim() || "N/A";
-          const periodo = (row.getCell(14).text || "").trim() || null;
-          const factura = (row.getCell(15).text || "").trim() || null;
-          const valor = parseDecimal(row.getCell(16).value);
-          const curDev = (row.getCell(17).text || "").trim() || null;
-          const inicialesAnalista = (row.getCell(21).text || "").trim();
-          const idAnalista = mapearAnalista(inicialesAnalista);
-          const estadoRaw = (row.getCell(22).text || "DFI").trim();
-          const novedades = (row.getCell(23).text || "").trim() || null;
-          const fechaDevolucion = parseExcelDate(row.getCell(24).value);
-          const memoDevolucion = (row.getCell(25).text || "").trim() || null;
+          const idTipoTramite = mapearTipoTramitePago(item.tipoContratacion);
+          const esAltaCuantia = item.valor >= 10000;
 
-          const idTipoTramite = mapearTipoTramitePago(tipoContratacion);
-          const esAltaCuantia = valor >= 10000;
-
-          // Mapeo del estado institucional
+          // ===================================================================
+          // CLASIFICACIÓN EXACTA EN LOS 7 ESTADOS REALES
+          // ===================================================================
+          const estLower = item.estadoRaw.toLowerCase();
           let estadoGeneral = "DFI";
           let subEstado = "DERIVADO_A_DFI";
           let idAreaActual = 1;
@@ -380,103 +514,137 @@ export class MigracionExcelService {
           let esDevuelto = false;
           let estaPausado = false;
           let autorizadoPago = false;
+          let fechaUltimoMovimiento = item.fechaRecepcion;
 
-          const estLower = estadoRaw.toLowerCase();
-          if (estLower.includes("archivo")) {
+          // BUCKET 1: PAGADO (Fecha de pago registrada en Tesorería)
+          if (item.fechaPago) {
+            estadoGeneral = "PAGADO";
+            subEstado = "PAGO_EFECTIVO";
+            autorizadoPago = true;
+            idAreaActual = 4; // Tesorería
+            idCustodioActual = 8; // Econ. Margarita Alarcón
+            fechaUltimoMovimiento = item.fechaPago;
+          }
+          // BUCKET 2: ARCHIVO (Expediente custodiado en Archivo Central)
+          else if (estLower.includes("archiv")) {
             estadoGeneral = "ARCHIVO";
             subEstado = "ARCHIVADO_DEFINITIVO";
-            idAreaActual = 6;
-            idCustodioActual = 10; // Manuel Ramos
-          } else if (estLower.includes("devuelto")) {
+            idAreaActual = 6; // Archivo Central
+            idCustodioActual = 10; // Sr. Manuel Ramos
+            fechaUltimoMovimiento = item.fechaRecepcion;
+          }
+          // BUCKET 3: DEVUELTO (Devuelto formalmente a la entidad requirente)
+          else if (
+            estLower.includes("devuel") ||
+            item.fechaDevolucion ||
+            (item.memoDevolucion && item.memoDevolucion.toLowerCase().includes("devuel"))
+          ) {
             estadoGeneral = "DEVUELTO";
             subEstado = "DEVUELTO_FORMALMENTE";
             esDevuelto = true;
-            idAreaActual = 1;
-            idCustodioActual = 2; // Secretaría DFI
-          } else if (estLower.includes("observad")) {
+            idAreaActual = 1; // Secretaría DFI
+            idCustodioActual = 2; // Lorena Zambrano
+            fechaUltimoMovimiento = item.fechaDevolucion || item.fechaRecepcion;
+          }
+          // BUCKET 4: CONTABILIDAD (Control Previo / Justificación de partida)
+          else if (
+            estLower.includes("contabil") ||
+            estLower.includes("justificaci") ||
+            item.fechaRecibeJco
+          ) {
+            estadoGeneral = "CONTABILIDAD";
+            subEstado = estLower.includes("justificaci")
+              ? "JUSTIFICACION_CONTABILIDAD"
+              : "EN_CONTABILIDAD";
+            idAreaActual = 3; // Contabilidad
+            idCustodioActual = 6; // CPA Sergio Lindao (Contador General)
+            fechaUltimoMovimiento =
+              item.fechaRecibeJco || item.fechaEntregaAnalista || item.fechaRecepcion;
+          }
+          // BUCKET 5: OBSERVADO / FACTURA (Pausado con novedad o a espera de factura)
+          else if (estLower.includes("observad") || estLower.includes("factura")) {
             estadoGeneral = "OBSERVADO";
-            subEstado = "OBSERVADO";
+            subEstado = estLower.includes("factura") ? "ESPERA_FACTURA" : "OBSERVADO";
             estaPausado = true;
-            idAreaActual = 2;
+            idAreaActual = 2; // Presupuesto
             idCustodioActual = idAnalista;
-          } else if (estLower.includes("factura")) {
-            estadoGeneral = "REVISION";
-            subEstado = "ESPERA_FACTURA";
-            estaPausado = true;
-            idAreaActual = 2;
-            idCustodioActual = idAnalista;
-          } else if (estLower.includes("presupuesto") || estLower.includes("revisión") || estLower.includes("revision")) {
+            fechaUltimoMovimiento = item.fechaEntregaAnalista || item.fechaRecepcion;
+          }
+          // BUCKET 6: EN REVISIÓN EN PRESUPUESTO
+          else if (estLower.includes("presupuesto") || estLower.includes("revisi")) {
             estadoGeneral = "REVISION";
             subEstado = "EN_REVISION_PRESUPUESTO";
-            idAreaActual = 2;
+            idAreaActual = 2; // Presupuesto
             idCustodioActual = idAnalista;
-          } else if (estLower.includes("contabilidad") || estLower.includes("justificaci")) {
-            estadoGeneral = "CONTROL_PREVIO";
-            subEstado = "EN_CONTROL_PREVIO";
-            idAreaActual = 3;
-            idCustodioActual = 6; // CPA Sergio Lindao
-          } else {
-            // DFI / PAGADO
-            if (fechaPago) {
-              estadoGeneral = "PAGADO";
-              subEstado = "PAGO_EFECTIVO";
-              autorizadoPago = true;
-              idAreaActual = 4; // Tesorería
-              idCustodioActual = 8; // Margarita Alarcón
-            } else {
-              estadoGeneral = "DFI";
-              subEstado = "DERIVADO_A_DFI";
-              idAreaActual = 1;
-              idCustodioActual = 1;
-            }
+            fechaUltimoMovimiento = item.fechaEntregaAnalista || item.fechaRecepcion;
+          }
+          // BUCKET 7: EN DFI PENDIENTE DE AUTORIZACIÓN DE PAGO
+          else {
+            estadoGeneral = "DFI";
+            subEstado = "DERIVADO_A_DFI";
+            idAreaActual = 1;
+            idCustodioActual = 1; // Directora Financiera
+            fechaUltimoMovimiento =
+              item.fechaRecibeJco || item.fechaEntregaAnalista || item.fechaRecepcion;
           }
 
-          const codigoTramite = `TRM-2026-P-${String(r).padStart(4, "0")}`;
+          // Numeración correlativa cronológica estricta
+          const codigoTramite = `TRM-2026-P-${String(idx + 1).padStart(4, "0")}`;
 
           const nuevoTramite = await prisma.tramites.create({
             data: {
               codigo_tramite: codigoTramite,
               numero_quipux: primaryQuipux,
-              fecha_memorando: fechaRecepcion,
-              fecha_recepcion_fisica: fechaRecepcion,
-              fecha_entrega_control_previo: fechaEntregaAnalista,
+              fecha_memorando: item.fechaRecepcion,
+              fecha_recepcion_fisica: item.fechaRecepcion,
+              fecha_entrega_control_previo: item.fechaEntregaAnalista,
               id_tipo_tramite: idTipoTramite,
               tipo_flujo: "PAGO",
               padre_gestion: "PAGO",
               tipo_gestion: "PAGO",
               area_requirente: "Dirección Financiera Aduanera",
-              ciudad,
-              asunto: descripcion || `Pago por concepto de ${tipoContratacion || "contratación"}`,
-              nro_tramite: contrato || null,
-              certificacion_presupuestaria: certPresup || null,
-              item_presupuestario: item || null,
-              proveedor_beneficiario: proveedor,
-              ruc_proveedor: ruc,
-              periodo_pago: periodo,
-              numero_factura: factura,
-              subtotal: valor,
-              monto_total: valor,
+              ciudad: item.ciudad,
+              asunto:
+                item.descripcion ||
+                `Pago por concepto de ${item.tipoContratacion || "contratación"}`,
+              nro_tramite: item.contrato || null,
+              certificacion_presupuestaria: item.certPresup || null,
+              item_presupuestario: item.item || null,
+              proveedor_beneficiario: item.proveedor,
+              ruc_proveedor: item.ruc,
+              periodo_pago: item.periodo,
+              numero_factura: item.factura,
+              subtotal: item.valor,
+              monto_total: item.valor,
               es_alta_cuantia: esAltaCuantia,
-              numero_cur_devengado: curDev,
-              numero_cur_compromiso: curDev,
-              fecha_pago: fechaPago,
+              numero_cur_devengado: item.curDev,
+              numero_cur_compromiso: item.curDev,
+              fecha_pago: item.fechaPago,
               autorizado_pago: autorizadoPago,
-              fecha_autorizacion_pago: fechaPago || (estadoGeneral === "DFI" ? fechaRecibeJco : null),
+              fecha_autorizacion_pago:
+                item.fechaPago || (estadoGeneral === "DFI" ? item.fechaRecibeJco : null),
               id_area_actual: idAreaActual,
               id_custodio_actual: idCustodioActual,
               estado_general: estadoGeneral,
               sub_estado: subEstado,
               es_devuelto: esDevuelto,
               esta_pausado: estaPausado,
-              motivo_observacion: novedades,
-              motivo_devolucion: memoDevolucion,
-              fecha_ingreso: fechaRecepcion,
-              fecha_ultimo_movimiento: fechaPago || fechaRecibeJco || fechaEntregaAnalista || fechaRecepcion,
+              fecha_pausa: estaPausado
+                ? item.fechaEntregaAnalista || item.fechaRecepcion
+                : null,
+              motivo_pausa: estaPausado
+                ? item.novedades || "Expediente con observaciones en trámite"
+                : null,
+              motivo_observacion: item.novedades,
+              motivo_devolucion:
+                item.memoDevolucion || (esDevuelto ? item.novedades : null),
+              fecha_ingreso: item.fechaRecepcion,
+              fecha_ultimo_movimiento: fechaUltimoMovimiento,
               fecha_ultima_modificacion: new Date(),
             },
           });
 
-          // Guardar Quipux adicionales en tramite_referencias
+          // Quipux adicionales vinculados
           const secondaryQuipux = quipuxList.slice(1);
           for (const extra of secondaryQuipux) {
             await prisma.tramite_referencias.create({
@@ -484,7 +652,7 @@ export class MigracionExcelService {
                 id_tramite: nuevoTramite.id_tramite,
                 tipo_documento: "QUIPUX_VINCULADO",
                 numero_documento: extra,
-                fecha_documento: fechaRecepcion,
+                fecha_documento: item.fechaRecepcion,
                 asunto_sumilla: "Quipux vinculado en Bitácora Histórica 2026 (Hoja PAGO)",
                 id_usuario_registro: idUsuarioAdmin,
               },
@@ -492,17 +660,111 @@ export class MigracionExcelService {
             totalReferenciasCreadas++;
           }
 
-          // Registrar en historial de movimientos
+          // Indexar Novedades en Referencias para búsqueda global
+          if (item.novedades) {
+            await prisma.tramite_referencias.create({
+              data: {
+                id_tramite: nuevoTramite.id_tramite,
+                tipo_documento: "NOVEDAD_BITACORA",
+                numero_documento:
+                  item.novedades.length > 50
+                    ? item.novedades.slice(0, 50)
+                    : item.novedades,
+                fecha_documento: item.fechaRecepcion,
+                asunto_sumilla: `Novedad de bitácora: ${item.novedades}`,
+                id_usuario_registro: idUsuarioAdmin,
+              },
+            });
+            totalReferenciasCreadas++;
+          }
+
+          // Indexar Memorando de Devolución en Referencias
+          if (item.memoDevolucion) {
+            await prisma.tramite_referencias.create({
+              data: {
+                id_tramite: nuevoTramite.id_tramite,
+                tipo_documento: "MEMORANDO_DEVOLUCION",
+                numero_documento:
+                  item.memoDevolucion.length > 50
+                    ? item.memoDevolucion.slice(0, 50)
+                    : item.memoDevolucion,
+                fecha_documento: item.fechaDevolucion || item.fechaRecepcion,
+                asunto_sumilla: `Memorando de Devolución formal: ${item.memoDevolucion}`,
+                id_usuario_registro: idUsuarioAdmin,
+              },
+            });
+            totalReferenciasCreadas++;
+          }
+
+          // Historial de movimientos: Traspasos entre analistas de Presupuesto
+          if (infoAnalistas.cadenaAnalistas.length > 1) {
+            const primerAnalista = infoAnalistas.cadenaAnalistas[0];
+            await prisma.historial_movimientos.create({
+              data: {
+                id_tramite: nuevoTramite.id_tramite,
+                id_usuario_entrega: idUsuarioAdmin,
+                id_usuario_recibe: primerAnalista.id_usuario,
+                id_area_origen: 1,
+                id_area_destino: primerAnalista.id_area,
+                tipo_accion: "ASIGNACION_ANALISTA",
+                comentarios: `Asignación inicial histórica a analista ${primerAnalista.nombre_completo} (${primerAnalista.token}) registrada en bitácora.`,
+                fecha_hora: item.fechaEntregaAnalista || item.fechaRecepcion,
+              },
+            });
+
+            for (let i = 1; i < infoAnalistas.cadenaAnalistas.length; i++) {
+              const previo = infoAnalistas.cadenaAnalistas[i - 1];
+              const actual = infoAnalistas.cadenaAnalistas[i];
+              await prisma.historial_movimientos.create({
+                data: {
+                  id_tramite: nuevoTramite.id_tramite,
+                  id_usuario_entrega: previo.id_usuario,
+                  id_usuario_recibe: actual.id_usuario,
+                  id_area_origen: previo.id_area,
+                  id_area_destino: actual.id_area,
+                  tipo_accion: "TRASPASO_CUSTODIA",
+                  comentarios: `Traspaso / Reasignación interna en Presupuesto (${previo.token} -> ${actual.token}): recibido por ${actual.nombre_completo}.`,
+                  fecha_hora: item.fechaEntregaAnalista || item.fechaRecepcion,
+                },
+              });
+            }
+          }
+
+          // Historial: Pase a Contabilidad si tuvo fecha JCO
+          if (item.fechaRecibeJco) {
+            await prisma.historial_movimientos.create({
+              data: {
+                id_tramite: nuevoTramite.id_tramite,
+                id_usuario_entrega: idAnalista,
+                id_usuario_recibe: 6, // CPA Sergio Lindao (Contador General)
+                id_area_origen: 2,
+                id_area_destino: 3,
+                tipo_accion: "PASE_A_CONTABILIDAD",
+                comentarios: `Expediente revisado en Presupuesto y entregado a Contabilidad (JCO) para Control Previo.`,
+                fecha_hora: item.fechaRecibeJco,
+              },
+            });
+          }
+
+          // Historial: Movimiento del estado final / actual del trámite
           await prisma.historial_movimientos.create({
             data: {
               id_tramite: nuevoTramite.id_tramite,
-              id_usuario_entrega: idUsuarioAdmin,
+              id_usuario_entrega: item.fechaRecibeJco
+                ? 6
+                : infoAnalistas.ultimoAnalista?.id_usuario || idUsuarioAdmin,
               id_usuario_recibe: idCustodioActual,
-              id_area_origen: 1,
+              id_area_origen: idAreaActual,
               id_area_destino: idAreaActual,
               tipo_accion: "MIGRACION_EXCEL_2026",
-              comentarios: `Migración histórica desde Bitácora Excel 2026 (Hoja PAGO, Fila ${r}). Estado bitácora: ${estadoRaw}. Analista: ${inicialesAnalista || "N/A"}.`,
-              fecha_hora: fechaRecepcion,
+              comentarios: `Migración histórica Bitácora 2026 (Hoja PAGO, Fila ${item.filaOriginal}). Estado bitácora: ${item.estadoRaw}. Analistas: ${item.inicialesAnalista || "N/A"}${
+                infoAnalistas.ultimoAnalista
+                  ? ` (Analista Presupuesto: ${infoAnalistas.ultimoAnalista.nombre_completo})`
+                  : ""
+              }${item.novedades ? ` | Novedades: ${item.novedades}` : ""}${
+                item.memoDevolucion ? ` | Memo Devolución: ${item.memoDevolucion}` : ""
+              }.`,
+              fecha_hora: fechaUltimoMovimiento,
             },
           });
 
@@ -510,7 +772,7 @@ export class MigracionExcelService {
         } catch (err: any) {
           errores.push({
             hoja: "PAGO",
-            fila: r,
+            fila: item.filaOriginal,
             mensaje: err.message || String(err),
           });
         }
@@ -518,46 +780,97 @@ export class MigracionExcelService {
     }
 
     // =========================================================================
-    // 2. PROCESAR HOJA GARANTÍA
+    // 2. PROCESAR HOJA GARANTÍA (Orden Cronológico Estricto)
     // =========================================================================
     const wsGarantia = obtenerHoja(wb, "GARANTIA");
     if (wsGarantia) {
+      const filasGarantia: Array<{
+        filaOriginal: number;
+        colNum: string;
+        tipoPagoRaw: string;
+        ciudad: string;
+        quipuxRaw: string;
+        fechaIngreso: Date;
+        fechaEntregaAnalista: Date | null;
+        descripcion: string;
+        nroLiquidacion: string | null;
+        beneficiario: string;
+        valor: number;
+        curContable: string | null;
+        fechaRecibeJco: Date | null;
+        fechaRecibeJac: Date | null;
+        fechaSolPago: Date | null;
+        inicialesAnalista: string;
+        estadoRaw: string;
+        novedades: string | null;
+        fechaDevolucion: Date | null;
+        memoDevolucion: string | null;
+      }> = [];
+
       for (let r = 4; r <= wsGarantia.rowCount; r++) {
         const row = wsGarantia.getRow(r);
         const colNum = (row.getCell(1).text || "").trim();
         const quipuxRaw = (row.getCell(4).text || "").trim();
         if (!colNum && !quipuxRaw) continue;
 
+        const fechaIngreso = parseExcelDate(row.getCell(5).value) || new Date("2026-01-05");
+        filasGarantia.push({
+          filaOriginal: r,
+          colNum,
+          tipoPagoRaw: (row.getCell(2).text || "Garantía").trim(),
+          ciudad: normalizarCiudad(row.getCell(3).text),
+          quipuxRaw,
+          fechaIngreso,
+          fechaEntregaAnalista: parseExcelDate(row.getCell(6).value),
+          descripcion: (row.getCell(7).text || "").trim(),
+          nroLiquidacion: (row.getCell(8).text || "").trim() || null,
+          beneficiario: (row.getCell(9).text || "").trim() || "N/A",
+          valor: parseDecimal(row.getCell(10).value),
+          curContable: (row.getCell(11).text || "").trim() || null,
+          fechaRecibeJco: parseExcelDate(row.getCell(12).value),
+          fechaRecibeJac: parseExcelDate(row.getCell(13).value),
+          fechaSolPago: parseExcelDate(row.getCell(14).value),
+          inicialesAnalista: (row.getCell(15).text || "").trim(),
+          estadoRaw: (row.getCell(16).text || "DFI").trim(),
+          novedades: (row.getCell(17).text || "").trim() || null,
+          fechaDevolucion: parseExcelDate(row.getCell(18).value),
+          memoDevolucion: (row.getCell(19).text || "").trim() || null,
+        });
+      }
+
+      // Ordenar cronológicamente por fecha de ingreso ascendente
+      filasGarantia.sort(
+        (a, b) =>
+          a.fechaIngreso.getTime() - b.fechaIngreso.getTime() ||
+          a.filaOriginal - b.filaOriginal
+      );
+
+      for (let idx = 0; idx < filasGarantia.length; idx++) {
+        const item = filasGarantia[idx];
+
         try {
-          const quipuxList = extraerQuipux(quipuxRaw);
-          let primaryQuipux = quipuxList[0] || `GAR-2026-F${r}`;
+          const quipuxList = extraerQuipux(item.quipuxRaw);
+          let primaryQuipux = quipuxList[0] || `GAR-2026-F${item.filaOriginal}`;
           if (existingQuipuxSet.has(primaryQuipux.toUpperCase())) {
-            primaryQuipux = `${primaryQuipux}-G${r}`;
+            primaryQuipux = `${primaryQuipux}-G${item.filaOriginal}`;
           }
           existingQuipuxSet.add(primaryQuipux.toUpperCase());
 
-          const tipoPagoRaw = (row.getCell(2).text || "Garantía").trim();
-          const ciudad = normalizarCiudad(row.getCell(3).text);
-          const fechaIngreso = parseExcelDate(row.getCell(5).value) || new Date("2026-01-05");
-          const fechaEntregaAnalista = parseExcelDate(row.getCell(6).value);
-          const descripcion = (row.getCell(7).text || "").trim();
-          const nroLiquidacion = (row.getCell(8).text || "").trim() || null;
-          const beneficiario = (row.getCell(9).text || "").trim() || "N/A";
-          const valor = parseDecimal(row.getCell(10).value);
-          const curContable = (row.getCell(11).text || "").trim() || null;
-          const fechaRecibeJco = parseExcelDate(row.getCell(12).value);
-          const fechaRecibeJac = parseExcelDate(row.getCell(13).value);
-          const fechaSolPago = parseExcelDate(row.getCell(14).value);
-          const inicialesAnalista = (row.getCell(15).text || "").trim();
-          const idAnalista = mapearAnalista(inicialesAnalista);
-          const estadoRaw = (row.getCell(16).text || "DFI").trim();
-          const novedades = (row.getCell(17).text || "").trim() || null;
-          const memoDevolucion = (row.getCell(19).text || "").trim() || null;
+          const infoAnalistas = resolverCadenaAnalistas(
+            item.inicialesAnalista,
+            mapaUsuariosPorInicial,
+            5,
+            9
+          );
+          const idAnalista = infoAnalistas.idAnalistaActivo;
 
-          const idTipoTramite = mapearTipoTramiteGarantia(tipoPagoRaw);
-          const esAltaCuantia = valor >= 10000;
+          const idTipoTramite = mapearTipoTramiteGarantia(item.tipoPagoRaw);
+          const esAltaCuantia = item.valor >= 10000;
 
-          // Mapeo del estado institucional
+          // ===================================================================
+          // CLASIFICACIÓN EXACTA EN LOS 7 ESTADOS REALES (GARANTÍAS)
+          // ===================================================================
+          const estLower = item.estadoRaw.toLowerCase();
           let estadoGeneral = "DFI";
           let subEstado = "DERIVADO_A_DFI";
           let idAreaActual = 1;
@@ -565,92 +878,126 @@ export class MigracionExcelService {
           let esDevuelto = false;
           let estaPausado = false;
           let autorizadoPago = false;
+          let fechaUltimoMovimiento = item.fechaIngreso;
 
-          const estLower = estadoRaw.toLowerCase();
-          if (estLower.includes("archivo")) {
+          // BUCKET 1: PAGADO / SOLICITUD DE PAGO EMITIDA
+          if (item.fechaSolPago) {
+            estadoGeneral = "PAGADO";
+            subEstado = "PAGO_EFECTIVO";
+            autorizadoPago = true;
+            idAreaActual = 5; // Cobranzas y Garantías
+            idCustodioActual = 9; // Abg. Roberto Intriago
+            fechaUltimoMovimiento = item.fechaSolPago;
+          }
+          // BUCKET 2: ARCHIVO
+          else if (estLower.includes("archiv")) {
             estadoGeneral = "ARCHIVO";
             subEstado = "ARCHIVADO_DEFINITIVO";
             idAreaActual = 6;
             idCustodioActual = 10;
-          } else if (estLower.includes("devuelto")) {
+            fechaUltimoMovimiento = item.fechaIngreso;
+          }
+          // BUCKET 3: DEVUELTO
+          else if (
+            estLower.includes("devuel") ||
+            item.fechaDevolucion ||
+            (item.memoDevolucion && item.memoDevolucion.toLowerCase().includes("devuel"))
+          ) {
             estadoGeneral = "DEVUELTO";
             subEstado = "DEVUELTO_FORMALMENTE";
             esDevuelto = true;
             idAreaActual = 1;
             idCustodioActual = 2;
-          } else if (estLower.includes("observad")) {
+            fechaUltimoMovimiento = item.fechaDevolucion || item.fechaIngreso;
+          }
+          // BUCKET 4: CONTABILIDAD
+          else if (estLower.includes("contabil") || item.fechaRecibeJco) {
+            estadoGeneral = "CONTABILIDAD";
+            subEstado = "EN_CONTABILIDAD";
+            idAreaActual = 3;
+            idCustodioActual = 6;
+            fechaUltimoMovimiento =
+              item.fechaRecibeJco || item.fechaEntregaAnalista || item.fechaIngreso;
+          }
+          // BUCKET 5: OBSERVADO
+          else if (estLower.includes("observad")) {
             estadoGeneral = "OBSERVADO";
             subEstado = "OBSERVADO";
             estaPausado = true;
-            idAreaActual = 2;
+            idAreaActual = 5;
             idCustodioActual = idAnalista;
-          } else if (estLower.includes("revisión") || estLower.includes("revision") || estLower.includes("presupuesto")) {
+            fechaUltimoMovimiento = item.fechaEntregaAnalista || item.fechaIngreso;
+          }
+          // BUCKET 6: EN REVISIÓN / PRESUPUESTO
+          else if (estLower.includes("revisión") || estLower.includes("revision") || estLower.includes("presupuesto")) {
             estadoGeneral = "REVISION";
             subEstado = "EN_REVISION_PRESUPUESTO";
             idAreaActual = 2;
             idCustodioActual = idAnalista;
-          } else if (estLower.includes("contabilidad")) {
-            estadoGeneral = "CONTROL_PREVIO";
-            subEstado = "EN_CONTROL_PREVIO";
-            idAreaActual = 3;
-            idCustodioActual = 6;
-          } else {
-            // DFI / Sol. Pago
-            if (fechaSolPago) {
-              estadoGeneral = "PAGADO";
-              subEstado = "PAGO_EFECTIVO";
-              autorizadoPago = true;
-              idAreaActual = 5; // Cobranzas y Garantías
-              idCustodioActual = 9; // Abg. Roberto Intriago
-            } else {
-              estadoGeneral = "DFI";
-              subEstado = "DERIVADO_A_DFI";
-              idAreaActual = 1;
-              idCustodioActual = 1;
-            }
+            fechaUltimoMovimiento = item.fechaEntregaAnalista || item.fechaIngreso;
+          }
+          // BUCKET 7: EN DFI
+          else {
+            estadoGeneral = "DFI";
+            subEstado = "DERIVADO_A_DFI";
+            idAreaActual = 1;
+            idCustodioActual = 1;
+            fechaUltimoMovimiento =
+              item.fechaRecibeJco || item.fechaEntregaAnalista || item.fechaIngreso;
           }
 
-          const codigoTramite = `TRM-2026-G-${String(r).padStart(4, "0")}`;
+          // Numeración correlativa cronológica estricta
+          const codigoTramite = `TRM-2026-G-${String(idx + 1).padStart(4, "0")}`;
 
           const nuevoTramite = await prisma.tramites.create({
             data: {
               codigo_tramite: codigoTramite,
               numero_quipux: primaryQuipux,
-              fecha_memorando: fechaIngreso,
-              fecha_recepcion_fisica: fechaIngreso,
-              fecha_entrega_control_previo: fechaEntregaAnalista,
+              fecha_memorando: item.fechaIngreso,
+              fecha_recepcion_fisica: item.fechaIngreso,
+              fecha_entrega_control_previo: item.fechaEntregaAnalista,
               id_tipo_tramite: idTipoTramite,
               tipo_flujo: "GARANTIA",
               padre_gestion: "GARANTIA",
-              tipo_gestion: tipoPagoRaw.toUpperCase().includes("CAUCIÓN") ? "DEVOLUCION_CAUCION" : "GARANTIA",
+              tipo_gestion: item.tipoPagoRaw.toUpperCase().includes("CAUCIÓN")
+                ? "DEVOLUCION_CAUCION"
+                : "GARANTIA",
               area_requirente: "Dirección Financiera Aduanera",
-              ciudad,
-              asunto: descripcion || `Devolución de Garantía / Caución`,
-              nro_tramite: nroLiquidacion || null,
-              numero_liquidacion: nroLiquidacion || null,
-              proveedor_beneficiario: beneficiario,
-              subtotal: valor,
-              monto_total: valor,
+              ciudad: item.ciudad,
+              asunto: item.descripcion || `Devolución de Garantía / Caución`,
+              nro_tramite: item.nroLiquidacion || null,
+              numero_liquidacion: item.nroLiquidacion || null,
+              proveedor_beneficiario: item.beneficiario,
+              subtotal: item.valor,
+              monto_total: item.valor,
               es_alta_cuantia: esAltaCuantia,
-              numero_cur_contable: curContable,
-              fecha_pago: fechaSolPago,
+              numero_cur_contable: item.curContable,
+              fecha_pago: item.fechaSolPago,
               autorizado_pago: autorizadoPago,
-              fecha_autorizacion_pago: fechaSolPago || (estadoGeneral === "DFI" ? fechaRecibeJco : null),
+              fecha_autorizacion_pago:
+                item.fechaSolPago || (estadoGeneral === "DFI" ? item.fechaRecibeJco : null),
               id_area_actual: idAreaActual,
               id_custodio_actual: idCustodioActual,
               estado_general: estadoGeneral,
               sub_estado: subEstado,
               es_devuelto: esDevuelto,
               esta_pausado: estaPausado,
-              motivo_observacion: novedades,
-              motivo_devolucion: memoDevolucion,
-              fecha_ingreso: fechaIngreso,
-              fecha_ultimo_movimiento: fechaSolPago || fechaRecibeJco || fechaEntregaAnalista || fechaIngreso,
+              fecha_pausa: estaPausado
+                ? item.fechaEntregaAnalista || item.fechaIngreso
+                : null,
+              motivo_pausa: estaPausado
+                ? item.novedades || "Garantía con observaciones en trámite"
+                : null,
+              motivo_observacion: item.novedades,
+              motivo_devolucion:
+                item.memoDevolucion || (esDevuelto ? item.novedades : null),
+              fecha_ingreso: item.fechaIngreso,
+              fecha_ultimo_movimiento: fechaUltimoMovimiento,
               fecha_ultima_modificacion: new Date(),
             },
           });
 
-          // Quipux adicionales
+          // Quipux adicionales vinculados
           const secondaryQuipux = quipuxList.slice(1);
           for (const extra of secondaryQuipux) {
             await prisma.tramite_referencias.create({
@@ -658,7 +1005,7 @@ export class MigracionExcelService {
                 id_tramite: nuevoTramite.id_tramite,
                 tipo_documento: "QUIPUX_VINCULADO",
                 numero_documento: extra,
-                fecha_documento: fechaIngreso,
+                fecha_documento: item.fechaIngreso,
                 asunto_sumilla: "Quipux vinculado en Bitácora Histórica 2026 (Hoja GARANTÍA)",
                 id_usuario_registro: idUsuarioAdmin,
               },
@@ -666,17 +1013,93 @@ export class MigracionExcelService {
             totalReferenciasCreadas++;
           }
 
-          // Historial de movimientos
+          // Indexar Novedades en Referencias
+          if (item.novedades) {
+            await prisma.tramite_referencias.create({
+              data: {
+                id_tramite: nuevoTramite.id_tramite,
+                tipo_documento: "NOVEDAD_BITACORA",
+                numero_documento:
+                  item.novedades.length > 50
+                    ? item.novedades.slice(0, 50)
+                    : item.novedades,
+                fecha_documento: item.fechaIngreso,
+                asunto_sumilla: `Novedad de garantía: ${item.novedades}`,
+                id_usuario_registro: idUsuarioAdmin,
+              },
+            });
+            totalReferenciasCreadas++;
+          }
+
+          // Indexar Memorando de Devolución en Referencias
+          if (item.memoDevolucion) {
+            await prisma.tramite_referencias.create({
+              data: {
+                id_tramite: nuevoTramite.id_tramite,
+                tipo_documento: "MEMORANDO_DEVOLUCION",
+                numero_documento:
+                  item.memoDevolucion.length > 50
+                    ? item.memoDevolucion.slice(0, 50)
+                    : item.memoDevolucion,
+                fecha_documento: item.fechaDevolucion || item.fechaIngreso,
+                asunto_sumilla: `Memorando de Devolución formal: ${item.memoDevolucion}`,
+                id_usuario_registro: idUsuarioAdmin,
+              },
+            });
+            totalReferenciasCreadas++;
+          }
+
+          // Historial de movimientos: Traspasos entre analistas
+          if (infoAnalistas.cadenaAnalistas.length > 1) {
+            const primerAnalista = infoAnalistas.cadenaAnalistas[0];
+            await prisma.historial_movimientos.create({
+              data: {
+                id_tramite: nuevoTramite.id_tramite,
+                id_usuario_entrega: idUsuarioAdmin,
+                id_usuario_recibe: primerAnalista.id_usuario,
+                id_area_origen: 1,
+                id_area_destino: primerAnalista.id_area,
+                tipo_accion: "ASIGNACION_ANALISTA",
+                comentarios: `Asignación inicial histórica a analista ${primerAnalista.nombre_completo} (${primerAnalista.token}) registrada en bitácora.`,
+                fecha_hora: item.fechaEntregaAnalista || item.fechaIngreso,
+              },
+            });
+
+            for (let i = 1; i < infoAnalistas.cadenaAnalistas.length; i++) {
+              const previo = infoAnalistas.cadenaAnalistas[i - 1];
+              const actual = infoAnalistas.cadenaAnalistas[i];
+              await prisma.historial_movimientos.create({
+                data: {
+                  id_tramite: nuevoTramite.id_tramite,
+                  id_usuario_entrega: previo.id_usuario,
+                  id_usuario_recibe: actual.id_usuario,
+                  id_area_origen: previo.id_area,
+                  id_area_destino: actual.id_area,
+                  tipo_accion: "TRASPASO_CUSTODIA",
+                  comentarios: `Traspaso / Reasignación interna (${previo.token} -> ${actual.token}): recibido por ${actual.nombre_completo}.`,
+                  fecha_hora: item.fechaEntregaAnalista || item.fechaIngreso,
+                },
+              });
+            }
+          }
+
+          // Historial: Movimiento del estado final / actual del trámite
           await prisma.historial_movimientos.create({
             data: {
               id_tramite: nuevoTramite.id_tramite,
-              id_usuario_entrega: idUsuarioAdmin,
+              id_usuario_entrega: infoAnalistas.ultimoAnalista?.id_usuario || idUsuarioAdmin,
               id_usuario_recibe: idCustodioActual,
-              id_area_origen: 1,
+              id_area_origen: idAreaActual === 5 ? 5 : 1,
               id_area_destino: idAreaActual,
               tipo_accion: "MIGRACION_EXCEL_2026",
-              comentarios: `Migración histórica desde Bitácora Excel 2026 (Hoja GARANTÍA, Fila ${r}). Estado bitácora: ${estadoRaw}. Analista: ${inicialesAnalista || "N/A"}.`,
-              fecha_hora: fechaIngreso,
+              comentarios: `Migración histórica Bitácora 2026 (Hoja GARANTÍA, Fila ${item.filaOriginal}). Estado bitácora: ${item.estadoRaw}. Analistas: ${item.inicialesAnalista || "N/A"}${
+                infoAnalistas.ultimoAnalista
+                  ? ` (Analista: ${infoAnalistas.ultimoAnalista.nombre_completo})`
+                  : ""
+              }${item.novedades ? ` | Novedades: ${item.novedades}` : ""}${
+                item.memoDevolucion ? ` | Memo Devolución: ${item.memoDevolucion}` : ""
+              }.`,
+              fecha_hora: fechaUltimoMovimiento,
             },
           });
 
@@ -684,7 +1107,7 @@ export class MigracionExcelService {
         } catch (err: any) {
           errores.push({
             hoja: "GARANTÍA",
-            fila: r,
+            fila: item.filaOriginal,
             mensaje: err.message || String(err),
           });
         }

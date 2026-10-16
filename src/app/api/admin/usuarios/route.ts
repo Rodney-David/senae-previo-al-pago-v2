@@ -29,6 +29,7 @@ export async function POST(request: NextRequest) {
       cargo,
       rol,
       id_area,
+      iniciales,
       estado_disponibilidad,
     } = body;
 
@@ -49,6 +50,8 @@ export async function POST(request: NextRequest) {
       INACTIVO: "INACTIVO",
     };
 
+    const cleanIniciales = iniciales ? String(iniciales).trim().toUpperCase() : null;
+
     const nuevoUsuario = await prisma.usuarios.create({
       data: {
         nombre_completo,
@@ -56,6 +59,7 @@ export async function POST(request: NextRequest) {
         cargo,
         rol: rol as any,
         id_area: Number(id_area),
+        iniciales: cleanIniciales,
         estado_disponibilidad: dispMap[estado_disponibilidad] || "DISPONIBLE",
         activo: true,
       },
@@ -83,6 +87,7 @@ export async function PUT(request: NextRequest) {
       cargo,
       rol,
       id_area,
+      iniciales,
       estado_disponibilidad,
       activo,
     } = body;
@@ -99,6 +104,7 @@ export async function PUT(request: NextRequest) {
       INACTIVO: "INACTIVO",
     };
 
+    const cleanIniciales = iniciales !== undefined ? (iniciales ? String(iniciales).trim().toUpperCase() : null) : undefined;
     const correo = correo_institucional || email;
 
     const usuarioActualizado = await prisma.usuarios.update({
@@ -109,6 +115,7 @@ export async function PUT(request: NextRequest) {
         ...(cargo && { cargo }),
         ...(rol && { rol: rol as any }),
         ...(id_area && { id_area: Number(id_area) }),
+        ...(cleanIniciales !== undefined && { iniciales: cleanIniciales }),
         ...(estado_disponibilidad && {
           estado_disponibilidad: dispMap[estado_disponibilidad] || estado_disponibilidad,
         }),

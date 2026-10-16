@@ -17,6 +17,7 @@ export interface UsuarioInstitucional {
   cargo: string;
   rol: string;
   id_area: number;
+  iniciales?: string | null;
   activo?: boolean | null;
   estado_disponibilidad?: string | null;
   area_nombre?: string;

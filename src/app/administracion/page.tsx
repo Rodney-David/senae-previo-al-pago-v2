@@ -25,9 +25,11 @@ import {
   SlidersHorizontal,
   KeyRound,
 } from "lucide-react";
-import { SeccionCatalogos } from "@/components/admin/SeccionCatalogos";
-import { SeccionMigracionExcel } from "@/components/admin/SeccionMigracionExcel";
-import { SeccionConfiguracionSLA } from "@/components/admin/SeccionConfiguracionSLA";
+import {
+  SeccionCatalogos,
+  SeccionMigracionExcel,
+  SeccionConfiguracionSLA,
+} from "@/components/admin";
 
 type AdminTab = "usuarios" | "parametros" | "catalogos" | "auditoria";
 type ParametrosSubTab = "sla" | "feriados" | "institucionales";
@@ -58,6 +60,7 @@ export default function AdministracionPage() {
   const [userNombre, setUserNombre] = useState("");
   const [userCorreo, setUserCorreo] = useState("");
   const [userCargo, setUserCargo] = useState("");
+  const [userIniciales, setUserIniciales] = useState("");
   const [userRol, setUserRol] = useState("ANALISTA");
   const [userArea, setUserArea] = useState("2");
   const [userDisp, setUserDisp] = useState("DISPONIBLE");
@@ -116,6 +119,7 @@ export default function AdministracionPage() {
         nombre_completo: userNombre.trim(),
         correo_institucional: userCorreo.trim(),
         cargo: userCargo.trim(),
+        iniciales: userIniciales.trim().toUpperCase() || null,
         rol: userRol,
         id_area: Number(userArea),
         estado_disponibilidad: userDisp,
@@ -153,6 +157,7 @@ export default function AdministracionPage() {
     setUserNombre(u.nombre_completo);
     setUserCorreo(u.correo_institucional);
     setUserCargo(u.cargo);
+    setUserIniciales(u.iniciales || "");
     setUserRol(u.rol);
     setUserArea(String(u.id_area));
     setUserDisp(u.estado_disponibilidad || "DISPONIBLE");
@@ -164,6 +169,7 @@ export default function AdministracionPage() {
     setUserNombre("");
     setUserCorreo("");
     setUserCargo("");
+    setUserIniciales("");
     setUserRol("ANALISTA");
     setUserArea("2");
     setUserDisp("DISPONIBLE");
@@ -388,6 +394,7 @@ export default function AdministracionPage() {
               <thead>
                 <tr className="border-b border-slate-200 bg-slate-50/70 text-[11px] font-bold text-slate-700 uppercase">
                   <th className="py-3 px-4">Funcionario</th>
+                  <th className="py-3 px-4 text-center">Iniciales / Código</th>
                   <th className="py-3 px-4">Correo Institucional</th>
                   <th className="py-3 px-4">Departamento Orgánico</th>
                   <th className="py-3 px-4">Cargo / Rol</th>
@@ -400,6 +407,15 @@ export default function AdministracionPage() {
                   <tr key={u.id_usuario} className="hover:bg-slate-50 transition-colors">
                     <td className="py-3 px-4 font-bold text-slate-900 uppercase">
                       {u.nombre_completo}
+                    </td>
+                    <td className="py-3 px-4 text-center">
+                      {u.iniciales ? (
+                        <span className="inline-block px-2.5 py-0.5 rounded text-[11px] font-mono font-bold bg-indigo-50 text-indigo-700 border border-indigo-200 uppercase shadow-2xs">
+                          {u.iniciales}
+                        </span>
+                      ) : (
+                        <span className="text-slate-400 italic text-[11px]">—</span>
+                      )}
                     </td>
                     <td className="py-3 px-4 text-slate-600 font-mono text-[11px]">
                       {u.correo_institucional}
@@ -906,18 +922,33 @@ export default function AdministracionPage() {
                 />
               </div>
 
-              <div>
-                <label className="block font-semibold text-slate-700 mb-1 uppercase">
-                  Cargo Nominal *
-                </label>
-                <input
-                  type="text"
-                  value={userCargo}
-                  onChange={(e) => setUserCargo(e.target.value)}
-                  placeholder="ej. Analista de Presupuesto 3"
-                  className="w-full p-2 border border-slate-300 rounded-lg uppercase font-medium"
-                  required
-                />
+              <div className="grid grid-cols-3 gap-2">
+                <div className="col-span-2">
+                  <label className="block font-semibold text-slate-700 mb-1 uppercase">
+                    Cargo Nominal *
+                  </label>
+                  <input
+                    type="text"
+                    value={userCargo}
+                    onChange={(e) => setUserCargo(e.target.value)}
+                    placeholder="ej. Analista de Presupuesto 3"
+                    className="w-full p-2 border border-slate-300 rounded-lg uppercase font-medium"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1 uppercase">
+                    Iniciales (Sumilla)
+                  </label>
+                  <input
+                    type="text"
+                    value={userIniciales}
+                    onChange={(e) => setUserIniciales(e.target.value.toUpperCase())}
+                    placeholder="ej. RG, DB"
+                    maxLength={10}
+                    className="w-full p-2 border border-slate-300 rounded-lg uppercase font-mono font-bold text-center text-indigo-700"
+                  />
+                </div>
               </div>
 
               <div className="grid grid-cols-2 gap-2">

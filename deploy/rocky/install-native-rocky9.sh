@@ -57,9 +57,9 @@ systemctl start postgresql-16
 
 # Configurar usuario y base de datos SENAE
 echo -e "${GREEN}[5/8] Configurando base de datos senae_control_previo...${NC}"
-DB_USER="senae_admin"
-DB_PASS="senae_segura_2026"
-DB_NAME="senae_control_previo"
+DB_USER="${SENAE_DB_USER:-senae_admin}"
+DB_PASS="${SENAE_DB_PASS:-$(openssl rand -hex 16)}"
+DB_NAME="${SENAE_DB_NAME:-senae_control_previo}"
 
 sudo -u postgres psql -tc "SELECT 1 FROM pg_roles WHERE rolname='${DB_USER}'" | grep -q 1 || \
     sudo -u postgres psql -c "CREATE USER ${DB_USER} WITH PASSWORD '${DB_PASS}' CREATEDB;"

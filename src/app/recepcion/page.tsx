@@ -4,7 +4,7 @@ import React, { useState, useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { formatCurrency } from "@/lib/utils";
 import { FilePlus2, DollarSign, AlertCircle, FileText, ShieldCheck } from "lucide-react";
-import { SearchableSelect } from "@/components/ui/SearchableSelect";
+import { SearchableSelect } from "@/components/ui";
 
 const GESTIONES_PADRE = [
   { codigo: "PAGO", nombre: "TIPO PAGO", descripcion: "Trámites con afectación presupuestaria o expedientes de pago" },

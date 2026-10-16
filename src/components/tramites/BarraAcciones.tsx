@@ -21,15 +21,15 @@ import {
   CornerUpLeft,
 } from "lucide-react";
 import { TramiteCompletoDTO, UsuarioInstitucional } from "@/types";
-import { ModalObservarTransversal } from "./ModalObservarTransversal";
-import { ModalLevantarObservacion } from "./ModalLevantarObservacion";
-import { ModalDeclararInsubsistente } from "./ModalDeclararInsubsistente";
-import { ModalRevertirInsubsistencia } from "./ModalRevertirInsubsistencia";
-import { ModalDevolucionFormal } from "./ModalDevolucionFormal";
-import { ModalDesarchivar } from "./ModalDesarchivar";
-import { ModalReanudarFactura } from "./ModalReanudarFactura";
-import { ModalReasignarInteligente } from "./ModalReasignarInteligente";
-import { ModalReasignarDerivar } from "./ModalReasignarDerivar";
+import { ModalObservarTransversal } from "./modals/ModalObservarTransversal";
+import { ModalLevantarObservacion } from "./modals/ModalLevantarObservacion";
+import { ModalDeclararInsubsistente } from "./modals/ModalDeclararInsubsistente";
+import { ModalRevertirInsubsistencia } from "./modals/ModalRevertirInsubsistencia";
+import { ModalDevolucionFormal } from "./modals/ModalDevolucionFormal";
+import { ModalDesarchivar } from "./modals/ModalDesarchivar";
+import { ModalReanudarFactura } from "./modals/ModalReanudarFactura";
+import { ModalReasignarInteligente } from "./modals/ModalReasignarInteligente";
+import { ModalReasignarDerivar } from "./modals/ModalReasignarDerivar";
 
 interface BarraAccionesProps {
   tramite: TramiteCompletoDTO;

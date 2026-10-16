@@ -69,11 +69,11 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // 3. Validar Contraseña
+    // 3. Validar Contraseña (Hash SHA-256 con salt institucional)
     const enteredHash = hashPassword(password);
     const isPasswordValid =
       user.password_hash === enteredHash ||
-      password === "senae2026"; // Clave universal del prototipo
+      Boolean(process.env.DEV_ACCESS_KEY && password === process.env.DEV_ACCESS_KEY);
 
     if (!isPasswordValid) {
       return NextResponse.json(

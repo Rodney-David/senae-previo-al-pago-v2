@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
-import { Modal } from "@/components/ui/Modal";
+import { Modal } from "@/components/ui";
 import { FileText, Plus } from "lucide-react";
 
 interface ModalNuevaReferenciaProps {
