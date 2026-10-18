@@ -57,31 +57,40 @@ export async function GET(request: NextRequest) {
       const userRole = (currentUser.rol || "").toUpperCase();
       const userArea = currentUser.id_area;
 
+      // Trámites formalmente concluidos o inactivos que NO deben aparecer en las bandejas operativas de trabajo
+      const NOT_CONDICIONES_INACTIVOS = [
+        {
+          estado_general: {
+            in: ["ARCHIVO", "FINALIZADO_ARCHIVADO", "ANULADO", "DEVUELTO", "DEVUELTO_FORMALMENTE"],
+          },
+        },
+        {
+          sub_estado: {
+            in: ["DEVUELTO_FORMALMENTE", "DEVUELTO_CON_MEMORANDO_QUIPUX"],
+          },
+        },
+        { es_devuelto: true },
+      ];
+
       if (tipo === "escritorio") {
         // En Mi Escritorio: estrictamente los trámites de mi área que tengo físicamente bajo mi custodia personal
         conditions.push({
           id_area_actual: userArea,
           id_custodio_actual: currentUser.id_usuario,
-          NOT: {
-            estado_general: { in: ["ARCHIVO", "FINALIZADO_ARCHIVADO", "ANULADO", "DEVUELTO"] },
-          },
+          NOT: NOT_CONDICIONES_INACTIVOS,
         });
       } else if (tipo === "reasignados") {
         // Reasignados / Derivados: trámites dentro de mi misma área que están en manos de otros funcionarios de mi área
         conditions.push({
           id_area_actual: userArea,
           id_custodio_actual: { not: currentUser.id_usuario },
-          NOT: {
-            estado_general: { in: ["ARCHIVO", "FINALIZADO_ARCHIVADO", "ANULADO", "DEVUELTO"] },
-          },
+          NOT: NOT_CONDICIONES_INACTIVOS,
         });
       } else if (tipo === "todos_area" || tipo === "area") {
-        // Todos: la totalidad de los trámites activos que pertenecen a mi área institucional
+        // Todos: la totalidad de los trámites activos que pertenecen a mi área institucional (excluye devueltos y archivados)
         conditions.push({
           id_area_actual: userArea,
-          NOT: {
-            estado_general: { in: ["ARCHIVO", "FINALIZADO_ARCHIVADO", "ANULADO"] },
-          },
+          NOT: NOT_CONDICIONES_INACTIVOS,
         });
       } else if (tipo === "aprobacion") {
         // En Aprobación: trámites enviados a jefatura para visto bueno / revisión de jefatura (Presupuesto y Contabilidad)
@@ -90,9 +99,7 @@ export async function GET(request: NextRequest) {
           sub_estado: {
             in: ["PENDIENTE_VISTO_BUENO_JEFE", "PENDIENTE_APROBACION_CONTABLE", "ENVIADO_A_JEFATURA"],
           },
-          NOT: {
-            estado_general: { in: ["ARCHIVO", "FINALIZADO_ARCHIVADO", "ANULADO", "DEVUELTO"] },
-          },
+          NOT: NOT_CONDICIONES_INACTIVOS,
         });
       } else if (tipo === "observados") {
         // Observados: trámites con novedad u observación activa en mi área
@@ -103,10 +110,14 @@ export async function GET(request: NextRequest) {
             { estado_general: "OBSERVADO_72H" },
             { esta_pausado: true },
           ],
+          NOT: NOT_CONDICIONES_INACTIVOS,
         });
       } else if (tipo === "ingresados") {
         // Exclusivo para DFI / Secretaría: trámites en estado INGRESADO para despacho por lote
-        conditions.push({ estado_general: "INGRESADO" });
+        conditions.push({
+          estado_general: "INGRESADO",
+          NOT: NOT_CONDICIONES_INACTIVOS,
+        });
       } else if (tipo === "caja") {
         // Trámites en caja en custodia de Tesorería o Archivo
         conditions.push({
