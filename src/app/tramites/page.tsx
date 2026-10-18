@@ -5,8 +5,18 @@ import { TramiteCompletoDTO, UsuarioInstitucional } from "@/types";
 import { formatCurrency, formatDate } from "@/lib/utils";
 import { BadgeEstado, SemaforoSLA } from "@/components/ui";
 import Link from "next/link";
-import { FileText, Search, RefreshCw, Filter, Trash2, User, FilePlus2 } from "lucide-react";
+import { FileText, Search, RefreshCw, Filter, Trash2, User, FilePlus2, Calendar } from "lucide-react";
 import { useRouter } from "next/navigation";
+
+function toIsoDateString(d: Date | string | null | undefined): string | null {
+  if (!d) return null;
+  if (typeof d === "string") {
+    return d.slice(0, 10);
+  }
+  const dateObj = new Date(d);
+  if (isNaN(dateObj.getTime())) return null;
+  return dateObj.toISOString().slice(0, 10);
+}
 
 export default function TramitesCatalogoPage() {
   const router = useRouter();
@@ -16,6 +26,9 @@ export default function TramitesCatalogoPage() {
   const [filtroArea, setFiltroArea] = useState("TODAS");
   const [filtroFuncionario, setFiltroFuncionario] = useState("TODOS");
   const [filtroEstado, setFiltroEstado] = useState("TODOS");
+  const [criterioFecha, setCriterioFecha] = useState<"INGRESO" | "MEMORANDO" | "MOVIMIENTO">("INGRESO");
+  const [fechaDesde, setFechaDesde] = useState("");
+  const [fechaHasta, setFechaHasta] = useState("");
   const [usuariosList, setUsuariosList] = useState<{ id_usuario: number; nombre_completo: string; cargo?: string | null; iniciales?: string | null }[]>([]);
   const [currentUser, setCurrentUser] = useState<UsuarioInstitucional | null>(null);
 
@@ -126,7 +139,29 @@ export default function TramitesCatalogoPage() {
         }
       }
 
-      // 4. Búsqueda Global: NÚMERO DE QUIPUX, GESTION, BENEFICIARIO, TIPO DE PROCESO, FUNCIONARIO, ESTADO
+      // 4. Filtro por Fechas (Rango Desde / Hasta)
+      if (fechaDesde || fechaHasta) {
+        let rawDate: Date | string | null | undefined = null;
+        if (criterioFecha === "INGRESO") {
+          rawDate = t.fecha_ingreso || t.fecha_recepcion_fisica;
+        } else if (criterioFecha === "MEMORANDO") {
+          rawDate = t.fecha_memorando;
+        } else if (criterioFecha === "MOVIMIENTO") {
+          rawDate = t.fecha_ultimo_movimiento;
+        }
+
+        const dateStr = toIsoDateString(rawDate);
+        if (!dateStr) return false;
+
+        if (fechaDesde && dateStr < fechaDesde) {
+          return false;
+        }
+        if (fechaHasta && dateStr > fechaHasta) {
+          return false;
+        }
+      }
+
+      // 5. Búsqueda Global: NÚMERO DE QUIPUX, GESTION, BENEFICIARIO, TIPO DE PROCESO, FUNCIONARIO, ESTADO
       if (q) {
         const quipux = (t.numero_quipux || "").toLowerCase();
         const codigo = (t.codigo_tramite || "").toLowerCase();
@@ -152,7 +187,7 @@ export default function TramitesCatalogoPage() {
 
       return true;
     });
-  }, [tramites, filtroArea, filtroFuncionario, filtroEstado, search]);
+  }, [tramites, filtroArea, filtroFuncionario, filtroEstado, criterioFecha, fechaDesde, fechaHasta, search]);
 
   return (
     <div className="space-y-6">
@@ -193,7 +228,7 @@ export default function TramitesCatalogoPage() {
         </div>
       </div>
 
-      {/* Filters Bar: AREAS, FUNCIONARIOS, ESTADOS y Búsqueda Global */}
+      {/* Filters Bar: AREAS, FUNCIONARIOS, ESTADOS, FECHAS y Búsqueda Global */}
       <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-xs flex flex-col xl:flex-row xl:items-center justify-between gap-3">
         <div className="flex flex-wrap items-center gap-2.5">
           <div className="flex items-center gap-1.5 text-xs text-slate-500 font-bold uppercase tracking-wider">
@@ -246,16 +281,79 @@ export default function TramitesCatalogoPage() {
             ))}
           </select>
 
+          {/* 4. FILTRO DE FECHAS (Criterio + Desde + Hasta) */}
+          <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-300 rounded-lg p-1 text-xs">
+            <div className="flex items-center gap-1 pl-1 text-[11px] font-bold text-slate-600 uppercase">
+              <Calendar className="w-3.5 h-3.5 text-blue-600 shrink-0" />
+              <span>Fecha:</span>
+            </div>
+
+            <select
+              value={criterioFecha}
+              onChange={(e) => setCriterioFecha(e.target.value as any)}
+              className="text-xs bg-white border border-slate-300 rounded py-1 px-2 focus:ring-1 focus:ring-blue-500 focus:outline-none font-semibold text-slate-700 cursor-pointer uppercase"
+              title="Seleccionar tipo de fecha para el rango"
+            >
+              <option value="INGRESO">Ingreso / Radicación</option>
+              <option value="MEMORANDO">Memorando Quipux</option>
+              <option value="MOVIMIENTO">Último Movimiento</option>
+            </select>
+
+            <div className="flex items-center gap-1">
+              <span className="text-[10px] font-bold text-slate-500 uppercase">Desde:</span>
+              <input
+                type="date"
+                value={fechaDesde}
+                onChange={(e) => setFechaDesde(e.target.value)}
+                className="text-xs bg-white border border-slate-300 rounded py-1 px-1.5 focus:ring-1 focus:ring-blue-500 focus:outline-none font-mono text-slate-700 cursor-pointer"
+                title="Fecha inicial"
+              />
+            </div>
+
+            <div className="flex items-center gap-1">
+              <span className="text-[10px] font-bold text-slate-500 uppercase">Hasta:</span>
+              <input
+                type="date"
+                value={fechaHasta}
+                onChange={(e) => setFechaHasta(e.target.value)}
+                className="text-xs bg-white border border-slate-300 rounded py-1 px-1.5 focus:ring-1 focus:ring-blue-500 focus:outline-none font-mono text-slate-700 cursor-pointer"
+                title="Fecha final"
+              />
+            </div>
+
+            {(fechaDesde || fechaHasta) && (
+              <button
+                type="button"
+                onClick={() => {
+                  setFechaDesde("");
+                  setFechaHasta("");
+                }}
+                className="text-slate-400 hover:text-rose-600 px-1 text-xs font-bold transition-colors"
+                title="Limpiar rango de fechas"
+              >
+                ✕
+              </button>
+            )}
+          </div>
+
           {/* Botón para restablecer filtros si hay alguno activo */}
-          {(filtroArea !== "TODAS" || filtroFuncionario !== "TODOS" || filtroEstado !== "TODOS" || search.trim() !== "") && (
+          {(filtroArea !== "TODAS" ||
+            filtroFuncionario !== "TODOS" ||
+            filtroEstado !== "TODOS" ||
+            fechaDesde !== "" ||
+            fechaHasta !== "" ||
+            search.trim() !== "") && (
             <button
               onClick={() => {
                 setFiltroArea("TODAS");
                 setFiltroFuncionario("TODOS");
                 setFiltroEstado("TODOS");
+                setFechaDesde("");
+                setFechaHasta("");
+                setCriterioFecha("INGRESO");
                 setSearch("");
               }}
-              className="px-2.5 py-1.5 text-[11px] font-bold text-slate-500 hover:text-slate-800 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors uppercase tracking-wider"
+              className="px-2.5 py-1.5 text-[11px] font-bold text-slate-500 hover:text-slate-800 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors uppercase tracking-wider cursor-pointer"
               title="Restablecer todos los filtros"
             >
               Limpiar
@@ -321,6 +419,14 @@ export default function TramitesCatalogoPage() {
                     <div className="font-mono font-bold text-blue-700 group-hover:text-blue-900 transition-colors text-xs" title={t.numero_quipux}>
                       {t.numero_quipux}
                     </div>
+                    {(t.fecha_ingreso || t.fecha_recepcion_fisica || t.fecha_memorando) && (
+                      <div
+                        className="text-[10px] text-slate-400 font-mono mt-0.5"
+                        title={`Fecha de Ingreso: ${formatDate(t.fecha_ingreso || t.fecha_recepcion_fisica || t.fecha_memorando)}`}
+                      >
+                        {formatDate(t.fecha_ingreso || t.fecha_recepcion_fisica || t.fecha_memorando)}
+                      </div>
+                    )}
                   </td>
 
                   {/* Gestión */}
