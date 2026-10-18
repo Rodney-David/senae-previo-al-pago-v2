@@ -72,7 +72,10 @@ export default function RecepcionPage() {
         const data = await res.json();
         const user = data.user || data.usuario;
         if (!user) {
-          router.replace("/login");
+          try {
+            localStorage.removeItem("senae_user_session");
+          } catch (e) {}
+          window.location.href = "/login";
           return;
         }
         const userRole = (user.rol || "").toUpperCase();

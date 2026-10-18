@@ -57,11 +57,30 @@ export default function LoginPage() {
   useEffect(() => {
     fetchCaptcha();
     if (typeof window !== "undefined") {
+      // 1. Limpieza rigurosa de cualquier sesión residual en caché local
+      try {
+        localStorage.removeItem("senae_user_session");
+      } catch (e) {}
+
+      // 2. Comprobar parámetros de URL informativos
       const params = new URLSearchParams(window.location.search);
       if (params.get("reason") === "inactivity") {
         setInfoMessage("Su sesión se cerró automáticamente por 30 minutos de inactividad.");
       } else if (params.get("expired") === "1") {
         setInfoMessage("Su sesión anterior ha finalizado. Ingrese nuevamente sus credenciales.");
+      }
+
+      // 3. Blindaje anti-anidación: si la URL del navegador no es /login (ej. RSC redirect interno)
+      if (!window.location.pathname.startsWith("/login")) {
+        window.location.href = "/login";
+        return;
+      }
+
+      // 4. Blindaje anti-anidación de layout: si detecta que el Navbar <header> está presente en el DOM
+      const inDashboardShell = document.querySelector("header") !== null;
+      if (inDashboardShell) {
+        window.location.reload();
+        return;
       }
     }
   }, []);

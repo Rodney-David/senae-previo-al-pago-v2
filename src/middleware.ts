@@ -68,6 +68,7 @@ export async function middleware(request: NextRequest) {
       loginUrl.searchParams.set("callbackUrl", pathname);
     }
     const redirectResponse = NextResponse.redirect(loginUrl);
+    redirectResponse.headers.set("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
     // Si la cookie existía pero ya expiró o no es válida, limpiarla del navegador
     if (sessionCookie) {
       redirectResponse.cookies.delete(SESSION_COOKIE_NAME);
