@@ -63,7 +63,7 @@ export async function GET(request: NextRequest) {
           id_area_actual: userArea,
           id_custodio_actual: currentUser.id_usuario,
           NOT: {
-            estado_general: { in: ["ARCHIVO", "FINALIZADO_ARCHIVADO", "ANULADO"] },
+            estado_general: { in: ["ARCHIVO", "FINALIZADO_ARCHIVADO", "ANULADO", "DEVUELTO"] },
           },
         });
       } else if (tipo === "reasignados") {
@@ -72,7 +72,7 @@ export async function GET(request: NextRequest) {
           id_area_actual: userArea,
           id_custodio_actual: { not: currentUser.id_usuario },
           NOT: {
-            estado_general: { in: ["ARCHIVO", "FINALIZADO_ARCHIVADO", "ANULADO"] },
+            estado_general: { in: ["ARCHIVO", "FINALIZADO_ARCHIVADO", "ANULADO", "DEVUELTO"] },
           },
         });
       } else if (tipo === "todos_area" || tipo === "area") {
@@ -91,7 +91,7 @@ export async function GET(request: NextRequest) {
             in: ["PENDIENTE_VISTO_BUENO_JEFE", "PENDIENTE_APROBACION_CONTABLE", "ENVIADO_A_JEFATURA"],
           },
           NOT: {
-            estado_general: { in: ["ARCHIVO", "FINALIZADO_ARCHIVADO", "ANULADO"] },
+            estado_general: { in: ["ARCHIVO", "FINALIZADO_ARCHIVADO", "ANULADO", "DEVUELTO"] },
           },
         });
       } else if (tipo === "observados") {

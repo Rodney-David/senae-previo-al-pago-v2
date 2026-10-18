@@ -141,6 +141,7 @@ export const BarraAcciones: React.FC<BarraAccionesProps> = ({
   const isInsubsistente = estado === "INSUBSISTENTE";
   const isObservado = estado === "OBSERVADO" || estado === "OBSERVADO_72H";
   const isArchivado = estado === "ARCHIVO" || estado === "FINALIZADO_ARCHIVADO";
+  const isDevuelto = estado === "DEVUELTO" || Boolean(tramite.es_devuelto);
 
   const isIngresado = estado === "INGRESADO";
   const isRevision = estado === "REVISION" && !tramite.esta_pausado;
@@ -237,6 +238,25 @@ export const BarraAcciones: React.FC<BarraAccionesProps> = ({
         </div>
       )}
 
+      {/* Alerta si el trámite está DEVUELTO */}
+      {isDevuelto && (
+        <div className="p-3 bg-orange-50 border border-orange-300 rounded-lg text-orange-950 text-xs flex items-start justify-between gap-3">
+          <div className="flex items-start gap-2.5">
+            <CornerUpLeft className="w-4 h-4 text-orange-600 shrink-0 mt-0.5" />
+            <div>
+              <span className="font-bold block uppercase tracking-wide">
+                EXPEDIENTE DEVUELTO FORMALMENTE A LA ENTIDAD REQUIRENTE
+              </span>
+              <p className="mt-0.5 text-orange-800">
+                {tramite.motivo_devolucion
+                  ? `Memorando / Causal: ${tramite.motivo_devolucion}.`
+                  : "Trámite devuelto formalmente a la unidad solicitante mediante memorando oficial. Flujo concluido fuera de la Dirección Financiera."}
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Alerta si el trámite está OBSERVADO */}
       {isObservado && (
         <div className="p-3 bg-amber-50 border border-amber-300 rounded-lg text-amber-900 text-xs flex items-start justify-between gap-3">
@@ -299,7 +319,7 @@ export const BarraAcciones: React.FC<BarraAccionesProps> = ({
       )}
 
       {/* Fila principal de botones de acción */}
-      {!isInsubsistente && (
+      {!isInsubsistente && !isDevuelto && (
         <div className="flex flex-wrap items-center justify-end gap-2">
             {/* 1. ESTADO INGRESADO (Secretaría DFI / Recepción física en Presupuesto) */}
             {isIngresado && (
