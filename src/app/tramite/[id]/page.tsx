@@ -215,36 +215,33 @@ export default function TramiteDetallePage() {
         isReadOnly={Boolean(isReadOnly && !isAdmin)}
       />
 
-      {/* Grid de Tarjetas de Fases Financieras */}
-      <div className="grid grid-cols-1 xl:grid-cols-2 gap-5 w-full max-w-full min-w-0">
-        {/* Card 3: Fase Presupuesto */}
-        <TarjetaPresupuesto
-          tramite={tramite}
-          currentUser={targetUserForEditing}
-          onRefresh={fetchTramite}
-        />
+      {/* Card 3: Fase Presupuesto */}
+      <TarjetaPresupuesto
+        tramite={tramite}
+        currentUser={targetUserForEditing}
+        onRefresh={fetchTramite}
+      />
 
-        {/* Card 4: Fase Contabilidad */}
-        <TarjetaContabilidad
-          tramite={tramite}
-          currentUser={targetUserForEditing}
-          onRefresh={fetchTramite}
-        />
+      {/* Card 4: Fase Contabilidad */}
+      <TarjetaContabilidad
+        tramite={tramite}
+        currentUser={targetUserForEditing}
+        onRefresh={fetchTramite}
+      />
 
-        {/* Card 5: Fase Tesorería y Pagos */}
-        <TarjetaTesoreria
-          tramite={tramite}
-          currentUser={targetUserForEditing}
-          onRefresh={fetchTramite}
-        />
+      {/* Card 5: Fase Tesorería y Pagos */}
+      <TarjetaTesoreria
+        tramite={tramite}
+        currentUser={targetUserForEditing}
+        onRefresh={fetchTramite}
+      />
 
-        {/* Card 6: Custodia de Archivo */}
-        <TarjetaArchivo
-          tramite={tramite}
-          currentUser={targetUserForEditing}
-          onRefresh={fetchTramite}
-        />
-      </div>
+      {/* Card 6: Custodia de Archivo */}
+      <TarjetaArchivo
+        tramite={tramite}
+        currentUser={targetUserForEditing}
+        onRefresh={fetchTramite}
+      />
 
       {/* Card 7: Bitácora Histórica (Timeline) */}
       <TimelineBitacora

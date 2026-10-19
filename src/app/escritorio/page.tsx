@@ -1051,7 +1051,7 @@ export default function EscritorioPage() {
                 <tr className="border-b border-slate-200 bg-slate-50 text-[11px] font-bold text-slate-700 uppercase tracking-wider">
                   {/* Columna de Checkbox para despacho / autorización por lote */}
                   {(isDFIOrAdmin || isPresupuestoOrAdmin) && (
-                    <th className="py-3 px-2 text-center w-12 min-w-[48px] sticky left-0 z-20 bg-slate-50">
+                    <th className="py-3 px-2 text-center w-12 min-w-[48px] max-w-[48px] sticky left-0 z-20 bg-slate-50">
                       {selectableTramitesEnVista.length > 0 && (
                         <button
                           type="button"
@@ -1075,19 +1075,19 @@ export default function EscritorioPage() {
                     </th>
                   )}
                   <th
-                    className={`py-3 px-3 text-center w-44 min-w-[150px] sticky ${
+                    className={`py-3 px-3 text-center w-44 min-w-[150px] max-w-[170px] sticky ${
                       isDFIOrAdmin || isPresupuestoOrAdmin ? "left-12" : "left-0"
                     } z-20 bg-slate-50 border-r border-slate-200/80`}
                   >
                     NÚMERO QUIPUX
                   </th>
-                  <th className="py-3 px-3 text-left whitespace-nowrap">GESTIÓN</th>
-                  <th className="py-3 px-3.5 text-left w-56 min-w-[180px]">BENEFICIARIO / RUC</th>
-                  <th className="py-3 px-3.5 text-left w-48 min-w-[150px]">TIPO DE PROCESO</th>
-                  <th className="py-3 px-3 text-left w-44 min-w-[140px]">FUNCIONARIO</th>
-                  <th className="py-3 px-3 text-center w-28 min-w-[105px]">MONTO TOTAL</th>
-                  <th className="py-3 px-2.5 text-center w-24 min-w-[85px]">SLA (6D)</th>
-                  <th className="py-3 px-3 text-center w-36 min-w-[130px]">ESTADO</th>
+                  <th className="py-3 px-3 text-left w-28 min-w-[90px] max-w-[110px] whitespace-nowrap">GESTIÓN</th>
+                  <th className="py-3 px-3.5 text-left min-w-[180px] max-w-[320px]">BENEFICIARIO / RUC</th>
+                  <th className="py-3 px-3.5 text-left w-44 min-w-[140px] max-w-[200px]">TIPO DE PROCESO</th>
+                  <th className="py-3 px-3 text-left w-40 min-w-[130px] max-w-[170px]">FUNCIONARIO</th>
+                  <th className="py-3 px-3 text-right w-28 min-w-[100px]">MONTO TOTAL</th>
+                  <th className="py-3 px-2 text-center w-24 min-w-[80px]">SLA (6D)</th>
+                  <th className="py-3 px-3 text-center w-28 min-w-[100px]">ESTADO</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 text-xs">
@@ -1113,7 +1113,7 @@ export default function EscritorioPage() {
                       {/* Checkbox de selección */}
                       {(isDFIOrAdmin || isPresupuestoOrAdmin) && (
                         <td
-                          className={`py-3.5 px-2 text-center align-middle sticky left-0 z-10 transition-colors ${
+                          className={`py-3.5 px-2 text-center align-middle w-12 min-w-[48px] max-w-[48px] sticky left-0 z-10 transition-colors ${
                             isSelected
                               ? "bg-blue-50 group-hover:bg-blue-100/90"
                               : "bg-white group-hover:bg-slate-50"
@@ -1142,7 +1142,7 @@ export default function EscritorioPage() {
 
                       {/* Número Quipux Sticky Left */}
                       <td
-                        className={`py-3.5 px-3 align-middle text-center whitespace-nowrap sticky ${
+                        className={`py-3.5 px-3 align-middle text-center w-44 min-w-[150px] max-w-[170px] whitespace-nowrap sticky ${
                           isDFIOrAdmin || isPresupuestoOrAdmin ? "left-12" : "left-0"
                         } z-10 transition-colors border-r border-slate-200/80 ${
                           isSelected
@@ -1151,14 +1151,14 @@ export default function EscritorioPage() {
                         }`}
                       >
                         <div
-                          className="font-mono font-bold text-blue-700 group-hover:text-blue-900 transition-colors text-xs"
+                          className="font-mono font-bold text-blue-700 group-hover:text-blue-900 transition-colors text-xs max-w-[160px] truncate mx-auto"
                           title={t.numero_quipux}
                         >
                           {t.numero_quipux}
                         </div>
                         {(t.fecha_ingreso || t.fecha_recepcion_fisica || t.fecha_memorando) && (
                           <div
-                            className="text-[10px] text-slate-400 font-mono mt-0.5"
+                            className="text-[10px] text-slate-400 font-mono mt-0.5 max-w-[160px] truncate mx-auto"
                             title={`Fecha de Ingreso: ${formatDate(
                               t.fecha_ingreso || t.fecha_recepcion_fisica || t.fecha_memorando
                             )}`}
@@ -1169,9 +1169,9 @@ export default function EscritorioPage() {
                       </td>
 
                       {/* Gestión */}
-                      <td className="py-3.5 px-3 align-middle whitespace-nowrap">
+                      <td className="py-3.5 px-3 align-middle w-28 min-w-[90px] max-w-[110px] whitespace-nowrap">
                         <div className="flex flex-col gap-0.5">
-                          <span className="text-[10px] uppercase font-bold text-slate-500">
+                          <span className="text-[10px] uppercase font-bold text-slate-500 truncate">
                             {t.padre_gestion || t.tipo_flujo || "PAGO"}
                           </span>
                           <span className="font-semibold text-slate-800 text-[11px] truncate">
@@ -1181,7 +1181,7 @@ export default function EscritorioPage() {
                       </td>
 
                       {/* Beneficiario / RUC */}
-                      <td className="py-3.5 px-3.5 align-middle">
+                      <td className="py-3.5 px-3.5 align-middle min-w-[180px] max-w-[320px]">
                         <div
                           className="font-semibold text-slate-800 uppercase line-clamp-2 leading-tight"
                           title={t.proveedor_beneficiario}
@@ -1194,7 +1194,7 @@ export default function EscritorioPage() {
                       </td>
 
                       {/* Tipo de Proceso */}
-                      <td className="py-3.5 px-3.5 align-middle">
+                      <td className="py-3.5 px-3.5 align-middle w-44 min-w-[140px] max-w-[200px]">
                         <div
                           className="text-slate-800 uppercase line-clamp-2 leading-snug text-[11px] font-semibold"
                           title={t.tipos_tramite?.nombre || "CONTRATACIÓN"}
@@ -1204,7 +1204,7 @@ export default function EscritorioPage() {
                       </td>
 
                       {/* Funcionario (Custodio Actual del Trámite) */}
-                      <td className="py-3.5 px-3 align-middle whitespace-nowrap">
+                      <td className="py-3.5 px-3 align-middle w-40 min-w-[130px] max-w-[170px] whitespace-nowrap">
                         <div
                           className="font-bold text-slate-800 text-[11px] truncate uppercase flex items-center gap-1.5"
                           title={t.usuarios?.nombre_completo || "Sin Asignar"}
@@ -1220,19 +1220,19 @@ export default function EscritorioPage() {
                       </td>
 
                       {/* Monto Total */}
-                      <td className="py-3.5 px-3 align-middle text-center whitespace-nowrap">
+                      <td className="py-3.5 px-3 align-middle text-right whitespace-nowrap w-28 min-w-[100px]">
                         <div className="font-mono font-bold text-slate-900 text-xs">
                           {formatCurrency(t.monto_total || t.subtotal || 0)}
                         </div>
                       </td>
 
                       {/* Semáforo SLA */}
-                      <td className="py-3.5 px-2.5 align-middle text-center whitespace-nowrap">
+                      <td className="py-3.5 px-2 align-middle text-center whitespace-nowrap w-24 min-w-[80px]">
                         <SemaforoSLA sla={t.sla} />
                       </td>
 
                       {/* Estado Oficial & Indicador de Caja */}
-                      <td className="py-3.5 px-3 align-middle text-center whitespace-nowrap">
+                      <td className="py-3.5 px-3 align-middle text-center whitespace-nowrap w-28 min-w-[100px]">
                         <div className="flex flex-col items-center gap-1">
                           <BadgeEstado estado={t.estado_general} subEstado={t.sub_estado} />
                           {(t.caja?.codigo_caja || t.codigo_tomo_caja) && (

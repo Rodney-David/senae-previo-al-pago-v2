@@ -253,24 +253,46 @@ export function obtenerHoja(wb: ExcelJS.Workbook, tipo: "PAGO" | "GARANTIA"): Ex
 
 /**
  * Extrae Quipux individuales de un texto o celda que contenga múltiples memorandos.
+ * Detecta y extrae todos los códigos que sigan el patrón institucional Quipux (SENAE, MEMO, OFICIO, CZ*, D*, etc.)
+ * o separa por saltos de línea, comas, punto y coma o espacios en blanco.
  */
 export function extraerQuipux(texto: string): string[] {
   if (!texto) return [];
-  const tokens = texto.split(/[\r\n,;]+/);
+
   const list: string[] = [];
   const seen = new Set<string>();
 
-  for (const t of tokens) {
-    const clean = t.trim();
-    if (clean.length >= 6 && clean.includes("-") && !seen.has(clean.toUpperCase())) {
-      seen.add(clean.toUpperCase());
-      list.push(clean);
+  // 1. Patrón Quipux institucional (ej. SENAE-DDQ-2026-0283-PV, SENAE-DSGQ-2026-7900-E, MEMO-..., CZ5-...)
+  const regex = /(?:SENAE?|MEMO|OFICIO|CZ[0-9]|D[A-Z]{2,4}|[A-Z]{2,6})-[A-Z0-9]+(?:-[A-Z0-9]+)?-\d{4}-\d+-[A-Z0-9]+/gi;
+  const matches = texto.match(regex);
+
+  if (matches && matches.length > 0) {
+    for (const m of matches) {
+      const clean = m.trim().toUpperCase();
+      if (!seen.has(clean)) {
+        seen.add(clean);
+        list.push(clean);
+      }
     }
   }
 
+  // 2. Si no se encontraron con regex, separar por saltos de línea, comas, punto y coma o espacios
+  if (list.length === 0) {
+    const tokens = texto.split(/[\r\n,;\s]+/);
+    for (const t of tokens) {
+      const clean = t.trim();
+      if (clean.length >= 6 && clean.includes("-") && !seen.has(clean.toUpperCase())) {
+        seen.add(clean.toUpperCase());
+        list.push(clean);
+      }
+    }
+  }
+
+  // 3. Fallback si no tiene guion pero contiene texto
   if (list.length === 0 && texto.trim()) {
     list.push(texto.trim());
   }
+
   return list;
 }
 

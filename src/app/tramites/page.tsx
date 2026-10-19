@@ -546,10 +546,10 @@ export default function TramitesCatalogoPage() {
             No se encontraron trámites que coincidan con los filtros de búsqueda.
           </div>
         ) : (
-          <table className="min-w-[950px] w-full border-collapse">
+          <table className="min-w-[900px] w-full border-collapse">
             <thead>
               <tr className="border-b border-slate-200 bg-slate-50 text-[11px] font-bold text-slate-700 uppercase tracking-wider">
-                <th className="py-3 px-3 text-center w-36 min-w-[130px] sticky left-0 bg-slate-50 z-20 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)]">
+                <th className="py-3 px-3 text-center w-40 min-w-[140px] sticky left-0 bg-slate-50 z-20 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)]">
                   NÚMERO QUIPUX
                 </th>
                 <th className="py-3 px-3 text-left w-24 min-w-[80px] whitespace-nowrap">
@@ -561,16 +561,16 @@ export default function TramitesCatalogoPage() {
                 <th className="py-3 px-3 text-left min-w-[130px] max-w-[170px]">
                   TIPO DE PROCESO
                 </th>
-                <th className="py-3 px-3 text-left min-w-[130px] max-w-[160px]">
+                <th className="py-3 px-3 text-left min-w-[120px] max-w-[150px]">
                   FUNCIONARIO
                 </th>
-                <th className="py-3 px-3 text-right w-28 min-w-[100px]">
+                <th className="py-3 px-3 text-right w-28 min-w-[95px]">
                   MONTO TOTAL
                 </th>
-                <th className="py-3 px-2 text-center w-24 min-w-[80px]">
+                <th className="py-3 px-2 text-center w-20 min-w-[70px]">
                   SLA (6D)
                 </th>
-                <th className="py-3 px-3 text-center w-36 min-w-[120px]">
+                <th className="py-3 px-3 text-center w-28 min-w-[100px]">
                   ESTADO
                 </th>
               </tr>
@@ -585,13 +585,13 @@ export default function TramitesCatalogoPage() {
                   className="hover:bg-blue-50/70 transition-colors cursor-pointer select-none group"
                 >
                   {/* NÚMERO QUIPUX: Columna fija a la izquierda al hacer scroll horizontal */}
-                  <td className="py-3 px-3 align-middle text-center whitespace-nowrap w-36 min-w-[130px] sticky left-0 bg-white z-10 group-hover:bg-blue-50/90 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)] transition-colors">
-                    <div className="font-mono font-bold text-blue-700 group-hover:text-blue-900 transition-colors text-xs truncate" title={t.numero_quipux}>
+                  <td className="py-3 px-3 align-middle text-center whitespace-nowrap w-40 min-w-[140px] sticky left-0 bg-white z-10 group-hover:bg-blue-50/90 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)] transition-colors overflow-hidden">
+                    <div className="font-mono font-bold text-blue-700 group-hover:text-blue-900 transition-colors text-xs max-w-[160px] truncate overflow-hidden mx-auto" title={t.numero_quipux}>
                       {t.numero_quipux}
                     </div>
                     {(t.fecha_ingreso || t.fecha_recepcion_fisica || t.fecha_memorando) && (
                       <div
-                        className="text-[10px] text-slate-400 font-mono mt-0.5 truncate"
+                        className="text-[10px] text-slate-400 font-mono mt-0.5 max-w-[160px] truncate overflow-hidden mx-auto"
                         title={`Fecha de Ingreso: ${formatDate(t.fecha_ingreso || t.fecha_recepcion_fisica || t.fecha_memorando)}`}
                       >
                         {formatDate(t.fecha_ingreso || t.fecha_recepcion_fisica || t.fecha_memorando)}
@@ -640,7 +640,7 @@ export default function TramitesCatalogoPage() {
                   </td>
 
                   {/* FUNCIONARIO */}
-                  <td className="py-3 px-3 align-middle min-w-[130px] max-w-[160px] whitespace-nowrap">
+                  <td className="py-3 px-3 align-middle min-w-[120px] max-w-[150px] whitespace-nowrap">
                     <div
                       className="font-bold text-slate-800 text-[11px] truncate uppercase flex items-center gap-1.5"
                       title={t.usuarios?.nombre_completo || "Sin Asignar"}
@@ -656,19 +656,19 @@ export default function TramitesCatalogoPage() {
                   </td>
 
                   {/* MONTO TOTAL */}
-                  <td className="py-3 px-3 align-middle text-right w-28 min-w-[100px] whitespace-nowrap">
+                  <td className="py-3 px-3 align-middle text-right w-28 min-w-[95px] whitespace-nowrap">
                     <div className="font-mono font-bold text-slate-900 text-xs">
                       {formatCurrency(t.monto_total)}
                     </div>
                   </td>
 
                   {/* SLA (6D) */}
-                  <td className="py-3 px-2 align-middle text-center w-24 min-w-[80px] whitespace-nowrap">
+                  <td className="py-3 px-2 align-middle text-center w-20 min-w-[70px] whitespace-nowrap">
                     <SemaforoSLA sla={t.sla} />
                   </td>
 
                   {/* ESTADO */}
-                  <td className="py-3 px-3 align-middle text-center w-36 min-w-[120px] whitespace-nowrap">
+                  <td className="py-3 px-3 align-middle text-center w-28 min-w-[100px] whitespace-nowrap">
                     <BadgeEstado estado={t.estado_general} subEstado={t.sub_estado} />
                   </td>
                 </tr>

@@ -1,5 +1,5 @@
 import { prisma } from "../src/lib/prisma";
-import { MigracionExcelService, RUTA_DEFAULT_EXCEL_2026 } from "../src/services/migracionExcelService";
+import { MigracionExcelService, RUTA_DEFAULT_EXCEL_2026, extraerQuipux } from "../src/services/migracionExcelService";
 
 async function main() {
   console.log("===============================================================================");
@@ -128,6 +128,14 @@ async function main() {
     where: { tipo_documento: "QUIPUX_VINCULADO" },
   });
   console.log(`\nTotal Quipux Secundarios Vinculados en Referencias: ${referenciasVinculadas}`);
+
+  // 7. Verificación de trámites con múltiples Quipux en numero_quipux
+  const todosTramites = await prisma.tramites.findMany({ select: { numero_quipux: true } });
+  const tramitesConMultiples = todosTramites.filter(
+    (t) => extraerQuipux(t.numero_quipux).length > 1 || t.numero_quipux.trim().includes(" ")
+  );
+  console.log(`- Trámites con múltiples Quipux en campo principal: ${tramitesConMultiples.length} (Esperado: 0)`);
+
   console.log(`\nProceso completado exitosamente en ${((Date.now() - t0) / 1000).toFixed(2)} segundos.`);
 }
 
