@@ -26,7 +26,17 @@ export async function GET(
           include: {
             tipos_tramite: true,
             areas: true,
-            usuarios: true,
+            usuarios: {
+              select: {
+                id_usuario: true,
+                nombre_completo: true,
+                correo_institucional: true,
+                cargo: true,
+                rol: true,
+                id_area: true,
+                activo: true,
+              },
+            },
           },
           orderBy: {
             fecha_pago: "desc",

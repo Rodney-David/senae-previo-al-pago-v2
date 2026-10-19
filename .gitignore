@@ -54,8 +54,10 @@ prisma/dev.db-journal
 # OS Files & packages
 .DS_Store
 Thumbs.db
+# Packages & Dumps
 *.zip
 /uploads/
+PROYECTO_COMPLETO_SENAE.txt
 
 # IDEs
 .idea/

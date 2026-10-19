@@ -167,7 +167,7 @@ export const SeccionMigracionExcel: React.FC = () => {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 w-full max-w-full min-w-0">
       {/* Input oculto de archivo para selección manual */}
       <input
         type="file"
@@ -416,11 +416,11 @@ export const SeccionMigracionExcel: React.FC = () => {
       )}
 
       {/* Pestañas de Vista Previa y Diagnóstico */}
-      <div className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-2xs">
-        <div className="flex border-b border-slate-200 bg-slate-50/80 px-4 pt-3 gap-2 text-xs font-semibold">
+      <div className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-2xs w-full max-w-full min-w-0">
+        <div className="flex border-b border-slate-200 bg-slate-50/80 px-4 pt-3 gap-2 text-xs font-semibold overflow-x-auto flex-nowrap sm:flex-wrap w-full max-w-full min-w-0">
           <button
             onClick={() => setTabMuestra("pago")}
-            className={`px-3.5 py-2 rounded-t-lg transition-colors border-b-2 flex items-center gap-1.5 ${
+            className={`px-3.5 py-2 rounded-t-lg transition-colors border-b-2 flex items-center gap-1.5 shrink-0 whitespace-nowrap ${
               tabMuestra === "pago"
                 ? "border-blue-600 text-blue-700 bg-white"
                 : "border-transparent text-slate-500 hover:text-slate-800"
@@ -430,7 +430,7 @@ export const SeccionMigracionExcel: React.FC = () => {
           </button>
           <button
             onClick={() => setTabMuestra("garantia")}
-            className={`px-3.5 py-2 rounded-t-lg transition-colors border-b-2 flex items-center gap-1.5 ${
+            className={`px-3.5 py-2 rounded-t-lg transition-colors border-b-2 flex items-center gap-1.5 shrink-0 whitespace-nowrap ${
               tabMuestra === "garantia"
                 ? "border-purple-600 text-purple-700 bg-white"
                 : "border-transparent text-slate-500 hover:text-slate-800"
@@ -440,7 +440,7 @@ export const SeccionMigracionExcel: React.FC = () => {
           </button>
           <button
             onClick={() => setTabMuestra("resumen")}
-            className={`px-3.5 py-2 rounded-t-lg transition-colors border-b-2 flex items-center gap-1.5 ${
+            className={`px-3.5 py-2 rounded-t-lg transition-colors border-b-2 flex items-center gap-1.5 shrink-0 whitespace-nowrap ${
               tabMuestra === "resumen"
                 ? "border-emerald-600 text-emerald-700 bg-white"
                 : "border-transparent text-slate-500 hover:text-slate-800"
@@ -457,8 +457,8 @@ export const SeccionMigracionExcel: React.FC = () => {
                 <span>Muestra técnica de los primeros 5 expedientes mapeados de la hoja PAGO:</span>
                 <span className="font-semibold text-slate-700">Columnas: Quipux, Ciudad, Proveedor, Valor, Estado, Analista</span>
               </div>
-              <div className="overflow-x-auto border border-slate-200 rounded-lg">
-                <table className="min-w-full text-xs">
+              <div className="overflow-x-auto border border-slate-200 rounded-lg w-full max-w-full min-w-0">
+                <table className="min-w-[700px] w-full text-xs">
                   <thead className="bg-slate-50 text-[11px] font-bold text-slate-700 uppercase border-b border-slate-200">
                     <tr>
                       <th className="py-2.5 px-3 text-center w-14">Fila</th>
@@ -514,8 +514,8 @@ export const SeccionMigracionExcel: React.FC = () => {
                 <span>Muestra técnica de los primeros 5 expedientes mapeados de la hoja GARANTÍA:</span>
                 <span className="font-semibold text-slate-700">Columnas: Quipux, Ciudad, Beneficiario, Valor, Estado, Analista</span>
               </div>
-              <div className="overflow-x-auto border border-slate-200 rounded-lg">
-                <table className="min-w-full text-xs">
+              <div className="overflow-x-auto border border-slate-200 rounded-lg w-full max-w-full min-w-0">
+                <table className="min-w-[700px] w-full text-xs">
                   <thead className="bg-slate-50 text-[11px] font-bold text-slate-700 uppercase border-b border-slate-200">
                     <tr>
                       <th className="py-2.5 px-3 text-center w-14">Fila</th>

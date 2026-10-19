@@ -1,9 +1,34 @@
+import fs from "fs";
+import path from "path";
 import { PrismaClient } from "@prisma/client";
 
 const prisma = new PrismaClient();
 
+function detectDatabaseProvider(): "postgresql" | "sqlite" {
+  const dbUrl = process.env.DATABASE_URL || "";
+  if (dbUrl.startsWith("postgresql://") || dbUrl.startsWith("postgres://")) {
+    return "postgresql";
+  }
+  if (dbUrl.startsWith("file:")) {
+    return "sqlite";
+  }
+  try {
+    const schemaPath = path.join(process.cwd(), "prisma", "schema.prisma");
+    if (fs.existsSync(schemaPath)) {
+      const content = fs.readFileSync(schemaPath, "utf-8");
+      if (/provider\s*=\s*"postgresql"/.test(content)) {
+        return "postgresql";
+      }
+    }
+  } catch {}
+  return "sqlite";
+}
+
 async function main() {
   console.log("Iniciando vaciado completo de trámites y datos transaccionales...");
+
+  const provider = detectDatabaseProvider();
+  console.log(`Motor de base de datos detectado: ${provider.toUpperCase()}`);
 
   await prisma.$transaction(async (tx) => {
     // 1. Eliminar referencias y documentos dependientes
@@ -39,27 +64,48 @@ async function main() {
     });
     console.log("- Turnos de asignación inteligente reiniciados a cero.");
 
-    // 5. Reiniciar secuencias de SQLite para que el próximo trámite empiece en 1
+    // 5. Reiniciar secuencias según proveedor de base de datos
     const tablesToReset = [
-      "tramites",
-      "historial_movimientos",
-      "observaciones",
-      "tramite_referencias",
-      "documentos_tramite",
-      "solicitudes_devolucion",
-      "cajas",
+      { table: "tramites", idCol: "id_tramite", seq: "tramites_id_tramite_seq" },
+      { table: "historial_movimientos", idCol: "id_movimiento", seq: "historial_movimientos_id_movimiento_seq" },
+      { table: "observaciones", idCol: "id_observacion", seq: "observaciones_id_observacion_seq" },
+      { table: "tramite_referencias", idCol: "id_referencia", seq: "tramite_referencias_id_referencia_seq" },
+      { table: "documentos_tramite", idCol: "id_documento", seq: "documentos_tramite_id_documento_seq" },
+      { table: "solicitudes_devolucion", idCol: "id_solicitud", seq: "solicitudes_devolucion_id_solicitud_seq" },
+      { table: "cajas", idCol: "id_caja", seq: "cajas_id_caja_seq" },
     ];
 
-    for (const table of tablesToReset) {
-      try {
-        await tx.$executeRawUnsafe(
-          `DELETE FROM sqlite_sequence WHERE name = '${table}';`
-        );
-      } catch (err) {
-        // En caso de que no exista la secuencia aún
+    if (provider === "postgresql") {
+      console.log("- Reiniciando secuencias de PostgreSQL 16 (ALTER SEQUENCE ... RESTART WITH 1)...");
+      for (const item of tablesToReset) {
+        try {
+          await tx.$executeRawUnsafe(
+            `ALTER SEQUENCE IF EXISTS "${item.seq}" RESTART WITH 1;`
+          );
+        } catch (err) {
+          try {
+            await tx.$executeRawUnsafe(
+              `SELECT setval(pg_get_serial_sequence('${item.table}', '${item.idCol}'), 1, false);`
+            );
+          } catch (err2) {
+            // Silencioso en caso de que la tabla o secuencia no existan aún
+          }
+        }
       }
+      console.log("- Secuencias PostgreSQL reiniciadas con éxito (el próximo trámite será TRM-2026-0001).");
+    } else {
+      console.log("- Reiniciando secuencias en SQLite (DELETE FROM sqlite_sequence)...");
+      for (const item of tablesToReset) {
+        try {
+          await tx.$executeRawUnsafe(
+            `DELETE FROM sqlite_sequence WHERE name = '${item.table}';`
+          );
+        } catch (err) {
+          // En caso de que no exista la secuencia aún
+        }
+      }
+      console.log("- Secuencias SQLite reiniciadas con éxito (el próximo trámite será TRM-2026-0001).");
     }
-    console.log("- Secuencias numéricas reiniciadas (el próximo trámite será TRM-2026-0001).");
   });
 
   // Verificación final

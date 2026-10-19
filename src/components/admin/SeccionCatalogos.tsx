@@ -349,11 +349,11 @@ export const SeccionCatalogos: React.FC<SeccionCatalogosProps> = ({ onNotify }) 
   const CurrentIcon = meta.icon;
 
   return (
-    <div className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-xs space-y-4">
+    <div className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-xs space-y-4 w-full max-w-full min-w-0">
       {/* Selector de sub-catálogo */}
-      <div className="p-4 bg-slate-50 border-b border-slate-200 flex flex-col md:flex-row md:items-center justify-between gap-3">
+      <div className="p-4 bg-slate-50 border-b border-slate-200 flex flex-col md:flex-row md:items-center justify-between gap-3 w-full max-w-full min-w-0">
         <div className="flex items-center gap-2">
-          <Database className="w-5 h-5 text-blue-600" />
+          <Database className="w-5 h-5 text-blue-600 shrink-0" />
           <div>
             <h2 className="text-sm font-bold text-slate-900 uppercase">
               Administración de Desplegables y Catálogos Paramétricos
@@ -364,7 +364,7 @@ export const SeccionCatalogos: React.FC<SeccionCatalogosProps> = ({ onNotify }) 
           </div>
         </div>
 
-        <div className="flex flex-wrap p-1 bg-slate-200 rounded-lg border border-slate-300 text-xs font-semibold uppercase gap-1">
+        <div className="flex flex-wrap p-1 bg-slate-200 rounded-lg border border-slate-300 text-xs font-semibold uppercase gap-1 shrink-0">
           <button
             onClick={() => setActiveCatalog("areas")}
             className={`px-3 py-1.5 rounded-md transition-all flex items-center gap-1.5 ${
@@ -489,7 +489,7 @@ export const SeccionCatalogos: React.FC<SeccionCatalogosProps> = ({ onNotify }) 
       </div>
 
       {/* Tabla de Registros */}
-      <div className="overflow-x-auto border-t border-slate-200">
+      <div className="overflow-x-auto border-t border-slate-200 w-full max-w-full min-w-0">
         {loading ? (
           <div className="p-10 text-center text-xs text-slate-500 flex flex-col items-center gap-2">
             <RefreshCw className="w-5 h-5 animate-spin text-blue-600" />
@@ -515,7 +515,7 @@ export const SeccionCatalogos: React.FC<SeccionCatalogosProps> = ({ onNotify }) 
             )}
           </div>
         ) : (
-          <table className="w-full text-left border-collapse text-xs">
+          <table className="w-full min-w-[650px] text-left border-collapse text-xs">
             <thead>
               <tr className="border-b border-slate-200 bg-slate-50 text-[11px] font-bold text-slate-700 uppercase tracking-wide">
                 <th className="py-2.5 px-4 w-12 text-center">#</th>

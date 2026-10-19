@@ -81,6 +81,18 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(new URL("/escritorio", request.url));
   }
 
+  // M-11: Proteger rutas administrativas verificando el rol de la sesión
+  const isAdminRoute = pathname.startsWith("/administracion") || pathname.startsWith("/api/admin");
+  if (isAdminRoute && !["ADMIN", "ADMINISTRADOR"].includes(session.role)) {
+    if (pathname.startsWith("/api/")) {
+      return NextResponse.json(
+        { error: "Acceso denegado. Se requieren permisos de Administrador.", code: "FORBIDDEN" },
+        { status: 403 }
+      );
+    }
+    return NextResponse.redirect(new URL("/escritorio", request.url));
+  }
+
   // 7. Acceso autorizado
   return NextResponse.next();
 }

@@ -124,7 +124,11 @@ export type EstadoTramiteOficial =
   | "PAGADO"
   | "ARCHIVO"
   | "OBSERVADO"
+  | "DEVUELTO"
   | "INSUBSISTENTE"
+  | "ANULADO"
+  | "CAJA"
+  | "AUTORIZADO_PAGO"
   | "PRESUPUESTO"
   | "JUSTIFICACION_CONTABILIDAD";
 

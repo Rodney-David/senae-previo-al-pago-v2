@@ -173,7 +173,7 @@ export const TarjetaTesoreria: React.FC<TarjetaTesoreriaProps> = ({
   };
 
   return (
-    <div className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-xs">
+    <div className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-xs w-full max-w-full min-w-0">
       <div
         onClick={() => setIsOpen(!isOpen)}
         className="px-5 py-3.5 bg-slate-900 text-white flex flex-wrap items-center justify-between gap-3 cursor-pointer select-none hover:bg-slate-850 transition-colors"

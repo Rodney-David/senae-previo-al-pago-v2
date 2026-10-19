@@ -146,8 +146,6 @@ model reglas_campo_flujo {
   @@index([etapa_flujo])
 }
 
-
-
 model solicitudes_devolucion {
   id_solicitud        Int       @id @default(autoincrement())
   id_tramite          Int
@@ -167,6 +165,7 @@ model solicitudes_devolucion {
 
 model tipos_gestion {
   id_tipo_gestion Int       @id @default(autoincrement())
+  padre           String?   @default("PAGO") // PAGO | GARANTIA
   codigo          String    @unique
   nombre          String
   descripcion     String?
@@ -194,13 +193,16 @@ model tramites {
   fecha_recepcion_fisica            DateTime?
   id_tipo_tramite                   Int
   tipo_flujo                        String                  @default("PAGO")
+  padre_gestion                     String?                 @default("PAGO") // PAGO | GARANTIA
+  tipo_gestion                      String?                 @default("PAGO") // PAGO, EXPEDIENTE, Caución, etc.
   area_requirente                   String?
+  ciudad                            String?
   asunto                            String?
   nro_tramite                       String?
   periodo_pago                      String?
   proveedor_beneficiario            String
   ruc_proveedor                     String?
-  monto_total                       Decimal
+  monto_total                       Decimal                 @default(0)
   es_alta_cuantia                   Boolean?                @default(false)
   numero_cur_compromiso             String?
   numero_cur_devengado              String?
@@ -210,6 +212,7 @@ model tramites {
   aprobado_presupuesto              Boolean?                @default(false)
   fecha_aprobacion_presupuesto      DateTime?
   id_usuario_aprobador_presupuesto  Int?
+  id_analista_presupuesto_previo    Int?
   aprobado_contabilidad             Boolean?                @default(false)
   fecha_aprobacion_contabilidad     DateTime?
   id_usuario_aprobador_contabilidad Int?
@@ -223,11 +226,16 @@ model tramites {
   item_presupuestario               String?
   numero_factura                    String?
   anexos                            String?
-  numero_hojas                      Int?
   id_area_actual                    Int
   id_custodio_actual                Int
-  estado_general                    String                  @default("EN_RECEPCION")
+  estado_general                    String                  @default("INGRESADO")
   sub_estado                        String                  @default("RECEPCIONADO_DFI")
+  fecha_entrega_control_previo      DateTime?
+  estado_previo_observacion         String?
+  motivo_observacion                String?
+  detalle_subsanacion               String?
+  justificacion_insubsistencia      String?
+  justificacion_desarchivo          String?
   esta_pausado                      Boolean?                @default(false)
   motivo_pausa                      String?
   fecha_pausa                       DateTime?
@@ -250,6 +258,9 @@ model tramites {
   historial_movimientos             historial_movimientos[]
   observaciones                     observaciones[]
   tramite_referencias               tramite_referencias[]
+  id_caja                           Int?
+  numero_hojas                      Int?
+  caja                              cajas?                  @relation(fields: [id_caja], references: [id_caja], onUpdate: Restrict, onDelete: SetNull)
   areas                             areas                   @relation(fields: [id_area_actual], references: [id_area], onUpdate: Restrict)
   usuarios                          usuarios                @relation(fields: [id_custodio_actual], references: [id_usuario], onUpdate: Restrict)
   tipos_tramite                     tipos_tramite           @relation(fields: [id_tipo_tramite], references: [id_tipo_tramite], onUpdate: Restrict)
@@ -257,6 +268,19 @@ model tramites {
   @@index([id_area_actual])
   @@index([id_custodio_actual])
   @@index([id_tipo_tramite])
+  @@index([id_caja])
+}
+
+model cajas {
+  id_caja             Int        @id @default(autoincrement())
+  codigo_caja         String     @unique
+  nombre              String?
+  estado              String     @default("ABIERTA")
+  fecha_creacion      DateTime?  @default(now())
+  fecha_cierre        DateTime?
+  id_usuario_creacion Int?
+  observaciones       String?
+  tramites            tramites[]
 }
 
 model usuarios {
@@ -268,6 +292,7 @@ model usuarios {
   rol                                                                      String
   password_hash                                                            String?
   activo                                                                   Boolean?                        @default(true)
+  iniciales                                                                String?                         @unique
   estado_disponibilidad                                                    String?                         @default("DISPONIBLE")
   created_at                                                               DateTime?                       @default(now())
   asignacion_turnos                                                        asignacion_turnos[]
@@ -307,4 +332,16 @@ model catalogo_areas {
   descripcion String?
   activo      Boolean?  @default(true)
   created_at  DateTime? @default(now())
+}
+
+model items_presupuestarios {
+  id_item     Int       @id @default(autoincrement())
+  codigo      String    @unique
+  nombre      String
+  descripcion String?
+  activo      Boolean?  @default(true)
+  created_at  DateTime? @default(now())
+
+  @@index([codigo])
+  @@index([nombre])
 }

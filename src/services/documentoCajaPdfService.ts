@@ -3,21 +3,19 @@ import autoTable from "jspdf-autotable";
 import { CajaParaDocumento, TramiteParaDocumentoCaja } from "./documentoCajaExcelService";
 
 /**
- * Genera el documento oficial PDF para el control físico de la CAJA antes de enviarla al archivo.
- * Sigue 1:1 las especificaciones de la nueva PLANTILLA DOC EXCEL CAJA:
+ * Genera el documento oficial PDF para el control físico de la CAJA antes de enviarla al Archivo Central.
+ * Sigue fielmente la estructura de 7 columnas requerida:
  * - Orientación: Horizontal (Landscape) A4
- * - 8 Columnas exactas:
- *   1. No. (Secuencial 1, 2, 3...)
- *   2. Cartón (Siempre 1)
- *   3. CUR
- *   4. Hojas
- *   5. Proveedor y Asunto
- *   6. Valor
- *   7. Fecha y Observaciones
- *   8. Fecha envío de correos
+ * - 7 Columnas exactas:
+ *   1. NO (Secuencial 1, 2, 3...)
+ *   2. CARTON (Predeterminado 1)
+ *   3. NUMERO DE QUIPUX
+ *   4. NRO CUR
+ *   5. PROVEEDOR
+ *   6. MONTO
+ *   7. OBSERVACION (Vacía para anotación física)
  * - Colores: Azul marino institucional #244062, Subtítulo #F1F5F9 con texto #475569, Totales #E2E8F0
- * - Tipografía: Arial / Helvetica
- * - Espaciado razonable en celdas para legibilidad ejecutiva
+ * - Tipografía: Helvetica
  */
 export function generarDocumentoCajaPdf(caja: CajaParaDocumento): jsPDF {
   const doc = new jsPDF({
@@ -63,7 +61,7 @@ export function generarDocumentoCajaPdf(caja: CajaParaDocumento): jsPDF {
     { align: "center" }
   );
 
-  // 3. DATOS DE LA TABLA (8 Columnas)
+  // 3. DATOS DE LA TABLA (7 Columnas exactas)
   let totalValor = 0;
   const bodyRows = (caja.tramites || []).map((t, index) => {
     const curParts = [
@@ -73,13 +71,9 @@ export function generarDocumentoCajaPdf(caja: CajaParaDocumento): jsPDF {
     ].filter(Boolean);
     const curDisplay = curParts.length > 0 ? curParts.join(", ") : "-";
 
-    const hojas = t.numero_hojas !== null && t.numero_hojas !== undefined ? t.numero_hojas : "-";
+    const carton = (t as any).carton ? String((t as any).carton) : "1";
     const monto = Number(t.monto_total || 0);
     totalValor += monto;
-
-    const proveedorAsunto = `${t.proveedor_beneficiario || "S/P"}${
-      t.asunto ? ` - ${t.asunto}` : ""
-    }`.trim();
 
     const formattedMonto = `$${monto.toLocaleString("en-US", {
       minimumFractionDigits: 2,
@@ -87,14 +81,13 @@ export function generarDocumentoCajaPdf(caja: CajaParaDocumento): jsPDF {
     })}`;
 
     return [
-      String(index + 1), // Col 1: No. (Secuencial)
-      "1", // Col 2: Cartón (Siempre 1)
-      curDisplay, // Col 3: CUR
-      String(hojas), // Col 4: Hojas
-      proveedorAsunto, // Col 5: Proveedor y Asunto
-      formattedMonto, // Col 6: Valor
-      "", // Col 7: Fecha y Observaciones
-      "", // Col 8: Fecha envío de correos
+      String(index + 1),               // Col 1: NO (Secuencial)
+      carton,                          // Col 2: CARTON (Predeterminado 1)
+      t.numero_quipux || "-",          // Col 3: NUMERO DE QUIPUX
+      curDisplay,                      // Col 4: NRO CUR
+      t.proveedor_beneficiario || "-", // Col 5: PROVEEDOR
+      formattedMonto,                  // Col 6: MONTO
+      "",                              // Col 7: OBSERVACION
     ];
   });
 
@@ -103,20 +96,33 @@ export function generarDocumentoCajaPdf(caja: CajaParaDocumento): jsPDF {
     maximumFractionDigits: 2,
   })}`;
 
-  const footRows = [
-    ["", "", "", "", "TOTAL GENERAL VALORES:", formattedTotal, "", ""],
+  const footRows: any[] = [
+    [
+      {
+        content: "TOTAL CAJA:",
+        colSpan: 5,
+        styles: { halign: "right", fontStyle: "bold" },
+      },
+      {
+        content: formattedTotal,
+        styles: { halign: "right", fontStyle: "bold" },
+      },
+      {
+        content: "",
+        styles: { halign: "center" },
+      },
+    ],
   ];
 
-  // Proporciones exactas de las 8 columnas para A4 horizontal (269mm total)
+  // Proporciones exactas de las 7 columnas para A4 horizontal (269mm total)
   const columnStyles: { [key: number]: any } = {
-    0: { cellWidth: 15.0, halign: "center", fontStyle: "bold" }, // No.
-    1: { cellWidth: 18.0, halign: "center", fontStyle: "bold" }, // Cartón
-    2: { cellWidth: 20.0, halign: "center", fontStyle: "bold" }, // CUR
-    3: { cellWidth: 18.0, halign: "center" }, // Hojas
-    4: { cellWidth: 86.0, halign: "left" }, // Proveedor y Asunto
-    5: { cellWidth: 36.0, halign: "right", fontStyle: "bold" }, // Valor
-    6: { cellWidth: 38.0, halign: "center" }, // Fecha y Observaciones
-    7: { cellWidth: 38.0, halign: "center" }, // Fecha envío de correos
+    0: { cellWidth: 14.0, halign: "center", fontStyle: "bold" }, // NO
+    1: { cellWidth: 16.0, halign: "center", fontStyle: "bold" }, // CARTON
+    2: { cellWidth: 46.0, halign: "center" },                     // NUMERO DE QUIPUX
+    3: { cellWidth: 30.0, halign: "center", fontStyle: "bold" }, // NRO CUR
+    4: { cellWidth: 88.0, halign: "left" },                       // PROVEEDOR
+    5: { cellWidth: 35.0, halign: "right", fontStyle: "bold" },  // MONTO
+    6: { cellWidth: 40.0, halign: "center" },                     // OBSERVACION
   };
 
   autoTable(doc, {
@@ -125,14 +131,13 @@ export function generarDocumentoCajaPdf(caja: CajaParaDocumento): jsPDF {
     tableWidth: tableWidth,
     head: [
       [
-        "No.",
-        "Cartón",
-        "CUR",
-        "Hojas",
-        "Proveedor y Asunto",
-        "Valor",
-        "Fecha y Observaciones",
-        "Fecha envío de correos",
+        "NO",
+        "CARTON",
+        "NUMERO DE QUIPUX",
+        "NRO CUR",
+        "PROVEEDOR",
+        "MONTO",
+        "OBSERVACION",
       ],
     ],
     body: bodyRows,
@@ -142,7 +147,7 @@ export function generarDocumentoCajaPdf(caja: CajaParaDocumento): jsPDF {
       fillColor: [36, 64, 98],
       textColor: [255, 255, 255],
       fontStyle: "bold",
-      fontSize: 9.5,
+      fontSize: 9,
       halign: "center",
       valign: "middle",
       minCellHeight: 9,
@@ -150,19 +155,19 @@ export function generarDocumentoCajaPdf(caja: CajaParaDocumento): jsPDF {
       lineWidth: 0.2,
     },
     bodyStyles: {
-      fontSize: 9,
+      fontSize: 8.5,
       textColor: [15, 23, 42],
       valign: "middle",
       lineColor: [0, 0, 0],
       lineWidth: 0.2,
-      cellPadding: { top: 3.5, bottom: 3.5, left: 3.5, right: 3.5 },
+      cellPadding: { top: 3.0, bottom: 3.0, left: 3.0, right: 3.0 },
     },
     columnStyles,
     footStyles: {
       fillColor: [226, 232, 240], // #E2E8F0
       textColor: [15, 23, 42],
       fontStyle: "bold",
-      fontSize: 9.5,
+      fontSize: 9,
       valign: "middle",
       lineColor: [0, 0, 0],
       lineWidth: 0.2,

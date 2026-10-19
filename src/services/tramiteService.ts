@@ -35,9 +35,22 @@ export class TramiteService {
     const sub = input.subtotal ? Number(input.subtotal) : 0;
     const esAltaCuantia = sub >= 10000;
 
-    // Generar código de trámite correlativo anual: TRM-2026-XXXX
-    const count = await prisma.tramites.count();
-    const codigoTramite = `TRM-${new Date().getFullYear()}-${String(count + 1).padStart(4, "0")}`;
+    // C-07: Generar código de trámite correlativo anual determinando el último número emitido
+    const year = new Date().getFullYear();
+    const prefix = `TRM-${year}-`;
+    const ultimoTramite = await prisma.tramites.findFirst({
+      where: { codigo_tramite: { startsWith: prefix } },
+      orderBy: { id_tramite: "desc" },
+      select: { codigo_tramite: true },
+    });
+
+    let nextSeq = 1;
+    if (ultimoTramite?.codigo_tramite) {
+      const parts = ultimoTramite.codigo_tramite.split("-");
+      const lastNum = parseInt(parts[2], 10);
+      if (!isNaN(lastNum)) nextSeq = lastNum + 1;
+    }
+    const codigoTramite = `${prefix}${String(nextSeq).padStart(4, "0")}`;
 
     const nuevoTramite = await prisma.tramites.create({
       data: {
@@ -104,39 +117,47 @@ export class TramiteService {
     const jefePresupuesto = await prisma.usuarios.findFirst({
       where: { id_area: 2, rol: "JEFE", activo: true },
     });
-    const idJefePresupuesto = jefePresupuesto?.id_usuario || 3;
+    if (!jefePresupuesto) {
+      throw new Error("No se encontró un Jefe de Presupuesto activo para recibir el lote de trámites.");
+    }
+    const idJefePresupuesto = jefePresupuesto.id_usuario;
+
+    // Validación previa de estado de todos los trámites
+    const tramitesAVerificar = await prisma.tramites.findMany({
+      where: { id_tramite: { in: idsTramites } },
+    });
+
+    for (const t of tramitesAVerificar) {
+      if (t.estado_general !== "INGRESADO") {
+        throw new Error(`El trámite ${t.codigo_tramite} no está en estado INGRESADO (actual: ${t.estado_general}).`);
+      }
+    }
 
     const now = new Date();
-    const tramitesActualizados = [];
+
+    // M-03: Actualización atómica en transacción
+    await prisma.$transaction(
+      idsTramites.map((id) =>
+        prisma.tramites.update({
+          where: { id_tramite: id },
+          data: {
+            estado_general: "INGRESADO",
+            sub_estado: "POR_RECIBIR_FISICAMENTE",
+            id_area_actual: 2, // PRESUPUESTO
+            id_custodio_actual: idJefePresupuesto,
+            fecha_entrega_control_previo: now,
+            fecha_ultimo_movimiento: now,
+            fecha_ultima_modificacion: now,
+          },
+        })
+      )
+    );
+
+    const tramitesActualizados = await prisma.tramites.findMany({
+      where: { id_tramite: { in: idsTramites } },
+    });
 
     for (const id of idsTramites) {
-      const tramite = await prisma.tramites.findUnique({
-        where: { id_tramite: id },
-      });
-
-      if (!tramite) continue;
-
-      if (tramite.estado_general !== "INGRESADO") {
-        throw new Error(
-          `El trámite ${tramite.codigo_tramite} no está en estado INGRESADO (actual: ${tramite.estado_general}).`
-        );
-      }
-
-      const updated = await prisma.tramites.update({
-        where: { id_tramite: id },
-        data: {
-          estado_general: "INGRESADO",
-          sub_estado: "POR_RECIBIR_FISICAMENTE",
-          id_area_actual: 2, // PRESUPUESTO
-          id_custodio_actual: idJefePresupuesto,
-          fecha_entrega_control_previo: now,
-          fecha_ultimo_movimiento: now,
-          fecha_ultima_modificacion: now,
-        },
-      });
-
-      tramitesActualizados.push(updated);
-
       await registrarBitacora({
         id_tramite: id,
         id_usuario_entrega: idUsuarioEntrega,
@@ -165,30 +186,30 @@ export class TramiteService {
     }
 
     const now = new Date();
-    const tramitesRecibidos = [];
+
+    // M-03: Actualización atómica en transacción
+    await prisma.$transaction(
+      idsTramites.map((id) =>
+        prisma.tramites.update({
+          where: { id_tramite: id },
+          data: {
+            estado_general: "REVISION",
+            sub_estado: "EN_REVISION_PRESUPUESTO",
+            id_area_actual: 2, // PRESUPUESTO
+            id_custodio_actual: idUsuarioRecibe,
+            fecha_recepcion_fisica: now,
+            fecha_ultimo_movimiento: now,
+            fecha_ultima_modificacion: now,
+          },
+        })
+      )
+    );
+
+    const tramitesRecibidos = await prisma.tramites.findMany({
+      where: { id_tramite: { in: idsTramites } },
+    });
 
     for (const id of idsTramites) {
-      const tramite = await prisma.tramites.findUnique({
-        where: { id_tramite: id },
-      });
-
-      if (!tramite) continue;
-
-      const updated = await prisma.tramites.update({
-        where: { id_tramite: id },
-        data: {
-          estado_general: "REVISION",
-          sub_estado: "EN_REVISION_PRESUPUESTO",
-          id_area_actual: 2, // PRESUPUESTO
-          id_custodio_actual: idUsuarioRecibe,
-          fecha_recepcion_fisica: now,
-          fecha_ultimo_movimiento: now,
-          fecha_ultima_modificacion: now,
-        },
-      });
-
-      tramitesRecibidos.push(updated);
-
       await registrarBitacora({
         id_tramite: id,
         id_usuario_entrega: idUsuarioRecibe,
@@ -203,6 +224,66 @@ export class TramiteService {
     return tramitesRecibidos;
   }
 
+  /**
+   * Paso 5: Autorización de Pago por la Directora Financiera (DFI) por lote.
+   * Cambia estado_general: "DFI", sub_estado: "AUTORIZADO_EN_TESORERIA",
+   * marca autorizado_pago: true, fecha_autorizacion_pago y deriva a Tesorería (id_area: 4).
+   */
+  public static async autorizarPagoDfiLote(
+    idsTramites: number[],
+    idUsuarioAutoriza: number
+  ) {
+    if (!idsTramites || idsTramites.length === 0) {
+      throw new Error("Debe seleccionar al menos un trámite para autorizar");
+    }
+
+    const tesorero = await prisma.usuarios.findFirst({
+      where: { id_area: 4, rol: "JEFE", activo: true },
+    });
+    if (!tesorero) {
+      throw new Error("No se encontró un Tesorero activo para autorizar y recibir los trámites en Tesorería.");
+    }
+    const idTesorero = tesorero.id_usuario;
+    const now = new Date();
+
+    await prisma.$transaction(async (tx) => {
+      for (const id of idsTramites) {
+        await tx.tramites.update({
+          where: { id_tramite: id },
+          data: {
+            autorizado_pago: true,
+            id_usuario_autoriza_pago: idUsuarioAutoriza,
+            fecha_autorizacion_pago: now,
+            id_area_actual: 4, // Tesorería
+            id_custodio_actual: idTesorero,
+            estado_general: "DFI",
+            sub_estado: "AUTORIZADO_EN_TESORERIA",
+            fecha_ultimo_movimiento: now,
+            fecha_ultima_modificacion: now,
+          },
+        });
+
+        await registrarBitacora(
+          {
+            id_tramite: id,
+            id_usuario_entrega: idUsuarioAutoriza,
+            id_usuario_recibe: idTesorero,
+            id_area_origen: 1, // DFI
+            id_area_destino: 4, // Tesorería
+            tipo_accion: "AUTORIZACION_DFI_PASE_TESORERIA",
+            comentarios:
+              "Pago autorizado en lote por la Dirección Financiera. Expedientes derivados formalmente a Tesorería / Pagos.",
+            fecha_hora: now,
+          },
+          tx
+        );
+      }
+    });
+
+    return prisma.tramites.findMany({
+      where: { id_tramite: { in: idsTramites } },
+    });
+  }
 }
 
 

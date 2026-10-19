@@ -29,7 +29,7 @@ export const TarjetaDatosGenerales: React.FC<TarjetaDatosGeneralesProps> = ({
   const canEditGeneral = isDFI || isPresupuesto || isAdmin;
 
   return (
-    <div className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-xs">
+    <div className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-xs w-full max-w-full min-w-0">
       {/* Card Header */}
       <div className="px-5 py-3.5 bg-slate-900 text-white flex items-center justify-between">
         <div className="flex items-center gap-2">

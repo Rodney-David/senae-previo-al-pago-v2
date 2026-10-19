@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { verifySessionToken, createSessionToken, SESSION_COOKIE_NAME } from "@/lib/session";
+import { sanitizeUser } from "@/lib/sanitize";
 
 export const dynamic = "force-dynamic";
 
@@ -22,7 +23,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ user: null, authenticated: false }, { status: 401 });
     }
 
-    return NextResponse.json({ user, authenticated: true });
+    return NextResponse.json({ user: sanitizeUser(user), authenticated: true });
   } catch (error) {
     console.error("Error fetching session:", error);
     return NextResponse.json(

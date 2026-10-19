@@ -1,6 +1,9 @@
-import crypto from "crypto";
+import crypto from "node:crypto";
 
 const CAPTCHA_SECRET = process.env.CAPTCHA_SECRET || "senae_captcha_secret_key_2026";
+if (!process.env.CAPTCHA_SECRET && process.env.NODE_ENV === "production") {
+  console.error("[SENAE ADVERTENCIA CRÍTICA DE SEGURIDAD] La variable de entorno CAPTCHA_SECRET no está configurada en producción. Usar una clave predeterminada compromete la validación del Captcha visual anti-bot. Configure CAPTCHA_SECRET en las variables de entorno de producción.");
+}
 
 export interface CaptchaChallenge {
   token: string;
@@ -15,7 +18,8 @@ function generateRandomCode(length = 5): string {
   const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
   let code = "";
   for (let i = 0; i < length; i++) {
-    code += chars.charAt(Math.floor(Math.random() * chars.length));
+    // M-05: Generación criptográficamente segura con randomInt
+    code += chars.charAt(crypto.randomInt(0, chars.length));
   }
   return code;
 }
@@ -115,8 +119,11 @@ export function verifyCaptcha(token: string, userInput: string): boolean {
     const payload = `${expectedCode}:${expiresAt}`;
     const calculatedHmac = crypto.createHmac("sha256", CAPTCHA_SECRET).update(payload).digest("hex");
 
-    if (calculatedHmac !== receivedHmac) {
-      return false; // Token alterado
+    const calcBuf = Buffer.from(calculatedHmac, "hex");
+    const recvBuf = Buffer.from(receivedHmac, "hex");
+
+    if (calcBuf.length !== recvBuf.length || !crypto.timingSafeEqual(calcBuf, recvBuf)) {
+      return false; // Token alterado o firma criptográfica no válida (timing-safe)
     }
 
     return expectedCode.toUpperCase().trim() === userInput.toUpperCase().trim();

@@ -42,41 +42,56 @@ export async function POST(
 
       const areaDestino = id_area_destino ? Number(id_area_destino) : 1;
 
-      // Crear registro de observación
-      const obs = await prisma.observaciones.create({
-        data: {
-          id_tramite: idTramite,
-          id_area_origen: currentUser.id_area,
-          id_usuario_origen: currentUserId,
-          id_area_destino: areaDestino,
-          id_area_reporta: currentUser.id_area,
-          id_usuario_reporta: currentUserId,
-          detalle_observacion: motivo,
-          estado_observacion: "PENDIENTE",
-          fecha_reporte: now,
-        },
-      });
+      const obs = await prisma.$transaction(async (tx) => {
+        // Crear registro de observación
+        const createdObs = await tx.observaciones.create({
+          data: {
+            id_tramite: idTramite,
+            id_area_origen: currentUser.id_area,
+            id_usuario_origen: currentUserId,
+            id_area_destino: areaDestino,
+            id_area_reporta: currentUser.id_area,
+            id_usuario_reporta: currentUserId,
+            detalle_observacion: motivo,
+            estado_observacion: "PENDIENTE",
+            fecha_reporte: now,
+          },
+        });
 
-      // Actualizar trámite
-      await prisma.tramites.update({
-        where: { id_tramite: idTramite },
-        data: {
-          estado_general: "OBSERVADO_72H",
-          sub_estado: "EN_ESPERA_SUBSANACION_72H",
-          id_area_actual: areaDestino,
-          fecha_ultimo_movimiento: now,
-          fecha_ultima_modificacion: now,
-        },
-      });
+        // Actualizar trámite: normalizar estado a OBSERVADO y pausar semáforo SLA
+        await tx.tramites.update({
+          where: { id_tramite: idTramite },
+          data: {
+            estado_previo_observacion: tramite.estado_general,
+            estado_general: "OBSERVADO",
+            sub_estado: "OBSERVACION_EXTERNA_72H",
+            motivo_observacion: motivo,
+            esta_pausado: true,
+            fecha_pausa: now,
+            motivo_pausa: `Observación preventiva (plazo 72h): ${motivo}`,
+            id_area_actual: areaDestino,
+            fecha_ultimo_movimiento: now,
+            fecha_ultima_modificacion: now,
+          },
+        });
 
-      await registrarBitacora({
-        id_tramite: idTramite,
-        id_usuario_entrega: currentUserId,
-        id_usuario_recibe: currentUserId,
-        id_area_origen: currentUser.id_area,
-        id_area_destino: areaDestino,
-        tipo_accion: "OBSERVACION_PREVENTIVA_72H",
-        comentarios: `Observación preventiva (plazo 72h) emitida por ${currentUser.nombre_completo}. Motivo: ${motivo}`,
+        // Registrar movimiento inmutable en bitácora dentro de la transacción
+        await registrarBitacora(
+          {
+            id_tramite: idTramite,
+            id_usuario_entrega: currentUserId,
+            id_usuario_recibe: currentUserId,
+            id_area_origen: currentUser.id_area,
+            id_area_destino: areaDestino,
+            tipo_accion: "OBSERVACION_PREVENTIVA_72H",
+            comentarios: `Observación preventiva (plazo 72h) emitida por ${currentUser.nombre_completo}. Motivo: ${motivo}`,
+            fecha_hora: now,
+            actualizarUltimoMovimiento: false,
+          },
+          tx
+        );
+
+        return createdObs;
       });
 
       return NextResponse.json({ success: true, observacion: obs });
@@ -95,39 +110,62 @@ export async function POST(
         return NextResponse.json({ error: "Observación no encontrada" }, { status: 404 });
       }
 
-      // Actualizar observación
-      await prisma.observaciones.update({
-        where: { id_observacion: obs.id_observacion },
-        data: {
-          estado_observacion: "SUBSANADO",
-          respuesta_observacion: respuesta,
-          id_usuario_responde: currentUserId,
-          fecha_respuesta: now,
-          fecha_resolucion: now,
-        },
-      });
+      // Calcular días transcurridos durante la pausa legítima
+      let diasPausa = 0;
+      if (tramite.fecha_pausa) {
+        const diffMs = now.getTime() - new Date(tramite.fecha_pausa).getTime();
+        diasPausa = Math.max(0, Math.floor(diffMs / (1000 * 60 * 60 * 24)));
+      }
 
-      // Retornar trámite al área y usuario que reportó
-      await prisma.tramites.update({
-        where: { id_tramite: idTramite },
-        data: {
-          estado_general: "EN_GESTION",
-          sub_estado: "OBSERVACION_SUBSANADA",
-          id_area_actual: obs.id_area_reporta,
-          id_custodio_actual: obs.id_usuario_reporta,
-          fecha_ultimo_movimiento: now,
-          fecha_ultima_modificacion: now,
-        },
-      });
+      const estadoRestaurado = tramite.estado_previo_observacion || "REVISION";
 
-      await registrarBitacora({
-        id_tramite: idTramite,
-        id_usuario_entrega: currentUserId,
-        id_usuario_recibe: obs.id_usuario_reporta,
-        id_area_origen: currentUser.id_area,
-        id_area_destino: obs.id_area_reporta,
-        tipo_accion: "SUBSANACION_DE_OBSERVACION",
-        comentarios: `Observación atendida y subsanada por ${currentUser.nombre_completo}. Respuesta: ${respuesta}. Retorna a quien observó.`,
+      await prisma.$transaction(async (tx) => {
+        // Actualizar observación
+        await tx.observaciones.update({
+          where: { id_observacion: obs.id_observacion },
+          data: {
+            estado_observacion: "SUBSANADO",
+            respuesta_observacion: respuesta,
+            id_usuario_responde: currentUserId,
+            fecha_respuesta: now,
+            fecha_resolucion: now,
+          },
+        });
+
+        // Retornar trámite al área y usuario que reportó con SLA reanudado
+        await tx.tramites.update({
+          where: { id_tramite: idTramite },
+          data: {
+            estado_general: estadoRestaurado,
+            sub_estado: "OBSERVACION_SUBSANADA",
+            id_area_actual: obs.id_area_reporta,
+            id_custodio_actual: obs.id_usuario_reporta,
+            esta_pausado: false,
+            fecha_pausa: null,
+            motivo_pausa: null,
+            motivo_observacion: null,
+            estado_previo_observacion: null,
+            detalle_subsanacion: respuesta,
+            dias_pausa_acumulados: (tramite.dias_pausa_acumulados || 0) + diasPausa,
+            fecha_ultimo_movimiento: now,
+            fecha_ultima_modificacion: now,
+          },
+        });
+
+        await registrarBitacora(
+          {
+            id_tramite: idTramite,
+            id_usuario_entrega: currentUserId,
+            id_usuario_recibe: obs.id_usuario_reporta,
+            id_area_origen: currentUser.id_area,
+            id_area_destino: obs.id_area_reporta,
+            tipo_accion: "SUBSANACION_DE_OBSERVACION",
+            comentarios: `Observación atendida y subsanada por ${currentUser.nombre_completo}. Respuesta: ${respuesta}. Retorna a quien observó. Trámite restaurado a ${estadoRestaurado}.`,
+            fecha_hora: now,
+            actualizarUltimoMovimiento: false,
+          },
+          tx
+        );
       });
 
       return NextResponse.json({ success: true });
@@ -141,43 +179,50 @@ export async function POST(
 
       const areaDestino = id_area_destino ? Number(id_area_destino) : 1;
 
-      // Registrar referencia Quipux
-      await prisma.tramite_referencias.create({
-        data: {
-          id_tramite: idTramite,
-          tipo_documento: "MEMORANDO_DEVOLUCION",
-          numero_documento: memo_quipux,
-          fecha_documento: now,
-          asunto_sumilla: `Devolución formal: ${motivo}`,
-          id_usuario_registro: currentUserId,
-        },
-      });
+      await prisma.$transaction(async (tx) => {
+        // Registrar referencia Quipux
+        await tx.tramite_referencias.create({
+          data: {
+            id_tramite: idTramite,
+            tipo_documento: "MEMORANDO_DEVOLUCION",
+            numero_documento: memo_quipux,
+            fecha_documento: now,
+            asunto_sumilla: `Devolución formal: ${motivo}`,
+            id_usuario_registro: currentUserId,
+          },
+        });
 
-      // Actualizar trámite (Pausar el cómputo de SLA mientras se encuentra devuelto)
-      await prisma.tramites.update({
-        where: { id_tramite: idTramite },
-        data: {
-          estado_general: "DEVUELTO_FORMALMENTE",
-          sub_estado: "DEVUELTO_CON_MEMORANDO_QUIPUX",
-          es_devuelto: true,
-          esta_pausado: true,
-          fecha_pausa: now,
-          motivo_pausa: `Expediente devuelto formalmente mediante Memo Quipux ${memo_quipux}`,
-          motivo_devolucion: `[Memo ${memo_quipux}] ${motivo}`,
-          id_area_actual: areaDestino,
-          fecha_ultimo_movimiento: now,
-          fecha_ultima_modificacion: now,
-        },
-      });
+        // Actualizar trámite: normalizar a DEVUELTO y sub_estado DEVUELTO_FORMALMENTE
+        await tx.tramites.update({
+          where: { id_tramite: idTramite },
+          data: {
+            estado_general: "DEVUELTO",
+            sub_estado: "DEVUELTO_FORMALMENTE",
+            es_devuelto: true,
+            esta_pausado: true,
+            fecha_pausa: now,
+            motivo_pausa: `Expediente devuelto formalmente mediante Memo Quipux ${memo_quipux}`,
+            motivo_devolucion: `[Memo ${memo_quipux}] ${motivo}`,
+            id_area_actual: areaDestino,
+            fecha_ultimo_movimiento: now,
+            fecha_ultima_modificacion: now,
+          },
+        });
 
-      await registrarBitacora({
-        id_tramite: idTramite,
-        id_usuario_entrega: currentUserId,
-        id_usuario_recibe: currentUserId,
-        id_area_origen: currentUser.id_area,
-        id_area_destino: areaDestino,
-        tipo_accion: "DEVOLUCION_FORMAL_QUIPUX",
-        comentarios: `Devolución formal emitida mediante Memo Quipux Nro: ${memo_quipux}. Justificación: ${motivo}`,
+        await registrarBitacora(
+          {
+            id_tramite: idTramite,
+            id_usuario_entrega: currentUserId,
+            id_usuario_recibe: currentUserId,
+            id_area_origen: currentUser.id_area,
+            id_area_destino: areaDestino,
+            tipo_accion: "DEVOLUCION_FORMAL_QUIPUX",
+            comentarios: `Devolución formal emitida mediante Memo Quipux Nro: ${memo_quipux}. Justificación: ${motivo}`,
+            fecha_hora: now,
+            actualizarUltimoMovimiento: false,
+          },
+          tx
+        );
       });
 
       return NextResponse.json({ success: true });

@@ -41,3 +41,15 @@ export function formatDateTime(date: Date | string | null | undefined): string {
     hour12: false,
   }).format(d);
 }
+
+/**
+ * L-02: Convierte una fecha a string ISO YYYY-MM-DD para comparación lexicográfica segura.
+ * Retorna null si el valor es nulo o inválido.
+ */
+export function toIsoDateString(d: Date | string | null | undefined): string | null {
+  if (!d) return null;
+  if (typeof d === "string") return d.slice(0, 10);
+  const dateObj = new Date(d);
+  if (isNaN(dateObj.getTime())) return null;
+  return dateObj.toISOString().slice(0, 10);
+}

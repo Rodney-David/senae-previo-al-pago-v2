@@ -2,13 +2,44 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { verifyCaptcha } from "@/lib/captcha";
 import crypto from "crypto";
+import { sanitizeUser } from "@/lib/sanitize";
 
 export const dynamic = "force-dynamic";
 
-const AUTH_SECRET = process.env.AUTH_SECRET || "senae_auth_secret_key_2026";
+import { AUTH_SECRET } from "@/lib/session";
 
-function hashPassword(password: string): string {
+function hashPasswordLegacy(password: string): string {
   return crypto.createHash("sha256").update(password + "senae_salt_2026").digest("hex");
+}
+
+function verifyUserPassword(enteredPassword: string, storedHash?: string | null): boolean {
+  if (!storedHash) return false;
+  if (storedHash.startsWith("pbkdf2$")) {
+    try {
+      const parts = storedHash.split("$");
+      const salt = parts[1];
+      const iterations = parseInt(parts[2], 10);
+      const expectedKey = parts[3];
+      const calculatedKey = crypto.pbkdf2Sync(enteredPassword, salt, iterations, 64, "sha512").toString("hex");
+      const expectedBuf = Buffer.from(expectedKey, "hex");
+      const calculatedBuf = Buffer.from(calculatedKey, "hex");
+      if (expectedBuf.length !== calculatedBuf.length) return false;
+      return crypto.timingSafeEqual(expectedBuf, calculatedBuf);
+    } catch {
+      return false;
+    }
+  }
+  const legacyHash = hashPasswordLegacy(enteredPassword);
+  try {
+    const legacyBuf = Buffer.from(legacyHash, "hex");
+    const storedBuf = Buffer.from(storedHash, "hex");
+    if (legacyBuf.length === storedBuf.length) {
+      return crypto.timingSafeEqual(legacyBuf, storedBuf);
+    }
+  } catch {
+    // fallback
+  }
+  return legacyHash === storedHash;
 }
 
 export async function POST(request: NextRequest) {
@@ -69,11 +100,8 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // 3. Validar Contraseña (Hash SHA-256 con salt institucional)
-    const enteredHash = hashPassword(password);
-    const isPasswordValid =
-      user.password_hash === enteredHash ||
-      Boolean(process.env.DEV_ACCESS_KEY && password === process.env.DEV_ACCESS_KEY);
+    // 3. Validar Contraseña (PBKDF2 seguro con fallback a SHA-256 institucional)
+    const isPasswordValid = verifyUserPassword(password, user.password_hash);
 
     if (!isPasswordValid) {
       return NextResponse.json(
@@ -86,10 +114,13 @@ export async function POST(request: NextRequest) {
     const { createSessionToken, SESSION_COOKIE_NAME } = await import("@/lib/session");
     const sessionToken = await createSessionToken(user);
 
+    // L-06: Excluir password_hash de la respuesta JSON enviada al cliente de forma segura
+    const safeUser = sanitizeUser(user);
+
     const response = NextResponse.json({
       success: true,
       message: "Inicio de sesión institucional exitoso",
-      user,
+      user: safeUser,
     });
 
     response.cookies.set(SESSION_COOKIE_NAME, sessionToken, {
@@ -97,6 +128,7 @@ export async function POST(request: NextRequest) {
       maxAge: 60 * 60 * 2, // 2 horas máximo (7200 s)
       sameSite: "lax",
       httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
     });
 
     return response;

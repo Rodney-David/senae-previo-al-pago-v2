@@ -7,4 +7,6 @@ export { ModalObservarTransversal } from "./ModalObservarTransversal";
 export { ModalReanudarFactura } from "./ModalReanudarFactura";
 export { ModalReasignarDerivar } from "./ModalReasignarDerivar";
 export { ModalReasignarInteligente } from "./ModalReasignarInteligente";
+export { ModalDevolucionInterna } from "./ModalDevolucionInterna";
 export { ModalRevertirInsubsistencia } from "./ModalRevertirInsubsistencia";
+

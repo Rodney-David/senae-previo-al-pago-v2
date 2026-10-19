@@ -264,18 +264,18 @@ export default function AdministracionPage() {
   });
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 w-full max-w-full min-w-0">
       {/* ------------------------------------------------------------------- */}
       {/* 1. ENCABEZADO MAESTRO DE GOBERNANZA                                 */}
       {/* ------------------------------------------------------------------- */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-5 rounded-xl border border-slate-200 shadow-2xs">
-        <div>
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-4 sm:p-5 rounded-xl border border-slate-200 shadow-2xs w-full max-w-full min-w-0">
+        <div className="min-w-0">
           <div className="flex items-center gap-2.5">
-            <div className="p-2 bg-slate-900 text-white rounded-lg shadow-2xs">
+            <div className="p-2 bg-slate-900 text-white rounded-lg shadow-2xs shrink-0">
               <ShieldCheck className="w-5 h-5 text-blue-400" />
             </div>
-            <div>
-              <h1 className="text-base font-bold text-slate-900 uppercase tracking-wide">
+            <div className="min-w-0">
+              <h1 className="text-base font-bold text-slate-900 uppercase tracking-wide truncate">
                 Consola de Administración y Gobernanza Institucional
               </h1>
               <p className="text-xs text-slate-500 mt-0.5">
@@ -288,7 +288,7 @@ export default function AdministracionPage() {
         <button
           onClick={fetchData}
           disabled={loading}
-          className="p-2 text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-lg border border-slate-200 transition-colors self-start sm:self-auto"
+          className="p-2 text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-lg border border-slate-200 transition-colors self-start sm:self-auto shrink-0"
           title="Actualizar datos de administración"
         >
           <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin text-blue-600" : ""}`} />
@@ -298,21 +298,21 @@ export default function AdministracionPage() {
       {/* Banner de Feedback */}
       {feedback && (
         <div
-          className={`p-3 text-xs rounded-lg font-medium border flex items-center justify-between ${
+          className={`p-3 text-xs rounded-lg font-medium border flex items-center justify-between w-full max-w-full min-w-0 ${
             feedback.type === "success"
               ? "bg-emerald-50 text-emerald-800 border-emerald-200"
               : "bg-rose-50 text-rose-800 border-rose-200"
           }`}
         >
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 min-w-0">
             {feedback.type === "success" ? (
               <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
             ) : (
               <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
             )}
-            <span>{feedback.text}</span>
+            <span className="truncate">{feedback.text}</span>
           </div>
-          <button onClick={() => setFeedback(null)} className="text-slate-500 hover:text-slate-700">
+          <button onClick={() => setFeedback(null)} className="text-slate-500 hover:text-slate-700 shrink-0">
             <X className="w-3.5 h-3.5" />
           </button>
         </div>
@@ -321,52 +321,52 @@ export default function AdministracionPage() {
       {/* ------------------------------------------------------------------- */}
       {/* 2. BARRA DE LAS 4 VISTAS MAESTRAS                                   */}
       {/* ------------------------------------------------------------------- */}
-      <div className="flex flex-wrap p-1.5 bg-slate-200/90 rounded-xl border border-slate-300 text-xs font-semibold uppercase gap-1.5 shadow-2xs">
+      <div className="flex overflow-x-auto flex-nowrap sm:flex-wrap p-1.5 bg-slate-200/90 rounded-xl border border-slate-300 text-xs font-semibold uppercase gap-1.5 shadow-2xs w-full max-w-full min-w-0">
         <button
           onClick={() => setActiveTab("usuarios")}
-          className={`px-4 py-2 rounded-lg transition-all flex items-center gap-2 ${
+          className={`px-4 py-2 rounded-lg transition-all flex items-center gap-2 shrink-0 whitespace-nowrap ${
             activeTab === "usuarios"
               ? "bg-white text-slate-900 shadow-xs font-bold"
               : "text-slate-600 hover:text-slate-900 hover:bg-slate-100/60"
           }`}
         >
-          <Users className="w-4 h-4 text-blue-600" />
+          <Users className="w-4 h-4 text-blue-600 shrink-0" />
           1. Talento Humano y Accesos
         </button>
 
         <button
           onClick={() => setActiveTab("parametros")}
-          className={`px-4 py-2 rounded-lg transition-all flex items-center gap-2 ${
+          className={`px-4 py-2 rounded-lg transition-all flex items-center gap-2 shrink-0 whitespace-nowrap ${
             activeTab === "parametros"
               ? "bg-white text-slate-900 shadow-xs font-bold"
               : "text-slate-600 hover:text-slate-900 hover:bg-slate-100/60"
           }`}
         >
-          <SlidersHorizontal className="w-4 h-4 text-amber-600" />
+          <SlidersHorizontal className="w-4 h-4 text-amber-600 shrink-0" />
           2. Parámetros y Reglas (SLA)
         </button>
 
         <button
           onClick={() => setActiveTab("catalogos")}
-          className={`px-4 py-2 rounded-lg transition-all flex items-center gap-2 ${
+          className={`px-4 py-2 rounded-lg transition-all flex items-center gap-2 shrink-0 whitespace-nowrap ${
             activeTab === "catalogos"
               ? "bg-white text-slate-900 shadow-xs font-bold"
               : "text-slate-600 hover:text-slate-900 hover:bg-slate-100/60"
           }`}
         >
-          <Database className="w-4 h-4 text-indigo-600" />
+          <Database className="w-4 h-4 text-indigo-600 shrink-0" />
           3. Catálogos Maestros y Procesos
         </button>
 
         <button
           onClick={() => setActiveTab("auditoria")}
-          className={`px-4 py-2 rounded-lg transition-all flex items-center gap-2 ${
+          className={`px-4 py-2 rounded-lg transition-all flex items-center gap-2 shrink-0 whitespace-nowrap ${
             activeTab === "auditoria"
               ? "bg-white text-slate-900 shadow-xs font-bold"
               : "text-slate-600 hover:text-slate-900 hover:bg-slate-100/60"
           }`}
         >
-          <History className="w-4 h-4 text-emerald-600" />
+          <History className="w-4 h-4 text-emerald-600 shrink-0" />
           4. Auditoría Forense y Migración
         </button>
       </div>
@@ -375,21 +375,21 @@ export default function AdministracionPage() {
       {/* VISTA 1: GESTIÓN DE TALENTO HUMANO Y ACCESOS                         */}
       {/* ------------------------------------------------------------------- */}
       {activeTab === "usuarios" && (
-        <div className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-2xs space-y-4">
-          <div className="p-4 bg-slate-50 border-b border-slate-200 text-xs text-slate-700 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-2xs space-y-4 w-full max-w-full min-w-0">
+          <div className="p-4 bg-slate-50 border-b border-slate-200 text-xs text-slate-700 flex flex-col sm:flex-row sm:items-center justify-between gap-3 w-full max-w-full min-w-0">
             <div>
               <strong>Plantilla de Servidores Públicos Institucionales:</strong> Asigne a cada funcionario
               su departamento orgánico, rol operativo y estado de disponibilidad en el despacho de expedientes.
             </div>
             <button
               onClick={handleOpenCreateUser}
-              className="px-3.5 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold uppercase rounded-lg transition-colors flex items-center gap-1.5 shadow-2xs self-start sm:self-auto text-xs"
+              className="px-3.5 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold uppercase rounded-lg transition-colors flex items-center gap-1.5 shadow-2xs self-start sm:self-auto text-xs shrink-0 whitespace-nowrap"
             >
               <Plus className="w-4 h-4" /> Nuevo Servidor Público
             </button>
           </div>
 
-          <div className="overflow-x-auto">
+          <div className="overflow-x-auto w-full max-w-full min-w-0">
             <table className="min-w-[850px] w-full text-left border-collapse text-xs">
               <thead>
                 <tr className="border-b border-slate-200 bg-slate-50/70 text-[11px] font-bold text-slate-700 uppercase">
@@ -463,12 +463,12 @@ export default function AdministracionPage() {
       {/* VISTA 2: PARÁMETROS DEL SISTEMA Y REGLAS DE NEGOCIO (SLA)           */}
       {/* ------------------------------------------------------------------- */}
       {activeTab === "parametros" && (
-        <div className="space-y-4">
+        <div className="space-y-4 w-full max-w-full min-w-0">
           {/* Sub-selector */}
-          <div className="flex items-center gap-2 border-b border-slate-200 pb-2">
+          <div className="flex items-center gap-2 border-b border-slate-200 pb-2 overflow-x-auto flex-nowrap sm:flex-wrap w-full max-w-full min-w-0">
             <button
               onClick={() => setParamSubTab("sla")}
-              className={`px-3 py-1.5 rounded-lg text-xs font-bold uppercase transition-all flex items-center gap-1.5 ${
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold uppercase transition-all flex items-center gap-1.5 shrink-0 whitespace-nowrap ${
                 paramSubTab === "sla"
                   ? "bg-blue-600 text-white shadow-2xs"
                   : "bg-slate-100 text-slate-600 hover:bg-slate-200"
@@ -479,7 +479,7 @@ export default function AdministracionPage() {
             </button>
             <button
               onClick={() => setParamSubTab("feriados")}
-              className={`px-3 py-1.5 rounded-lg text-xs font-bold uppercase transition-all flex items-center gap-1.5 ${
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold uppercase transition-all flex items-center gap-1.5 shrink-0 whitespace-nowrap ${
                 paramSubTab === "feriados"
                   ? "bg-blue-600 text-white shadow-2xs"
                   : "bg-slate-100 text-slate-600 hover:bg-slate-200"
@@ -490,7 +490,7 @@ export default function AdministracionPage() {
             </button>
             <button
               onClick={() => setParamSubTab("institucionales")}
-              className={`px-3 py-1.5 rounded-lg text-xs font-bold uppercase transition-all flex items-center gap-1.5 ${
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold uppercase transition-all flex items-center gap-1.5 shrink-0 whitespace-nowrap ${
                 paramSubTab === "institucionales"
                   ? "bg-blue-600 text-white shadow-2xs"
                   : "bg-slate-100 text-slate-600 hover:bg-slate-200"
@@ -506,15 +506,15 @@ export default function AdministracionPage() {
 
           {/* Sub-vista 2.2: Calendario Feriados */}
           {paramSubTab === "feriados" && (
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-              <div className="lg:col-span-2 bg-white border border-slate-200 rounded-xl overflow-hidden shadow-2xs">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 w-full max-w-full min-w-0">
+              <div className="lg:col-span-2 bg-white border border-slate-200 rounded-xl overflow-hidden shadow-2xs w-full max-w-full min-w-0">
                 <div className="px-5 py-3.5 bg-slate-900 text-white text-xs font-bold uppercase tracking-wider flex items-center justify-between">
                   <span>Calendario de Días No Laborables Registrados</span>
                   <span className="text-[11px] text-slate-300 font-normal">
                     Se descuentan automáticamente del cálculo de días hábiles
                   </span>
                 </div>
-                <div className="overflow-x-auto">
+                <div className="overflow-x-auto w-full max-w-full min-w-0">
                   <table className="min-w-[600px] w-full text-left border-collapse text-xs">
                     <thead>
                       <tr className="border-b border-slate-200 bg-slate-50 text-[11px] font-bold text-slate-700 uppercase">
@@ -658,10 +658,10 @@ export default function AdministracionPage() {
       {activeTab === "catalogos" && (
         <div className="space-y-4">
           {/* Sub-selector */}
-          <div className="flex items-center gap-2 border-b border-slate-200 pb-2">
+          <div className="flex items-center gap-2 border-b border-slate-200 pb-2 overflow-x-auto flex-nowrap sm:flex-wrap w-full max-w-full min-w-0">
             <button
               onClick={() => setCatSubTab("maestros")}
-              className={`px-3 py-1.5 rounded-lg text-xs font-bold uppercase transition-all flex items-center gap-1.5 ${
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold uppercase transition-all flex items-center gap-1.5 shrink-0 whitespace-nowrap ${
                 catSubTab === "maestros"
                   ? "bg-blue-600 text-white shadow-2xs"
                   : "bg-slate-100 text-slate-600 hover:bg-slate-200"
@@ -672,7 +672,7 @@ export default function AdministracionPage() {
             </button>
             <button
               onClick={() => setCatSubTab("procesos_cur")}
-              className={`px-3 py-1.5 rounded-lg text-xs font-bold uppercase transition-all flex items-center gap-1.5 ${
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold uppercase transition-all flex items-center gap-1.5 shrink-0 whitespace-nowrap ${
                 catSubTab === "procesos_cur"
                   ? "bg-blue-600 text-white shadow-2xs"
                   : "bg-slate-100 text-slate-600 hover:bg-slate-200"
@@ -700,7 +700,7 @@ export default function AdministracionPage() {
                 <span className="font-semibold text-slate-900">AMBOS</span>, así como la exigibilidad de Ítem Presupuestario.
               </div>
 
-              <div className="overflow-x-auto">
+              <div className="overflow-x-auto w-full max-w-full min-w-0">
                 <table className="min-w-[750px] w-full text-left border-collapse text-xs">
                   <thead>
                     <tr className="border-b border-slate-200 bg-slate-50/70 text-[11px] font-bold text-slate-700 uppercase">
@@ -776,10 +776,10 @@ export default function AdministracionPage() {
       {activeTab === "auditoria" && (
         <div className="space-y-4">
           {/* Sub-selector */}
-          <div className="flex items-center gap-2 border-b border-slate-200 pb-2">
+          <div className="flex items-center gap-2 border-b border-slate-200 pb-2 overflow-x-auto flex-nowrap sm:flex-wrap w-full max-w-full min-w-0">
             <button
               onClick={() => setAuditSubTab("bitacora")}
-              className={`px-3 py-1.5 rounded-lg text-xs font-bold uppercase transition-all flex items-center gap-1.5 ${
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold uppercase transition-all flex items-center gap-1.5 shrink-0 whitespace-nowrap ${
                 auditSubTab === "bitacora"
                   ? "bg-blue-600 text-white shadow-2xs"
                   : "bg-slate-100 text-slate-600 hover:bg-slate-200"
@@ -790,7 +790,7 @@ export default function AdministracionPage() {
             </button>
             <button
               onClick={() => setAuditSubTab("migracion")}
-              className={`px-3 py-1.5 rounded-lg text-xs font-bold uppercase transition-all flex items-center gap-1.5 ${
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold uppercase transition-all flex items-center gap-1.5 shrink-0 whitespace-nowrap ${
                 auditSubTab === "migracion"
                   ? "bg-blue-600 text-white shadow-2xs"
                   : "bg-slate-100 text-slate-600 hover:bg-slate-200"
@@ -824,7 +824,7 @@ export default function AdministracionPage() {
                 </div>
               </div>
 
-              <div className="overflow-x-auto">
+              <div className="overflow-x-auto w-full max-w-full min-w-0">
                 <table className="min-w-[850px] w-full text-left border-collapse text-xs">
                   <thead>
                     <tr className="border-b border-slate-200 bg-slate-50 text-[11px] font-bold text-slate-700 uppercase">

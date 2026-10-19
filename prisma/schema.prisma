@@ -146,8 +146,6 @@ model reglas_campo_flujo {
   @@index([etapa_flujo])
 }
 
-
-
 model solicitudes_devolucion {
   id_solicitud        Int       @id @default(autoincrement())
   id_tramite          Int
@@ -347,4 +345,3 @@ model items_presupuestarios {
   @@index([codigo])
   @@index([nombre])
 }
-

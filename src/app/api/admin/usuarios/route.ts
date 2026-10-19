@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { sanitizeUser, sanitizeUsers } from "@/lib/sanitize";
 
 export const dynamic = "force-dynamic";
 
@@ -9,7 +10,7 @@ export async function GET() {
       include: { areas: true },
       orderBy: { id_usuario: "asc" },
     });
-    return NextResponse.json({ usuarios });
+    return NextResponse.json({ usuarios: sanitizeUsers(usuarios) });
   } catch (error) {
     console.error("Error fetching users:", error);
     return NextResponse.json(
@@ -66,7 +67,7 @@ export async function POST(request: NextRequest) {
       include: { areas: true },
     });
 
-    return NextResponse.json({ success: true, usuario: nuevoUsuario }, { status: 201 });
+    return NextResponse.json({ success: true, usuario: sanitizeUser(nuevoUsuario) }, { status: 201 });
   } catch (error: any) {
     console.error("Error creating user:", error);
     return NextResponse.json(
@@ -124,7 +125,7 @@ export async function PUT(request: NextRequest) {
       include: { areas: true },
     });
 
-    return NextResponse.json({ success: true, usuario: usuarioActualizado });
+    return NextResponse.json({ success: true, usuario: sanitizeUser(usuarioActualizado) });
   } catch (error: any) {
     console.error("Error updating user:", error);
     return NextResponse.json(

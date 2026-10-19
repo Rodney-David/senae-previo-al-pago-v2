@@ -4,3 +4,5 @@ export * from "./documentoCajaExcelService";
 export * from "./documentoCajaPdfService";
 export * from "./migracionExcelService";
 export * from "./tramiteService";
+export * from "./reportesTiemposService";
+export * from "./reportesExcelService";

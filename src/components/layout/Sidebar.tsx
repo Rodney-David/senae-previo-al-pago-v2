@@ -112,6 +112,15 @@ export const Sidebar: React.FC = () => {
     isAdmin ||
     currentUser?.id_area === 1 ||
     ["DIRECTORA", "SECRETARIA", "DIRECTORA_FINANCIERA", "SECRETARIA_DFI"].includes(userRole);
+  const isDirectivoOrAdmin =
+    isAdmin ||
+    userRole === "DIRECTORA" ||
+    userRole === "DIRECTORA_FINANCIERA" ||
+    userRole === "JEFE" ||
+    userRole.includes("JEFE") ||
+    userRole.includes("DIRECTOR") ||
+    userCargo.includes("JEFE") ||
+    userCargo.includes("DIRECTOR");
 
   return (
     <aside className="w-64 h-full shrink-0 flex flex-col justify-between hidden md:flex bg-slate-900 border-r border-slate-800 text-white select-none">

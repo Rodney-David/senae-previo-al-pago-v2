@@ -234,13 +234,13 @@ export default function RecepcionPage() {
   }
 
   return (
-    <div className="max-w-4xl mx-auto space-y-6">
+    <div className="w-full max-w-4xl mx-auto space-y-6 min-w-0">
       {/* Header */}
-      <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-xs flex items-center justify-between">
-        <div>
+      <div className="bg-white p-4 sm:p-5 rounded-xl border border-slate-200 shadow-xs flex items-center justify-between w-full max-w-full min-w-0">
+        <div className="min-w-0">
           <div className="flex items-center gap-2">
-            <FilePlus2 className="w-5 h-5 text-blue-600" />
-            <h1 className="text-lg font-bold text-slate-900 tracking-tight">
+            <FilePlus2 className="w-5 h-5 text-blue-600 shrink-0" />
+            <h1 className="text-base sm:text-lg font-bold text-slate-900 tracking-tight truncate">
               Recepción Institucional de Trámites (DFI)
             </h1>
           </div>
@@ -251,16 +251,16 @@ export default function RecepcionPage() {
         </div>
       </div>
 
-      <form onSubmit={handleSubmit} className="space-y-6">
+      <form onSubmit={handleSubmit} className="space-y-6 w-full max-w-full min-w-0">
         {error && (
-          <div className="p-3 bg-rose-50 border border-rose-200 text-rose-700 text-xs rounded-lg font-medium flex items-center gap-2">
+          <div className="p-3 bg-rose-50 border border-rose-200 text-rose-700 text-xs rounded-lg font-medium flex items-center gap-2 w-full max-w-full min-w-0">
             <AlertCircle className="w-4 h-4 shrink-0 text-rose-600" />
             <span>{error}</span>
           </div>
         )}
 
         {/* Bloque 1: Clasificación Jerárquica (Padre - Hijo) */}
-        <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-xs space-y-4">
+        <div className="bg-white border border-slate-200 rounded-xl p-4 sm:p-5 shadow-xs space-y-4 w-full max-w-full min-w-0">
           <div className="flex items-center justify-between border-b border-slate-100 pb-2">
             <h2 className="text-xs font-bold uppercase tracking-wider text-slate-800 flex items-center gap-2">
               <ShieldCheck className="w-4 h-4 text-blue-600" />
@@ -268,7 +268,7 @@ export default function RecepcionPage() {
             </h2>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 w-full max-w-full min-w-0">
             <div>
               <label className="block text-xs font-semibold text-slate-700 mb-1">
                 Gestión <span className="text-rose-500">*</span>
@@ -306,7 +306,7 @@ export default function RecepcionPage() {
         </div>
 
         {/* Bloque 2: Radicación Quipux y Datos del Documento */}
-        <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-xs space-y-4">
+        <div className="bg-white border border-slate-200 rounded-xl p-4 sm:p-5 shadow-xs space-y-4 w-full max-w-full min-w-0">
           <div className="flex items-center justify-between border-b border-slate-100 pb-2">
             <h2 className="text-xs font-bold uppercase tracking-wider text-slate-800 flex items-center gap-2">
               <FileText className="w-4 h-4 text-blue-600" />
@@ -314,8 +314,8 @@ export default function RecepcionPage() {
             </h2>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            <div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 w-full max-w-full min-w-0">
+            <div className="col-span-1 md:col-span-2">
               <label className="block text-xs font-semibold text-slate-700 mb-1">
                 Número Quipux Oficial *
               </label>
@@ -324,7 +324,7 @@ export default function RecepcionPage() {
                 value={numeroQuipux}
                 onChange={(e) => setNumeroQuipux(e.target.value)}
                 placeholder="ej. SENAE-DFI-2026-0892-M"
-                className="w-full text-xs bg-white border border-slate-300 rounded-lg p-2.5 font-mono focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                className="w-full text-xs bg-white border border-slate-300 rounded-lg p-2.5 font-mono focus:ring-2 focus:ring-blue-500 focus:outline-none uppercase font-semibold"
                 required
               />
             </div>
@@ -355,7 +355,7 @@ export default function RecepcionPage() {
               />
             </div>
 
-            <div className="sm:col-span-2">
+            <div>
               <label className="block text-xs font-semibold text-slate-700 mb-1">
                 Área Requirente / Solicitante *
               </label>
@@ -374,7 +374,7 @@ export default function RecepcionPage() {
               />
             </div>
 
-            <div className="sm:col-span-1">
+            <div>
               <label className="block text-xs font-semibold text-slate-700 mb-1">
                 Ciudad / Jurisdicción *
               </label>
@@ -394,7 +394,7 @@ export default function RecepcionPage() {
               </datalist>
             </div>
 
-            <div className="sm:col-span-3">
+            <div className="col-span-1 md:col-span-2">
               <label className="block text-xs font-semibold text-slate-700 mb-1">
                 Tipo de Proceso Normativo (SENAE) *
               </label>
@@ -413,7 +413,7 @@ export default function RecepcionPage() {
               />
             </div>
 
-            <div className="sm:col-span-3">
+            <div className="col-span-1 md:col-span-2">
               <div className="flex items-center justify-between mb-1">
                 <label className="block text-xs font-semibold text-slate-700">
                   Asunto del Trámite *
@@ -438,13 +438,13 @@ export default function RecepcionPage() {
         </div>
 
         {/* Bloque 3: Datos del Beneficiario y Subtotal */}
-        <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-xs space-y-4">
+        <div className="bg-white border border-slate-200 rounded-xl p-4 sm:p-5 shadow-xs space-y-4 w-full max-w-full min-w-0">
           <h2 className="text-xs font-bold uppercase tracking-wider text-slate-800 flex items-center gap-2">
             <DollarSign className="w-4 h-4 text-emerald-600" />
             3. Beneficiario y Valor Económico
           </h2>
 
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 w-full max-w-full min-w-0">
             <div>
               <label className="block text-xs font-semibold text-slate-700 mb-1">
                 Razón Social / Proveedor Beneficiario {esPagoPrincipal && <span className="text-rose-500">*</span>}
@@ -491,7 +491,7 @@ export default function RecepcionPage() {
 
           {/* Campos exclusivos para tipo GARANTÍA */}
           {padreGestion === "GARANTIA" && (
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-3 border-t border-slate-100">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-3 border-t border-slate-100 w-full max-w-full min-w-0">
               <div>
                 <label className="block text-xs font-semibold text-slate-700 mb-1">
                   Nro. Juicio
@@ -522,7 +522,7 @@ export default function RecepcionPage() {
         </div>
 
         {/* Botones de Acción */}
-        <div className="flex justify-end gap-3">
+        <div className="flex flex-wrap justify-end gap-3 w-full max-w-full min-w-0">
           <button
             type="button"
             onClick={() => router.push("/escritorio")}

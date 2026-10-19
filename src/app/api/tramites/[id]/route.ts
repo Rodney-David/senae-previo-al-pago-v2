@@ -6,10 +6,16 @@ import { getAuthenticatedUser } from "@/lib/auth";
 export const dynamic = "force-dynamic";
 
 export async function GET(
-  _request: NextRequest,
+  request: NextRequest,
   { params }: { params: { id: string } }
 ) {
   try {
+    // M-06: Validar sesión activa institucional antes de entregar expediente
+    const currentUser = await getAuthenticatedUser(request);
+    if (!currentUser) {
+      return NextResponse.json({ error: "No autorizado. Sesión requerida." }, { status: 401 });
+    }
+
     const idTramite = parseInt(params.id, 10);
     if (isNaN(idTramite)) {
       return NextResponse.json({ error: "ID de trámite inválido" }, { status: 400 });
@@ -20,18 +26,52 @@ export async function GET(
       include: {
         tipos_tramite: true,
         areas: true,
-        usuarios: true,
+        usuarios: {
+          select: {
+            id_usuario: true,
+            nombre_completo: true,
+            correo_institucional: true,
+            cargo: true,
+            rol: true,
+            id_area: true,
+            activo: true,
+          },
+        },
         caja: true,
         tramite_referencias: {
           include: {
-            usuarios: true,
+            usuarios: {
+              select: {
+                id_usuario: true,
+                nombre_completo: true,
+                correo_institucional: true,
+                cargo: true,
+                rol: true,
+                id_area: true,
+                activo: true,
+              },
+            },
           },
           orderBy: { created_at: "desc" },
         },
         historial_movimientos: {
           include: {
-            usuarios_historial_movimientos_id_usuario_entregaTousuarios: true,
-            usuarios_historial_movimientos_id_usuario_recibeTousuarios: true,
+            usuarios_historial_movimientos_id_usuario_entregaTousuarios: {
+              select: {
+                id_usuario: true,
+                nombre_completo: true,
+                cargo: true,
+                rol: true,
+              },
+            },
+            usuarios_historial_movimientos_id_usuario_recibeTousuarios: {
+              select: {
+                id_usuario: true,
+                nombre_completo: true,
+                cargo: true,
+                rol: true,
+              },
+            },
             areas_historial_movimientos_id_area_origenToareas: true,
             areas_historial_movimientos_id_area_destinoToareas: true,
           },
@@ -39,7 +79,13 @@ export async function GET(
         },
         observaciones: {
           include: {
-            usuarios_observaciones_id_usuario_reportaTousuarios: true,
+            usuarios_observaciones_id_usuario_reportaTousuarios: {
+              select: {
+                id_usuario: true,
+                nombre_completo: true,
+                cargo: true,
+              },
+            },
             areas: true,
           },
           orderBy: { fecha_reporte: "desc" },
@@ -160,10 +206,16 @@ export async function PUT(
       numero_juicio,
     } = body;
 
-    // RBAC: Solo DFI (Directora, Secretaria), Presupuesto (Jefe, Analista) y Admin pueden modificar datos generales
+    // A-07: RBAC estricto basado exclusivamente en la sesión autenticada (no en el body del request)
     const authenticatedUser = await getAuthenticatedUser(request);
-    const userRole = (authenticatedUser?.rol || rol || "").toUpperCase();
-    const userAreaId = authenticatedUser?.id_area || (body.id_area ? Number(body.id_area) : undefined);
+    if (!authenticatedUser) {
+      return NextResponse.json(
+        { error: "No autorizado. Se requiere sesión activa para modificar datos." },
+        { status: 401 }
+      );
+    }
+    const userRole = (authenticatedUser.rol || "").toUpperCase();
+    const userAreaId = authenticatedUser.id_area;
 
     const isDFI = userAreaId === 1 || ["DIRECTORA", "SECRETARIA", "DIRECTORA_FINANCIERA", "SECRETARIA_DFI"].includes(userRole);
     const isPresupuesto = (userAreaId === 2 && (["JEFE", "ANALISTA"].includes(userRole) || userRole.includes("PRESUPUESTO"))) || ["JEFE_PRESUPUESTO", "ANALISTA_PRESUPUESTO"].includes(userRole);
@@ -225,21 +277,21 @@ export async function PUT(
     const { computeAuditDiff } = await import("@/lib/auditDiff");
     const diff = computeAuditDiff(tramiteAnterior as any, datosNuevos);
 
-    // Registrar en historial_movimientos con detalle forense
+    // L-08: Registrar en historial_movimientos usando datos seguros de la sesión
     try {
       await prisma.historial_movimientos.create({
         data: {
           id_tramite: idTramite,
-          id_usuario_entrega: id_usuario ? Number(id_usuario) : 1,
-          id_usuario_recibe: id_usuario ? Number(id_usuario) : 1,
+          id_usuario_entrega: authenticatedUser.id_usuario,
+          id_usuario_recibe: authenticatedUser.id_usuario,
           id_area_origen: tramiteActualizado.id_area_actual || 1,
           id_area_destino: tramiteActualizado.id_area_actual || 1,
           tipo_accion: "MODIFICACION_DATOS_GENERALES",
-          comentarios: `Modificación de datos por ${rol || "AUTORIZADO"}. ${diff.resumenTexto}`,
+          comentarios: `Modificación de datos por ${authenticatedUser.nombre_completo} (${userRole}). ${diff.resumenTexto}`,
         },
       });
     } catch (bitErr) {
-      console.error("Error creating historial entry:", bitErr);
+      console.error(`[ALERTA FORENSE] Error registrando historial para trámite ${idTramite}:`, bitErr);
     }
 
     return NextResponse.json({

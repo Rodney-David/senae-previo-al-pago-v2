@@ -51,8 +51,14 @@ export const AppLayout: React.FC<{ children: React.ReactNode }> = ({ children })
     // Iniciar el temporizador
     resetInactivityTimer();
 
-    // Detección proactiva de expiración de sesión al reenfocar la ventana o cambiar de pestaña
+    // L-07: Detección proactiva de expiración de sesión con debounce para evitar llamadas excesivas
+    let isCheckingSession = false;
+    let lastCheckTime = 0;
     const checkSessionValidity = async () => {
+      const now = Date.now();
+      if (isCheckingSession || now - lastCheckTime < 4000) return;
+      isCheckingSession = true;
+      lastCheckTime = now;
       try {
         const res = await fetch("/api/auth/session");
         const data = await res.json();
@@ -64,6 +70,8 @@ export const AppLayout: React.FC<{ children: React.ReactNode }> = ({ children })
         }
       } catch (err) {
         // Ignorar fallas transitorias de red
+      } finally {
+        isCheckingSession = false;
       }
     };
 
@@ -95,7 +103,7 @@ export const AppLayout: React.FC<{ children: React.ReactNode }> = ({ children })
       <Navbar />
       <div className="flex flex-1 h-[calc(100vh-4rem)] overflow-hidden">
         <Sidebar />
-        <main className="flex-1 min-w-0 h-full overflow-y-auto p-4 sm:p-6 lg:p-8 w-full max-w-[1680px] mx-auto">
+        <main className="flex-1 min-w-0 max-w-full h-full overflow-y-auto overflow-x-hidden p-3 sm:p-5 lg:p-6 w-full max-w-[1720px] mx-auto">
           {children}
         </main>
       </div>

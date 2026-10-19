@@ -17,7 +17,19 @@ export async function GET(
 
     const referencias = await prisma.tramite_referencias.findMany({
       where: { id_tramite: idTramite },
-      include: { usuarios: true },
+      include: {
+        usuarios: {
+          select: {
+            id_usuario: true,
+            nombre_completo: true,
+            correo_institucional: true,
+            cargo: true,
+            rol: true,
+            id_area: true,
+            activo: true,
+          },
+        },
+      },
       orderBy: { created_at: "desc" },
     });
 
@@ -69,7 +81,17 @@ export async function POST(
         id_usuario_registro: currentUserId,
       },
       include: {
-        usuarios: true,
+        usuarios: {
+          select: {
+            id_usuario: true,
+            nombre_completo: true,
+            correo_institucional: true,
+            cargo: true,
+            rol: true,
+            id_area: true,
+            activo: true,
+          },
+        },
       },
     });
 

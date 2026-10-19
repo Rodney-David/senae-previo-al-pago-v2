@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { TramiteService } from "@/services/tramiteService";
-import { calculateTramiteSLA } from "@/lib/slaCalculator";
+import { calculateTramiteSLA, getSLAConfig } from "@/lib/slaCalculator";
 import { getAuthenticatedUser } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
@@ -38,6 +38,17 @@ export async function GET(request: NextRequest) {
           { area_requirente: { contains: q } },
           { ciudad: { contains: q } },
           { asunto: { contains: q } },
+          { numero_juicio: { contains: q } },
+          { numero_liquidacion: { contains: q } },
+          { numero_cur_devengado: { contains: q } },
+          { numero_cur_contable: { contains: q } },
+          {
+            tramite_referencias: {
+              some: {
+                numero_documento: { contains: q },
+              },
+            },
+          },
           {
             tipos_tramite: {
               nombre: { contains: q },
@@ -61,7 +72,7 @@ export async function GET(request: NextRequest) {
       const NOT_CONDICIONES_INACTIVOS = [
         {
           estado_general: {
-            in: ["ARCHIVO", "FINALIZADO_ARCHIVADO", "ANULADO", "DEVUELTO", "DEVUELTO_FORMALMENTE"],
+            in: ["ARCHIVO", "FINALIZADO_ARCHIVADO", "ANULADO", "DEVUELTO", "DEVUELTO_FORMALMENTE", "INSUBSISTENTE"],
           },
         },
         {
@@ -132,24 +143,56 @@ export async function GET(request: NextRequest) {
 
     const whereClause: Record<string, any> = conditions.length > 0 ? { AND: conditions } : {};
 
+    // A-03: Soporte seguro de paginación para conjuntos de datos masivos
+    const limitParam = searchParams.get("limit");
+    const pageParam = searchParams.get("page");
+    const take = limitParam ? Math.min(Math.max(1, parseInt(limitParam, 10)), 1000) : undefined;
+    const skip = pageParam && take ? (Math.max(1, parseInt(pageParam, 10)) - 1) * take : undefined;
+
     // Consulta ordenada estrictamente por fecha_ultimo_movimiento DESC (prioridad por Última Novedad)
     const tramites = await prisma.tramites.findMany({
       where: whereClause,
       include: {
         areas: true,
-        usuarios: true,
+        usuarios: {
+          select: {
+            id_usuario: true,
+            nombre_completo: true,
+            correo_institucional: true,
+            cargo: true,
+            rol: true,
+            id_area: true,
+            activo: true,
+          },
+        },
         tipos_tramite: true,
         caja: true,
       },
       orderBy: {
         fecha_ultimo_movimiento: "desc",
       },
+      ...(take !== undefined && { take }),
+      ...(skip !== undefined && { skip }),
     });
 
-    // Calcular SLA para cada trámite
+    // A-02: Optimización crítica de N+1: Cargar configuración SLA y feriados activos UNA SOLA VEZ
+    const slaConfig = await getSLAConfig();
+    const feriadosList = await prisma.feriados.findMany({
+      where: { activo: true },
+      select: { fecha: true },
+    });
+    const feriadosSet = new Set(
+      feriadosList.map((f) =>
+        f.fecha instanceof Date
+          ? f.fecha.toISOString().split("T")[0]
+          : String(f.fecha).split("T")[0]
+      )
+    );
+
+    // Calcular SLA para cada trámite reutilizando la memoria caché única en lote
     const tramitesConSLA = await Promise.all(
       tramites.map(async (t) => {
-        const sla = await calculateTramiteSLA(t);
+        const sla = await calculateTramiteSLA(t, slaConfig, feriadosSet);
         return {
           ...t,
           sla,

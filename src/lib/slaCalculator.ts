@@ -4,23 +4,53 @@ import { SLAResult } from "@/types";
 /**
  * Normaliza una fecha a medianoche en tiempo local sin sufrir
  * desplazamientos por desfase UTC (ej. UTC-5 Ecuador).
+ * Maneja correctamente objetos Date, cadenas ISO y cadenas YYYY-MM-DD.
  */
-function toLocalMidnight(d: Date | string | null | undefined): Date {
-  if (!d) return new Date();
+export function toLocalMidnight(d: Date | string | null | undefined): Date {
+  if (!d) {
+    const now = new Date();
+    return new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0);
+  }
+
   if (d instanceof Date) {
+    if (isNaN(d.getTime())) {
+      const now = new Date();
+      return new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0);
+    }
+    // Si la fecha en UTC está exactamente a medianoche (00:00:00.000Z), como ocurre en Prisma
+    // o al parsear cadenas de solo fecha, tomamos los componentes UTC para no desfasar
+    // al día anterior en husos horarios negativos como UTC-5 (Ecuador).
+    if (
+      d.getUTCHours() === 0 &&
+      d.getUTCMinutes() === 0 &&
+      d.getUTCSeconds() === 0 &&
+      d.getUTCMilliseconds() === 0
+    ) {
+      return new Date(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate(), 0, 0, 0, 0);
+    }
     return new Date(d.getFullYear(), d.getMonth(), d.getDate(), 0, 0, 0, 0);
   }
+
   const s = String(d).trim();
-  if (s.includes("T")) {
-    const dt = new Date(s);
+  // Extracción pura de la porción YYYY-MM-DD antes de 'T' o espacio
+  const datePart = s.includes("T") ? s.split("T")[0] : s.split(" ")[0];
+  const parts = datePart.split("-");
+  if (parts.length === 3) {
+    const year = Number(parts[0]);
+    const month = Number(parts[1]) - 1;
+    const day = Number(parts[2]);
+    if (!isNaN(year) && !isNaN(month) && !isNaN(day)) {
+      return new Date(year, month, day, 0, 0, 0, 0);
+    }
+  }
+
+  const dt = new Date(s);
+  if (!isNaN(dt.getTime())) {
     return new Date(dt.getFullYear(), dt.getMonth(), dt.getDate(), 0, 0, 0, 0);
   }
-  const parts = s.split("-");
-  if (parts.length === 3) {
-    return new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]), 0, 0, 0, 0);
-  }
-  const dt = new Date(s);
-  return new Date(dt.getFullYear(), dt.getMonth(), dt.getDate(), 0, 0, 0, 0);
+
+  const now = new Date();
+  return new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0);
 }
 
 export interface SLAConfig {
@@ -120,10 +150,11 @@ export async function calculateTramiteSLA(
   const TERM_DAYS = config.limite_dias || 6;
   const estadoGeneral = (tramite.estado_general || "").toUpperCase();
 
-  // 1. Trámites devueltos formalmente o insubsistentes: EXENTOS de cómputo de SLA
+  // 1. Trámites devueltos formalmente, insubsistentes o anulados: EXENTOS de cómputo de SLA
   if (
     estadoGeneral === "INSUBSISTENTE" ||
     estadoGeneral === "DEVUELTO" ||
+    estadoGeneral === "ANULADO" ||
     tramite.es_devuelto
   ) {
     return {
@@ -227,12 +258,11 @@ export async function calculateTramiteSLA(
         select: { fecha: true },
       });
       feriadosFechas = new Set(
-        feriadosList.map((f) => {
-          const d = toLocalMidnight(f.fecha);
-          return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(
-            d.getDate()
-          ).padStart(2, "0")}`;
-        })
+        feriadosList.map((f) =>
+          f.fecha instanceof Date
+            ? f.fecha.toISOString().split("T")[0]
+            : String(f.fecha).split("T")[0]
+        )
       );
     } catch (error) {
       console.error("Error fetching feriados for SLA:", error);
@@ -243,8 +273,8 @@ export async function calculateTramiteSLA(
   let endDate = toLocalMidnight(new Date());
   if (isFinalized) {
     endDate = toLocalMidnight(finalEndDate);
-  } else if (isCurrentlyPaused && tramite.fecha_pausa) {
-    endDate = toLocalMidnight(tramite.fecha_pausa);
+  } else if (isCurrentlyPaused) {
+    endDate = toLocalMidnight(tramite.fecha_pausa || tramite.fecha_ultimo_movimiento || new Date());
   }
 
   // 6. Conteo de días hábiles entre startDate y endDate
@@ -265,9 +295,9 @@ export async function calculateTramiteSLA(
     current.setDate(current.getDate() + 1);
   }
 
-  // 7. Restar pausas acumuladas
-  const pauseDays = tramite.dias_pausa_acumulados || 0;
-  const netElapsedDays = Math.max(1, elapsedBusinessDays - pauseDays);
+  // 7. Restar pausas acumuladas (estrictamente en días hábiles)
+  const pauseDays = Math.max(0, tramite.dias_pausa_acumulados || 0);
+  const netElapsedDays = Math.max(0, elapsedBusinessDays - pauseDays);
 
   // 8. Umbrales dinámicos según el límite configurado (TERM_DAYS)
   const greenThreshold = Math.ceil(TERM_DAYS * 0.5); // Para 6 días: hasta 3 días
@@ -299,3 +329,69 @@ export async function calculateTramiteSLA(
     limiteDias: TERM_DAYS,
   };
 }
+
+/**
+ * Calcula días hábiles entre dos fechas, descontando fines de semana (sábado y domingo) y feriados.
+ */
+export function calcularDiasHabiles(
+  fechaInicio: Date | string,
+  fechaFin: Date | string,
+  feriadosFechas?: Set<string>
+): number {
+  const start = toLocalMidnight(fechaInicio);
+  const end = toLocalMidnight(fechaFin);
+  if (end < start) return 0;
+
+  let count = 0;
+  const current = new Date(start.getTime());
+
+  while (current <= end) {
+    const dayOfWeek = current.getDay();
+    const dateStr = `${current.getFullYear()}-${String(current.getMonth() + 1).padStart(2, "0")}-${String(
+      current.getDate()
+    ).padStart(2, "0")}`;
+
+    if (dayOfWeek !== 0 && dayOfWeek !== 6 && (!feriadosFechas || !feriadosFechas.has(dateStr))) {
+      count++;
+    }
+
+    current.setDate(current.getDate() + 1);
+  }
+
+  return count;
+}
+
+/**
+ * Calcula los días hábiles de pausa transcurridos entre la fecha de inicio de pausa
+ * y la fecha de reanudación, excluyendo fines de semana y feriados.
+ * Evita restar días calendario (ej. fines de semana) a los días hábiles del SLA.
+ */
+export function calcularDiasPausaHabiles(
+  fechaPausa: Date | string,
+  fechaReanudacion: Date | string = new Date(),
+  feriadosFechas?: Set<string>
+): number {
+  const start = toLocalMidnight(fechaPausa);
+  const end = toLocalMidnight(fechaReanudacion);
+  if (end <= start) return 0;
+
+  let businessDays = 0;
+  const current = new Date(start.getTime());
+  current.setDate(current.getDate() + 1);
+
+  while (current <= end) {
+    const dayOfWeek = current.getDay();
+    const dateStr = `${current.getFullYear()}-${String(current.getMonth() + 1).padStart(2, "0")}-${String(
+      current.getDate()
+    ).padStart(2, "0")}`;
+
+    if (dayOfWeek !== 0 && dayOfWeek !== 6 && (!feriadosFechas || !feriadosFechas.has(dateStr))) {
+      businessDays++;
+    }
+
+    current.setDate(current.getDate() + 1);
+  }
+
+  return businessDays;
+}
+

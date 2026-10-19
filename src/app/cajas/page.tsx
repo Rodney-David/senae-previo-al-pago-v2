@@ -41,11 +41,29 @@ export default function CajasPage() {
   const [loadingCajaDetail, setLoadingCajaDetail] = useState(false);
   const [currentUser, setCurrentUser] = useState<UsuarioInstitucional | null>(null);
 
+  // Control de estado de carga para acciones asíncronas de cajas (anti-doble clic)
+  const [loadingAccionCaja, setLoadingAccionCaja] = useState<Record<number, boolean>>({});
+  const [removerTramiteLoading, setRemoverTramiteLoading] = useState<Record<number, boolean>>({});
+
+  const setCajaLoading = (idCaja: number, isLoading: boolean) => {
+    setLoadingAccionCaja((prev) => ({ ...prev, [idCaja]: isLoading }));
+  };
+
   // Modales
   const [modalNuevaCajaOpen, setModalNuevaCajaOpen] = useState(false);
   const [nombreNuevaCaja, setNombreNuevaCaja] = useState("");
   const [obsNuevaCaja, setObsNuevaCaja] = useState("");
   const [creandoCaja, setCreandoCaja] = useState(false);
+
+  // Modal para cerrar caja (Adm. Caja)
+  const [modalCerrarOpen, setModalCerrarOpen] = useState(false);
+  const [cajaACerrar, setCajaACerrar] = useState<CajaDTO | null>(null);
+  const [cerrandoCaja, setCerrandoCaja] = useState(false);
+
+  // Modal para enviar caja a archivo (Adm. Caja)
+  const [modalEnviarArchivoOpen, setModalEnviarArchivoOpen] = useState(false);
+  const [cajaAEnviar, setCajaAEnviar] = useState<CajaDTO | null>(null);
+  const [enviandoArchivo, setEnviandoArchivo] = useState(false);
 
   // Modal para devolver caja (Custodio de Archivo)
   const [modalDevolverOpen, setModalDevolverOpen] = useState(false);
@@ -240,11 +258,12 @@ export default function CajasPage() {
 
   // Remover trámite de la caja
   const handleRemoverTramiteDeCaja = async (idTramite: number) => {
-    if (!selectedCaja) return;
+    if (!selectedCaja || removerTramiteLoading[idTramite]) return;
     if (!confirm("¿Desea retirar este trámite de la caja física? Volverá al estado PAGADO sin caja.")) {
       return;
     }
 
+    setRemoverTramiteLoading((prev) => ({ ...prev, [idTramite]: true }));
     try {
       const res = await fetch(`/api/cajas/${selectedCaja.id_caja}/tramites`, {
         method: "POST",
@@ -258,10 +277,12 @@ export default function CajasPage() {
       if (!res.ok) throw new Error(data.error || "Error al remover trámite");
 
       setSuccessMsg("Trámite retirado de la caja física.");
-      fetchCajas();
-      fetchCajaDetail(selectedCaja.id_caja);
+      await fetchCajas();
+      await fetchCajaDetail(selectedCaja.id_caja);
     } catch (err: any) {
       setErrorMsg(err.message);
+    } finally {
+      setRemoverTramiteLoading((prev) => ({ ...prev, [idTramite]: false }));
     }
   };
 
@@ -284,21 +305,24 @@ export default function CajasPage() {
   const isCustodioOnly = (userArea === 6 || userRole.includes("ARCHIVO") || userRole.includes("CUSTODIO") || userCargo.includes("ARCHIVO") || userCargo.includes("CUSTODIO")) && !isAdmin && !isAdmCaja;
 
   // Cerrar caja (Adm. Caja)
-  const handleCerrarCaja = async (caja: CajaDTO) => {
+  const handleCerrarCaja = (caja: CajaDTO) => {
+    if (loadingAccionCaja[caja.id_caja]) return;
     const totalTr = caja.tramites?.length || caja.total_tramites || 0;
     if (totalTr === 0) {
       alert("No se puede cerrar una caja vacía. Asigne al menos un trámite pagado.");
       return;
     }
+    setCajaACerrar(caja);
+    setModalCerrarOpen(true);
+  };
 
-    const conf = confirm(
-      `¿Desea cerrar la caja "${caja.codigo_caja}"?\n\n` +
-      `Contiene ${totalTr} expediente(s). Al cerrarla quedará lista para ser enviada formalmente al Archivo Central (o podrá reabrirse para ajustes si lo requiere).`
-    );
-    if (!conf) return;
-
+  const handleConfirmarCerrarCaja = async () => {
+    if (!cajaACerrar || loadingAccionCaja[cajaACerrar.id_caja]) return;
+    setCerrandoCaja(true);
+    setCajaLoading(cajaACerrar.id_caja, true);
+    setErrorMsg(null);
     try {
-      const res = await fetch(`/api/cajas/${caja.id_caja}/estado`, {
+      const res = await fetch(`/api/cajas/${cajaACerrar.id_caja}/estado`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ accion: "CERRAR" }),
@@ -306,24 +330,32 @@ export default function CajasPage() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Error al cerrar la caja");
 
-      setSuccessMsg(data.message || `Caja "${caja.codigo_caja}" cerrada exitosamente.`);
-      fetchCajas();
-      if (selectedCaja?.id_caja === caja.id_caja) {
-        fetchCajaDetail(caja.id_caja);
+      setSuccessMsg(data.message || `Caja "${cajaACerrar.codigo_caja}" cerrada exitosamente.`);
+      setModalCerrarOpen(false);
+      setCajaACerrar(null);
+      await fetchCajas();
+      if (selectedCaja?.id_caja === cajaACerrar.id_caja) {
+        await fetchCajaDetail(cajaACerrar.id_caja);
       }
     } catch (err: any) {
       setErrorMsg(err.message);
+    } finally {
+      setCerrandoCaja(false);
+      setCajaLoading(cajaACerrar.id_caja, false);
     }
   };
 
   // Reabrir caja cerrada para edición (Adm. Caja)
   const handleReabrirCaja = async (caja: CajaDTO) => {
+    if (loadingAccionCaja[caja.id_caja]) return;
     const conf = confirm(
       `¿Desea reabrir la caja "${caja.codigo_caja}"?\n\n` +
       `Volverá al estado ABIERTA para permitir agregar o retirar expedientes.`
     );
     if (!conf) return;
 
+    setCajaLoading(caja.id_caja, true);
+    setErrorMsg(null);
     try {
       const res = await fetch(`/api/cajas/${caja.id_caja}/estado`, {
         method: "POST",
@@ -334,26 +366,31 @@ export default function CajasPage() {
       if (!res.ok) throw new Error(data.error || "Error al reabrir la caja");
 
       setSuccessMsg(data.message || `Caja "${caja.codigo_caja}" reabierta para edición.`);
-      fetchCajas();
+      await fetchCajas();
       if (selectedCaja?.id_caja === caja.id_caja) {
-        fetchCajaDetail(caja.id_caja);
+        await fetchCajaDetail(caja.id_caja);
       }
     } catch (err: any) {
       setErrorMsg(err.message);
+    } finally {
+      setCajaLoading(caja.id_caja, false);
     }
   };
 
   // Enviar caja al Archivo Central (Adm. Caja)
-  const handleEnviarArchivo = async (caja: CajaDTO) => {
-    const totalTr = caja.tramites?.length || caja.total_tramites || 0;
-    const conf = confirm(
-      `¿Desea enviar formalmente la caja "${caja.codigo_caja}" al Archivo Central?\n\n` +
-      `Los ${totalTr} expediente(s) saldrán de Adm. Caja y pasarán a custodia del Custodio de Archivo para su recepción y aprobación final.`
-    );
-    if (!conf) return;
+  const handleEnviarArchivo = (caja: CajaDTO) => {
+    if (loadingAccionCaja[caja.id_caja]) return;
+    setCajaAEnviar(caja);
+    setModalEnviarArchivoOpen(true);
+  };
 
+  const handleConfirmarEnviarArchivo = async () => {
+    if (!cajaAEnviar || loadingAccionCaja[cajaAEnviar.id_caja]) return;
+    setEnviandoArchivo(true);
+    setCajaLoading(cajaAEnviar.id_caja, true);
+    setErrorMsg(null);
     try {
-      const res = await fetch(`/api/cajas/${caja.id_caja}/estado`, {
+      const res = await fetch(`/api/cajas/${cajaAEnviar.id_caja}/estado`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ accion: "ENVIAR_ARCHIVO" }),
@@ -361,18 +398,24 @@ export default function CajasPage() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Error al enviar la caja al Archivo");
 
-      setSuccessMsg(data.message || `Caja "${caja.codigo_caja}" enviada exitosamente a Custodia de Archivo.`);
-      fetchCajas();
-      if (selectedCaja?.id_caja === caja.id_caja) {
-        fetchCajaDetail(caja.id_caja);
+      setSuccessMsg(data.message || `Caja "${cajaAEnviar.codigo_caja}" enviada exitosamente a Custodia de Archivo.`);
+      setModalEnviarArchivoOpen(false);
+      setCajaAEnviar(null);
+      await fetchCajas();
+      if (selectedCaja?.id_caja === cajaAEnviar.id_caja) {
+        await fetchCajaDetail(cajaAEnviar.id_caja);
       }
     } catch (err: any) {
       setErrorMsg(err.message);
+    } finally {
+      setEnviandoArchivo(false);
+      setCajaLoading(cajaAEnviar.id_caja, false);
     }
   };
 
   // Aprobar y archivar definitivamente la caja (Custodio de Archivo)
   const handleAprobarArchivarCaja = async (caja: CajaDTO) => {
+    if (loadingAccionCaja[caja.id_caja]) return;
     const totalTr = caja.tramites?.length || caja.total_tramites || 0;
     const conf = confirm(
       `¿Desea aprobar y archivar definitivamente la caja "${caja.codigo_caja}"?\n\n` +
@@ -380,6 +423,8 @@ export default function CajasPage() {
     );
     if (!conf) return;
 
+    setCajaLoading(caja.id_caja, true);
+    setErrorMsg(null);
     try {
       const res = await fetch(`/api/cajas/${caja.id_caja}/estado`, {
         method: "POST",
@@ -390,12 +435,14 @@ export default function CajasPage() {
       if (!res.ok) throw new Error(data.error || "Error al aprobar y archivar la caja");
 
       setSuccessMsg(data.message || `Caja "${caja.codigo_caja}" archivada definitivamente. Expedientes pasaron a ARCHIVO.`);
-      fetchCajas();
+      await fetchCajas();
       if (selectedCaja?.id_caja === caja.id_caja) {
-        fetchCajaDetail(caja.id_caja);
+        await fetchCajaDetail(caja.id_caja);
       }
     } catch (err: any) {
       setErrorMsg(err.message);
+    } finally {
+      setCajaLoading(caja.id_caja, false);
     }
   };
 
@@ -405,7 +452,10 @@ export default function CajasPage() {
       setErrorMsg("La justificación para desarchivar la caja es obligatoria.");
       return;
     }
+    if (loadingAccionCaja[cajaADesarchivar.id_caja] || desarchivandoCaja) return;
+
     setDesarchivandoCaja(true);
+    setCajaLoading(cajaADesarchivar.id_caja, true);
     setErrorMsg(null);
     try {
       const res = await fetch(`/api/cajas/${cajaADesarchivar.id_caja}/estado`, {
@@ -421,14 +471,17 @@ export default function CajasPage() {
 
       setSuccessMsg(data.message || `Caja "${cajaADesarchivar.codigo_caja}" desarchivada exitosamente.`);
       setModalDesarchivarCajaOpen(false);
-      fetchCajas();
+      await fetchCajas();
       if (selectedCaja?.id_caja === cajaADesarchivar.id_caja) {
-        fetchCajaDetail(cajaADesarchivar.id_caja);
+        await fetchCajaDetail(cajaADesarchivar.id_caja);
       }
     } catch (err: any) {
       setErrorMsg(err.message);
     } finally {
       setDesarchivandoCaja(false);
+      if (cajaADesarchivar) {
+        setCajaLoading(cajaADesarchivar.id_caja, false);
+      }
     }
   };
 
@@ -436,8 +489,10 @@ export default function CajasPage() {
   const handleConfirmarDevolucion = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!cajaADevolver || !motivoDevolucion.trim()) return;
+    if (loadingAccionCaja[cajaADevolver.id_caja] || devolviendoCaja) return;
 
     setDevolviendoCaja(true);
+    setCajaLoading(cajaADevolver.id_caja, true);
     setErrorMsg(null);
     try {
       const res = await fetch(`/api/cajas/${cajaADevolver.id_caja}/estado`, {
@@ -455,23 +510,29 @@ export default function CajasPage() {
       setModalDevolverOpen(false);
       setCajaADevolver(null);
       setMotivoDevolucion("");
-      fetchCajas();
+      await fetchCajas();
       if (selectedCaja?.id_caja === cajaADevolver.id_caja) {
-        fetchCajaDetail(cajaADevolver.id_caja);
+        await fetchCajaDetail(cajaADevolver.id_caja);
       }
     } catch (err: any) {
       setErrorMsg(err.message);
     } finally {
       setDevolviendoCaja(false);
+      if (cajaADevolver) {
+        setCajaLoading(cajaADevolver.id_caja, false);
+      }
     }
   };
 
   // Eliminar caja vacía / abierta (Adm. Caja)
   const handleEliminarCaja = async (caja: CajaDTO) => {
+    if (loadingAccionCaja[caja.id_caja]) return;
     if (!confirm(`¿Desea eliminar la caja "${caja.codigo_caja}"? Los trámites que contenga regresarán a estado PAGADO libre.`)) {
       return;
     }
 
+    setCajaLoading(caja.id_caja, true);
+    setErrorMsg(null);
     try {
       const res = await fetch(`/api/cajas/${caja.id_caja}`, {
         method: "DELETE",
@@ -483,9 +544,11 @@ export default function CajasPage() {
       if (selectedCaja?.id_caja === caja.id_caja) {
         setSelectedCaja(null);
       }
-      fetchCajas();
+      await fetchCajas();
     } catch (err: any) {
       setErrorMsg(err.message);
+    } finally {
+      setCajaLoading(caja.id_caja, false);
     }
   };
 
@@ -538,7 +601,7 @@ export default function CajasPage() {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="w-full max-w-full min-w-0 space-y-6">
       {/* Page Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-5 rounded-xl border border-slate-200 shadow-xs">
         <div>
@@ -605,10 +668,10 @@ export default function CajasPage() {
       )}
 
       {/* Selector de Pestañas de Cajas */}
-      <div className="flex flex-wrap p-1 bg-slate-200/80 rounded-lg border border-slate-300 text-xs font-medium self-start gap-1 w-fit">
+      <div className="flex overflow-x-auto flex-nowrap sm:flex-wrap items-center p-1 bg-slate-200/80 rounded-lg border border-slate-300 text-xs font-medium self-stretch sm:self-start gap-1 scrollbar-none max-w-full">
         <button
           onClick={() => setTabEstado("TODAS")}
-          className={`px-3.5 py-1.5 rounded-md transition-all ${
+          className={`shrink-0 whitespace-nowrap px-3.5 py-1.5 rounded-md transition-all ${
             tabEstado === "TODAS"
               ? "bg-white text-slate-900 shadow-xs font-semibold"
               : "text-slate-600 hover:text-slate-900"
@@ -618,7 +681,7 @@ export default function CajasPage() {
         </button>
         <button
           onClick={() => setTabEstado("ABIERTA")}
-          className={`px-3.5 py-1.5 rounded-md transition-all ${
+          className={`shrink-0 whitespace-nowrap px-3.5 py-1.5 rounded-md transition-all ${
             tabEstado === "ABIERTA"
               ? "bg-white text-slate-900 shadow-xs font-semibold"
               : "text-slate-600 hover:text-slate-900"
@@ -628,7 +691,7 @@ export default function CajasPage() {
         </button>
         <button
           onClick={() => setTabEstado("CERRADA")}
-          className={`px-3.5 py-1.5 rounded-md transition-all ${
+          className={`shrink-0 whitespace-nowrap px-3.5 py-1.5 rounded-md transition-all ${
             tabEstado === "CERRADA"
               ? "bg-white text-slate-900 shadow-xs font-semibold"
               : "text-slate-600 hover:text-slate-900"
@@ -638,7 +701,7 @@ export default function CajasPage() {
         </button>
         <button
           onClick={() => setTabEstado("ENVIADA")}
-          className={`px-3.5 py-1.5 rounded-md transition-all ${
+          className={`shrink-0 whitespace-nowrap px-3.5 py-1.5 rounded-md transition-all ${
             tabEstado === "ENVIADA"
               ? "bg-white text-slate-900 shadow-xs font-semibold"
               : "text-slate-600 hover:text-slate-900"
@@ -648,7 +711,7 @@ export default function CajasPage() {
         </button>
         <button
           onClick={() => setTabEstado("ARCHIVADA")}
-          className={`px-3.5 py-1.5 rounded-md transition-all ${
+          className={`shrink-0 whitespace-nowrap px-3.5 py-1.5 rounded-md transition-all ${
             tabEstado === "ARCHIVADA"
               ? "bg-white text-slate-900 shadow-xs font-semibold"
               : "text-slate-600 hover:text-slate-900"
@@ -659,7 +722,7 @@ export default function CajasPage() {
       </div>
 
       {/* Grid de Cajas */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
         {loading ? (
           <div className="col-span-full p-12 text-center text-xs text-slate-500 flex flex-col items-center gap-2">
             <RefreshCw className="w-5 h-5 animate-spin text-blue-600" />
@@ -797,17 +860,27 @@ export default function CajasPage() {
                       <>
                         <button
                           onClick={() => handleCerrarCaja(c)}
-                          className="p-1.5 text-slate-600 hover:text-amber-700 hover:bg-amber-50 rounded-lg transition-colors border border-slate-200"
+                          disabled={Boolean(loadingAccionCaja[c.id_caja])}
+                          className="p-1.5 text-slate-600 hover:text-amber-700 hover:bg-amber-50 rounded-lg transition-colors border border-slate-200 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
                           title="Cerrar caja (preparar para enviar)"
                         >
-                          <Lock className="w-4 h-4" />
+                          {loadingAccionCaja[c.id_caja] ? (
+                            <RefreshCw className="w-3.5 h-3.5 animate-spin text-amber-600" />
+                          ) : (
+                            <Lock className="w-4 h-4" />
+                          )}
                         </button>
                         <button
                           onClick={() => handleEliminarCaja(c)}
-                          className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
+                          disabled={Boolean(loadingAccionCaja[c.id_caja])}
+                          className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
                           title="Eliminar caja abierta"
                         >
-                          <Trash2 className="w-3.5 h-3.5" />
+                          {loadingAccionCaja[c.id_caja] ? (
+                            <RefreshCw className="w-3.5 h-3.5 animate-spin text-rose-600" />
+                          ) : (
+                            <Trash2 className="w-3.5 h-3.5" />
+                          )}
                         </button>
                       </>
                     )}
@@ -817,17 +890,27 @@ export default function CajasPage() {
                       <>
                         <button
                           onClick={() => handleReabrirCaja(c)}
-                          className="p-1.5 text-slate-600 hover:text-blue-700 hover:bg-blue-50 rounded-lg transition-colors border border-slate-200"
+                          disabled={Boolean(loadingAccionCaja[c.id_caja])}
+                          className="p-1.5 text-slate-600 hover:text-blue-700 hover:bg-blue-50 rounded-lg transition-colors border border-slate-200 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
                           title="Reabrir caja para edición"
                         >
-                          <Unlock className="w-4 h-4" />
+                          {loadingAccionCaja[c.id_caja] ? (
+                            <RefreshCw className="w-3.5 h-3.5 animate-spin text-blue-600" />
+                          ) : (
+                            <Unlock className="w-4 h-4" />
+                          )}
                         </button>
                         <button
                           onClick={() => handleEnviarArchivo(c)}
-                          className="p-1.5 text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors shadow-2xs"
+                          disabled={Boolean(loadingAccionCaja[c.id_caja])}
+                          className="p-1.5 text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors shadow-2xs disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
                           title="Enviar caja al Archivo Central"
                         >
-                          <Send className="w-4 h-4" />
+                          {loadingAccionCaja[c.id_caja] ? (
+                            <RefreshCw className="w-3.5 h-3.5 animate-spin text-white" />
+                          ) : (
+                            <Send className="w-4 h-4" />
+                          )}
                         </button>
                       </>
                     )}
@@ -840,17 +923,27 @@ export default function CajasPage() {
                             setCajaADevolver(c);
                             setModalDevolverOpen(true);
                           }}
-                          className="p-1.5 text-amber-700 hover:bg-amber-50 rounded-lg transition-colors border border-amber-300"
+                          disabled={Boolean(loadingAccionCaja[c.id_caja])}
+                          className="p-1.5 text-amber-700 hover:bg-amber-50 rounded-lg transition-colors border border-amber-300 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
                           title="Devolver / Observar caja hacia Adm. Caja"
                         >
-                          <RotateCcw className="w-4 h-4" />
+                          {loadingAccionCaja[c.id_caja] ? (
+                            <RefreshCw className="w-3.5 h-3.5 animate-spin text-amber-600" />
+                          ) : (
+                            <RotateCcw className="w-4 h-4" />
+                          )}
                         </button>
                         <button
                           onClick={() => handleAprobarArchivarCaja(c)}
-                          className="p-1.5 text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg transition-colors shadow-2xs"
+                          disabled={Boolean(loadingAccionCaja[c.id_caja])}
+                          className="p-1.5 text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg transition-colors shadow-2xs disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
                           title="Aprobar y Archivar definitivamente"
                         >
-                          <Archive className="w-4 h-4" />
+                          {loadingAccionCaja[c.id_caja] ? (
+                            <RefreshCw className="w-3.5 h-3.5 animate-spin text-white" />
+                          ) : (
+                            <Archive className="w-4 h-4" />
+                          )}
                         </button>
                       </>
                     )}
@@ -863,10 +956,16 @@ export default function CajasPage() {
                           setMotivoDesarchivo("");
                           setModalDesarchivarCajaOpen(true);
                         }}
-                        className="px-2 py-1 text-xs font-bold text-amber-800 bg-amber-100 hover:bg-amber-200 rounded-lg transition-colors border border-amber-300 flex items-center gap-1 shadow-2xs"
+                        disabled={Boolean(loadingAccionCaja[c.id_caja])}
+                        className="px-2 py-1 text-xs font-bold text-amber-800 bg-amber-100 hover:bg-amber-200 rounded-lg transition-colors border border-amber-300 flex items-center gap-1 shadow-2xs disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
                         title="Desarchivar caja completa con justificación"
                       >
-                        <FolderOpen className="w-3.5 h-3.5" /> Desarchivar
+                        {loadingAccionCaja[c.id_caja] ? (
+                          <RefreshCw className="w-3.5 h-3.5 animate-spin text-amber-800" />
+                        ) : (
+                          <FolderOpen className="w-3.5 h-3.5" />
+                        )}
+                        <span>Desarchivar</span>
                       </button>
                     )}
                   </div>
@@ -948,15 +1047,21 @@ export default function CajasPage() {
                         fetchTramitesPagadosDisponibles();
                         setModalAgregarTramitesOpen(true);
                       }}
-                      className="px-3 py-1.5 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg transition-colors shadow-2xs flex items-center gap-1.5"
+                      className="px-3 py-1.5 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg transition-colors shadow-2xs flex items-center gap-1.5 cursor-pointer"
                     >
                       <Plus className="w-3.5 h-3.5" /> Almacenar Trámites Pagados
                     </button>
                     <button
                       onClick={() => handleCerrarCaja(selectedCaja)}
-                      className="px-3 py-1.5 text-xs font-bold text-white bg-amber-600 hover:bg-amber-700 rounded-lg transition-colors shadow-2xs flex items-center gap-1.5"
+                      disabled={Boolean(loadingAccionCaja[selectedCaja.id_caja])}
+                      className="px-3 py-1.5 text-xs font-bold text-white bg-amber-600 hover:bg-amber-700 rounded-lg transition-colors shadow-2xs flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
                     >
-                      <Lock className="w-3.5 h-3.5" /> Cerrar Caja
+                      {loadingAccionCaja[selectedCaja.id_caja] ? (
+                        <RefreshCw className="w-3.5 h-3.5 animate-spin text-white" />
+                      ) : (
+                        <Lock className="w-3.5 h-3.5" />
+                      )}
+                      <span>Cerrar Caja</span>
                     </button>
                   </>
                 )}
@@ -966,15 +1071,27 @@ export default function CajasPage() {
                   <>
                     <button
                       onClick={() => handleReabrirCaja(selectedCaja)}
-                      className="px-3 py-1.5 text-xs font-semibold text-slate-700 bg-white hover:bg-slate-100 border border-slate-300 rounded-lg transition-colors flex items-center gap-1.5 shadow-2xs"
+                      disabled={Boolean(loadingAccionCaja[selectedCaja.id_caja])}
+                      className="px-3 py-1.5 text-xs font-semibold text-slate-700 bg-white hover:bg-slate-100 border border-slate-300 rounded-lg transition-colors flex items-center gap-1.5 shadow-2xs disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
                     >
-                      <Unlock className="w-3.5 h-3.5" /> Reabrir Caja
+                      {loadingAccionCaja[selectedCaja.id_caja] ? (
+                        <RefreshCw className="w-3.5 h-3.5 animate-spin text-slate-600" />
+                      ) : (
+                        <Unlock className="w-3.5 h-3.5" />
+                      )}
+                      <span>Reabrir Caja</span>
                     </button>
                     <button
                       onClick={() => handleEnviarArchivo(selectedCaja)}
-                      className="px-3 py-1.5 text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors shadow-2xs flex items-center gap-1.5"
+                      disabled={Boolean(loadingAccionCaja[selectedCaja.id_caja])}
+                      className="px-3 py-1.5 text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors shadow-2xs flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
                     >
-                      <Send className="w-3.5 h-3.5" /> Enviar a Archivo Central
+                      {loadingAccionCaja[selectedCaja.id_caja] ? (
+                        <RefreshCw className="w-3.5 h-3.5 animate-spin text-white" />
+                      ) : (
+                        <Send className="w-3.5 h-3.5" />
+                      )}
+                      <span>Enviar a Archivo Central</span>
                     </button>
                   </>
                 )}
@@ -987,9 +1104,15 @@ export default function CajasPage() {
                       setMotivoDesarchivo("");
                       setModalDesarchivarCajaOpen(true);
                     }}
-                    className="px-3 py-1.5 text-xs font-bold text-amber-800 bg-amber-100 hover:bg-amber-200 border border-amber-300 rounded-lg transition-colors shadow-2xs flex items-center gap-1.5"
+                    disabled={Boolean(loadingAccionCaja[selectedCaja.id_caja])}
+                    className="px-3 py-1.5 text-xs font-bold text-amber-800 bg-amber-100 hover:bg-amber-200 border border-amber-300 rounded-lg transition-colors shadow-2xs flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
                   >
-                    <FolderOpen className="w-3.5 h-3.5" /> Desarchivar Caja
+                    {loadingAccionCaja[selectedCaja.id_caja] ? (
+                      <RefreshCw className="w-3.5 h-3.5 animate-spin text-amber-800" />
+                    ) : (
+                      <FolderOpen className="w-3.5 h-3.5" />
+                    )}
+                    <span>Desarchivar Caja</span>
                   </button>
                 )}
 
@@ -1001,15 +1124,27 @@ export default function CajasPage() {
                         setCajaADevolver(selectedCaja);
                         setModalDevolverOpen(true);
                       }}
-                      className="px-3 py-1.5 text-xs font-semibold text-amber-800 bg-amber-50 hover:bg-amber-100 border border-amber-300 rounded-lg transition-colors flex items-center gap-1.5"
+                      disabled={Boolean(loadingAccionCaja[selectedCaja.id_caja])}
+                      className="px-3 py-1.5 text-xs font-semibold text-amber-800 bg-amber-50 hover:bg-amber-100 border border-amber-300 rounded-lg transition-colors flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
                     >
-                      <RotateCcw className="w-3.5 h-3.5 text-amber-600" /> Devolver a Adm. Caja
+                      {loadingAccionCaja[selectedCaja.id_caja] ? (
+                        <RefreshCw className="w-3.5 h-3.5 animate-spin text-amber-600" />
+                      ) : (
+                        <RotateCcw className="w-3.5 h-3.5 text-amber-600" />
+                      )}
+                      <span>Devolver a Adm. Caja</span>
                     </button>
                     <button
                       onClick={() => handleAprobarArchivarCaja(selectedCaja)}
-                      className="px-3.5 py-1.5 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg transition-colors shadow-2xs flex items-center gap-1.5"
+                      disabled={Boolean(loadingAccionCaja[selectedCaja.id_caja])}
+                      className="px-3.5 py-1.5 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg transition-colors shadow-2xs flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
                     >
-                      <Archive className="w-3.5 h-3.5" /> Aprobar y Archivar Definitivamente
+                      {loadingAccionCaja[selectedCaja.id_caja] ? (
+                        <RefreshCw className="w-3.5 h-3.5 animate-spin text-white" />
+                      ) : (
+                        <Archive className="w-3.5 h-3.5" />
+                      )}
+                      <span>Aprobar y Archivar Definitivamente</span>
                     </button>
                   </>
                 )}
@@ -1018,14 +1153,14 @@ export default function CajasPage() {
                   <>
                     <button
                       onClick={() => setModalImprimirOpen(true)}
-                      className="px-3 py-1.5 text-xs font-semibold text-slate-700 bg-white hover:bg-slate-100 border border-slate-300 rounded-lg transition-colors flex items-center gap-1.5 shadow-2xs"
+                      className="px-3 py-1.5 text-xs font-semibold text-slate-700 bg-white hover:bg-slate-100 border border-slate-300 rounded-lg transition-colors flex items-center gap-1.5 shadow-2xs cursor-pointer"
                     >
                       <Printer className="w-3.5 h-3.5" /> Imprimir Documento
                     </button>
 
                     <button
                       onClick={() => handleDescargarExcel(selectedCaja.id_caja, selectedCaja.codigo_caja)}
-                      className="px-3 py-1.5 text-xs font-semibold text-slate-700 bg-white hover:bg-slate-100 border border-slate-300 rounded-lg transition-colors flex items-center gap-1.5 shadow-2xs"
+                      className="px-3 py-1.5 text-xs font-semibold text-slate-700 bg-white hover:bg-slate-100 border border-slate-300 rounded-lg transition-colors flex items-center gap-1.5 shadow-2xs cursor-pointer"
                     >
                       <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-600" /> Exportar Excel
                     </button>
@@ -1046,8 +1181,8 @@ export default function CajasPage() {
                   Esta caja aún no tiene expedientes almacenados.
                 </div>
               ) : (
-                <div className="overflow-x-auto border border-slate-200 rounded-xl">
-                  <table className="w-full text-left text-xs border-collapse">
+                <div className="overflow-x-auto w-full max-w-full min-w-0 border border-slate-200 rounded-xl shadow-2xs">
+                  <table className="min-w-[750px] w-full text-left text-xs border-collapse">
                     <thead>
                       <tr className="border-b border-slate-200 bg-slate-50 text-[11px] font-bold text-slate-700 uppercase tracking-wider">
                         <th className="py-2.5 px-3 text-center w-12">No.</th>
@@ -1116,10 +1251,15 @@ export default function CajasPage() {
                                     e.stopPropagation();
                                     handleRemoverTramiteDeCaja(t.id_tramite);
                                   }}
-                                  className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
+                                  disabled={Boolean(removerTramiteLoading[t.id_tramite])}
+                                  className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
                                   title="Retirar de esta caja"
                                 >
-                                  <Trash2 className="w-3.5 h-3.5" />
+                                  {removerTramiteLoading[t.id_tramite] ? (
+                                    <RefreshCw className="w-3.5 h-3.5 animate-spin text-rose-600" />
+                                  ) : (
+                                    <Trash2 className="w-3.5 h-3.5" />
+                                  )}
                                 </button>
                               </td>
                             )}
@@ -1149,18 +1289,19 @@ export default function CajasPage() {
         </div>
       )}
 
-      {/* MODAL: NUEVA CAJA */}
+      {/* MODAL: NUEVA CAJA (APERTURA DE CAJA) */}
       {modalNuevaCajaOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-xs p-4">
-          <div className="bg-white rounded-xl shadow-xl border border-slate-200 w-full max-w-md overflow-hidden animate-in fade-in zoom-in-95 duration-150">
-            <div className="px-5 py-4 bg-slate-900 text-white flex items-center justify-between">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-xs p-3 sm:p-4 overflow-y-auto">
+          <div className="bg-white rounded-xl shadow-xl border border-slate-200 max-w-lg w-full max-h-[90vh] overflow-y-auto animate-in fade-in zoom-in-95 duration-150">
+            <div className="px-5 py-4 bg-slate-900 text-white flex items-center justify-between sticky top-0 z-10">
               <div className="flex items-center gap-2">
                 <Package className="w-4 h-4 text-blue-400" />
                 <h3 className="text-xs font-bold uppercase tracking-wider">Crear Nueva Caja Física</h3>
               </div>
               <button
+                type="button"
                 onClick={() => setModalNuevaCajaOpen(false)}
-                className="text-slate-400 hover:text-white transition-colors"
+                className="text-slate-400 hover:text-white transition-colors cursor-pointer"
               >
                 <X className="w-4 h-4" />
               </button>
@@ -1203,16 +1344,23 @@ export default function CajasPage() {
                   type="button"
                   onClick={() => setModalNuevaCajaOpen(false)}
                   disabled={creandoCaja}
-                  className="px-3.5 py-1.5 text-xs font-semibold uppercase text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors"
+                  className="px-3.5 py-1.5 text-xs font-semibold uppercase text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors cursor-pointer"
                 >
                   Cancelar
                 </button>
                 <button
                   type="submit"
                   disabled={creandoCaja || !nombreNuevaCaja.trim()}
-                  className="px-4 py-1.5 text-xs font-bold uppercase text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors shadow-xs"
+                  className="px-4 py-1.5 text-xs font-bold uppercase text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors shadow-xs flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
                 >
-                  {creandoCaja ? "Creando..." : "Crear Caja"}
+                  {creandoCaja ? (
+                    <>
+                      <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                      <span>Creando...</span>
+                    </>
+                  ) : (
+                    "Crear Caja"
+                  )}
                 </button>
               </div>
             </form>
@@ -1220,11 +1368,153 @@ export default function CajasPage() {
         </div>
       )}
 
+      {/* MODAL: CIERRE DE CAJA */}
+      {modalCerrarOpen && cajaACerrar && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-xs p-3 sm:p-4 overflow-y-auto">
+          <div className="bg-white rounded-xl shadow-xl border border-slate-200 max-w-lg w-full max-h-[90vh] overflow-y-auto animate-in fade-in zoom-in-95 duration-150">
+            <div className="px-5 py-4 bg-slate-900 text-white flex items-center justify-between sticky top-0 z-10">
+              <div className="flex items-center gap-2">
+                <Lock className="w-4 h-4 text-amber-400" />
+                <h3 className="text-xs font-bold uppercase tracking-wider">
+                  Cierre de Caja: {cajaACerrar.codigo_caja}
+                </h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setModalCerrarOpen(false);
+                  setCajaACerrar(null);
+                }}
+                disabled={cerrandoCaja}
+                className="text-slate-400 hover:text-white transition-colors cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="p-5 space-y-4">
+              <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg text-xs text-amber-900 space-y-1">
+                <p className="font-semibold">
+                  ¿Está seguro de cerrar la caja &ldquo;{cajaACerrar.codigo_caja}&rdquo;?
+                </p>
+                <p className="text-[11px] text-amber-800">
+                  Contiene <strong>{cajaACerrar.tramites?.length || cajaACerrar.total_tramites || 0}</strong> expediente(s) por un monto total de <strong>{formatCurrency(cajaACerrar.total_monto || 0)}</strong>. Al cerrarla quedará lista para ser enviada formalmente al Archivo Central.
+                </p>
+              </div>
+
+              <div className="text-xs text-slate-600">
+                Una vez cerrada, la caja no admitirá nuevos trámites a menos que un Administrador de Caja la reabra para ajustes.
+              </div>
+
+              <div className="flex justify-end gap-2 pt-3 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setModalCerrarOpen(false);
+                    setCajaACerrar(null);
+                  }}
+                  disabled={cerrandoCaja}
+                  className="px-3.5 py-1.5 text-xs font-semibold uppercase text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors cursor-pointer"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="button"
+                  onClick={handleConfirmarCerrarCaja}
+                  disabled={cerrandoCaja || (cajaACerrar.tramites?.length === 0 && !cajaACerrar.total_tramites)}
+                  className="px-4 py-1.5 text-xs font-bold uppercase text-white bg-amber-600 hover:bg-amber-700 rounded-lg transition-colors shadow-xs flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+                >
+                  {cerrandoCaja ? (
+                    <>
+                      <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                      <span>Cerrando...</span>
+                    </>
+                  ) : (
+                    "Confirmar Cierre de Caja"
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL: ENVÍO A ARCHIVO */}
+      {modalEnviarArchivoOpen && cajaAEnviar && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-xs p-3 sm:p-4 overflow-y-auto">
+          <div className="bg-white rounded-xl shadow-xl border border-slate-200 max-w-lg w-full max-h-[90vh] overflow-y-auto animate-in fade-in zoom-in-95 duration-150">
+            <div className="px-5 py-4 bg-slate-900 text-white flex items-center justify-between sticky top-0 z-10">
+              <div className="flex items-center gap-2">
+                <Send className="w-4 h-4 text-blue-400" />
+                <h3 className="text-xs font-bold uppercase tracking-wider">
+                  Enviar a Archivo Central: {cajaAEnviar.codigo_caja}
+                </h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setModalEnviarArchivoOpen(false);
+                  setCajaAEnviar(null);
+                }}
+                disabled={enviandoArchivo}
+                className="text-slate-400 hover:text-white transition-colors cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="p-5 space-y-4">
+              <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg text-xs text-blue-900 space-y-1">
+                <p className="font-semibold">
+                  ¿Desea enviar formalmente la caja &ldquo;{cajaAEnviar.codigo_caja}&rdquo; al Archivo Central?
+                </p>
+                <p className="text-[11px] text-blue-800">
+                  Los <strong>{cajaAEnviar.tramites?.length || cajaAEnviar.total_tramites || 0}</strong> expediente(s) saldrán de Administración de Caja y pasarán a custodia formal del Custodio de Archivo para su verificación y aprobación definitiva.
+                </p>
+              </div>
+
+              <div className="text-xs text-slate-600">
+                Asegúrese de haber generado el documento oficial de entrega y verificado físicamente el cartón antes de enviarlo.
+              </div>
+
+              <div className="flex justify-end gap-2 pt-3 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setModalEnviarArchivoOpen(false);
+                    setCajaAEnviar(null);
+                  }}
+                  disabled={enviandoArchivo}
+                  className="px-3.5 py-1.5 text-xs font-semibold uppercase text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors cursor-pointer"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="button"
+                  onClick={handleConfirmarEnviarArchivo}
+                  disabled={enviandoArchivo}
+                  className="px-4 py-1.5 text-xs font-bold uppercase text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors shadow-xs flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+                >
+                  {enviandoArchivo ? (
+                    <>
+                      <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                      <span>Enviando...</span>
+                    </>
+                  ) : (
+                    "Confirmar Envío a Archivo"
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* MODAL: DEVOLVER CAJA A ADM. CAJA (CUSTODIO DE ARCHIVO) */}
       {modalDevolverOpen && cajaADevolver && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-xs p-4">
-          <div className="bg-white rounded-xl shadow-xl border border-slate-200 w-full max-w-md overflow-hidden animate-in fade-in zoom-in-95 duration-150">
-            <div className="px-5 py-4 bg-amber-900 text-white flex items-center justify-between">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-xs p-3 sm:p-4 overflow-y-auto">
+          <div className="bg-white rounded-xl shadow-xl border border-slate-200 max-w-lg w-full max-h-[90vh] overflow-y-auto animate-in fade-in zoom-in-95 duration-150">
+            <div className="px-5 py-4 bg-amber-900 text-white flex items-center justify-between sticky top-0 z-10">
               <div className="flex items-center gap-2">
                 <RotateCcw className="w-4 h-4 text-amber-300" />
                 <h3 className="text-xs font-bold uppercase tracking-wider">
@@ -1232,12 +1522,13 @@ export default function CajasPage() {
                 </h3>
               </div>
               <button
+                type="button"
                 onClick={() => {
                   setModalDevolverOpen(false);
                   setCajaADevolver(null);
                   setMotivoDevolucion("");
                 }}
-                className="text-amber-200 hover:text-white transition-colors"
+                className="text-amber-200 hover:text-white transition-colors cursor-pointer"
               >
                 <X className="w-4 h-4" />
               </button>
@@ -1272,16 +1563,107 @@ export default function CajasPage() {
                     setMotivoDevolucion("");
                   }}
                   disabled={devolviendoCaja}
-                  className="px-3.5 py-1.5 text-xs font-semibold uppercase text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors"
+                  className="px-3.5 py-1.5 text-xs font-semibold uppercase text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors cursor-pointer"
                 >
                   Cancelar
                 </button>
                 <button
                   type="submit"
-                  disabled={devolviendoCaja || !motivoDevolucion.trim()}
-                  className="px-4 py-1.5 text-xs font-bold uppercase text-white bg-amber-700 hover:bg-amber-800 rounded-lg transition-colors shadow-xs"
+                  disabled={devolviendoCaja || !motivoDevolucion.trim() || (cajaADevolver && Boolean(loadingAccionCaja[cajaADevolver.id_caja]))}
+                  className="px-4 py-1.5 text-xs font-bold uppercase text-white bg-amber-700 hover:bg-amber-800 rounded-lg transition-colors shadow-xs flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
                 >
-                  {devolviendoCaja ? "Devolviendo..." : "Confirmar Devolución"}
+                  {devolviendoCaja ? (
+                    <>
+                      <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                      <span>Devolviendo...</span>
+                    </>
+                  ) : (
+                    "Confirmar Devolución"
+                  )}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL: DESARCHIVAR CAJA (CUSTODIO DE ARCHIVO / ADMIN) */}
+      {modalDesarchivarCajaOpen && cajaADesarchivar && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-xs p-3 sm:p-4 overflow-y-auto">
+          <div className="bg-white rounded-xl shadow-xl border border-slate-200 max-w-lg w-full max-h-[90vh] overflow-y-auto animate-in fade-in zoom-in-95 duration-150">
+            <div className="px-5 py-4 bg-amber-900 text-white flex items-center justify-between sticky top-0 z-10">
+              <div className="flex items-center gap-2">
+                <FolderOpen className="w-4 h-4 text-amber-300" />
+                <h3 className="text-xs font-bold uppercase tracking-wider">
+                  Desarchivar Caja: {cajaADesarchivar.codigo_caja}
+                </h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setModalDesarchivarCajaOpen(false);
+                  setCajaADesarchivar(null);
+                  setMotivoDesarchivo("");
+                }}
+                disabled={desarchivandoCaja}
+                className="text-amber-200 hover:text-white transition-colors cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                handleConfirmarDesarchivo();
+              }}
+              className="p-5 space-y-4"
+            >
+              <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg text-xs text-amber-900">
+                Esta caja y todos sus expedientes saldrán del estado <strong>ARCHIVADA</strong> para retornar a estado <strong>ENVIADA</strong> bajo custodia, permitiendo revisiones excepcionales.
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
+                  Motivo de Desarchivo / Justificación *
+                </label>
+                <textarea
+                  rows={3}
+                  value={motivoDesarchivo}
+                  onChange={(e) => setMotivoDesarchivo(e.target.value)}
+                  placeholder="Detalle la justificación obligatoria para desarchivar esta caja..."
+                  required
+                  autoFocus
+                  className="w-full text-xs bg-white border border-slate-300 rounded-lg p-2.5 text-slate-900 focus:ring-2 focus:ring-amber-500 focus:outline-none"
+                />
+              </div>
+
+              <div className="flex justify-end gap-2 pt-3 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setModalDesarchivarCajaOpen(false);
+                    setCajaADesarchivar(null);
+                    setMotivoDesarchivo("");
+                  }}
+                  disabled={desarchivandoCaja}
+                  className="px-3.5 py-1.5 text-xs font-semibold uppercase text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors disabled:opacity-50 cursor-pointer"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  disabled={desarchivandoCaja || !motivoDesarchivo.trim() || Boolean(loadingAccionCaja[cajaADesarchivar.id_caja])}
+                  className="px-4 py-1.5 text-xs font-bold uppercase text-white bg-amber-700 hover:bg-amber-800 rounded-lg transition-colors shadow-xs flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+                >
+                  {desarchivandoCaja ? (
+                    <>
+                      <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                      <span>Desarchivando...</span>
+                    </>
+                  ) : (
+                    "Confirmar Desarchivo"
+                  )}
                 </button>
               </div>
             </form>
@@ -1291,7 +1673,7 @@ export default function CajasPage() {
 
       {/* MODAL: ALMACENAR TRÁMITES PAGADOS EN LA CAJA */}
       {modalAgregarTramitesOpen && selectedCaja && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-xs p-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-xs p-3 sm:p-4 overflow-y-auto">
           <div className="bg-white rounded-xl shadow-xl border border-slate-200 w-full max-w-3xl overflow-hidden flex flex-col max-h-[90vh] animate-in fade-in zoom-in-95 duration-150">
             <div className="px-5 py-4 bg-slate-900 text-white flex items-center justify-between shrink-0">
               <div className="flex items-center gap-2">
@@ -1301,8 +1683,9 @@ export default function CajasPage() {
                 </h3>
               </div>
               <button
+                type="button"
                 onClick={() => setModalAgregarTramitesOpen(false)}
-                className="text-slate-400 hover:text-white transition-colors"
+                className="text-slate-400 hover:text-white transition-colors cursor-pointer"
               >
                 <X className="w-4 h-4" />
               </button>
@@ -1335,78 +1718,80 @@ export default function CajasPage() {
                   No hay trámites pagados pendientes de asignar a caja.
                 </div>
               ) : (
-                <table className="w-full text-left text-xs border-collapse">
-                  <thead>
-                    <tr className="border-b border-slate-200 bg-slate-100 text-[11px] font-bold text-slate-700 uppercase">
-                      <th className="py-2 px-3 text-center w-12">
-                        <button
-                          type="button"
-                          onClick={toggleSelectAllDisponibles}
-                          className="p-1 hover:bg-slate-200 rounded"
-                          title={allDisponiblesSelected ? "Deseleccionar todos" : "Seleccionar todos"}
-                        >
-                          {allDisponiblesSelected ? (
-                            <CheckSquare className="w-4 h-4 text-blue-600" />
-                          ) : (
-                            <Square className="w-4 h-4 text-slate-400" />
-                          )}
-                        </button>
-                      </th>
-                      <th className="py-2 px-3">Número Quipux</th>
-                      <th className="py-2 px-3">Proveedor y Asunto</th>
-                      <th className="py-2 px-3 text-center">No. Hojas</th>
-                      <th className="py-2 px-3 text-right">Valor</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100">
-                    {tramitesDisponiblesFiltrados.map((t) => {
-                      const isSelected = selectedTramitesIds.includes(t.id_tramite);
-
-                      return (
-                        <tr
-                          key={t.id_tramite}
-                          onClick={() => toggleSelectOneDisponible(t.id_tramite)}
-                          className={`cursor-pointer transition-colors ${
-                            isSelected ? "bg-blue-50/80 font-medium" : "hover:bg-slate-50"
-                          }`}
-                        >
-                          <td className="py-2.5 px-3 text-center" onClick={(e) => e.stopPropagation()}>
-                            <button
-                              type="button"
-                              onClick={() => toggleSelectOneDisponible(t.id_tramite)}
-                              className="p-1"
-                            >
-                              {isSelected ? (
-                                <CheckSquare className="w-4 h-4 text-blue-600" />
-                              ) : (
-                                <Square className="w-4 h-4 text-slate-400" />
-                              )}
-                            </button>
-                          </td>
-                          <td className="py-2.5 px-3 whitespace-nowrap">
-                            <div className="font-mono font-bold text-blue-700">{t.numero_quipux}</div>
-                          </td>
-                          <td className="py-2.5 px-3">
-                            <div className="font-semibold text-slate-800 uppercase line-clamp-1">
-                              {t.proveedor_beneficiario}
-                            </div>
-                            {t.asunto && (
-                              <div className="text-[11px] text-slate-500 line-clamp-1 italic">
-                                {t.asunto}
-                              </div>
+                <div className="overflow-x-auto w-full max-w-full min-w-0 border border-slate-200 rounded-lg shadow-2xs">
+                  <table className="min-w-[650px] w-full text-left text-xs border-collapse">
+                    <thead>
+                      <tr className="border-b border-slate-200 bg-slate-100 text-[11px] font-bold text-slate-700 uppercase">
+                        <th className="py-2 px-3 text-center w-12">
+                          <button
+                            type="button"
+                            onClick={toggleSelectAllDisponibles}
+                            className="p-1 hover:bg-slate-200 rounded"
+                            title={allDisponiblesSelected ? "Deseleccionar todos" : "Seleccionar todos"}
+                          >
+                            {allDisponiblesSelected ? (
+                              <CheckSquare className="w-4 h-4 text-blue-600" />
+                            ) : (
+                              <Square className="w-4 h-4 text-slate-400" />
                             )}
-                          </td>
-                          <td className="py-2.5 px-3 text-center font-mono font-bold text-slate-800">
-                            {t.numero_hojas ?? "-"}
-                          </td>
-                          <td className="py-2.5 px-3 text-right font-mono font-bold text-slate-900 whitespace-nowrap">
-                            {formatCurrency(t.monto_total || 0)}
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
+                          </button>
+                        </th>
+                        <th className="py-2 px-3">Número Quipux</th>
+                        <th className="py-2 px-3">Proveedor y Asunto</th>
+                        <th className="py-2 px-3 text-center">No. Hojas</th>
+                        <th className="py-2 px-3 text-right">Valor</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {tramitesDisponiblesFiltrados.map((t) => {
+                        const isSelected = selectedTramitesIds.includes(t.id_tramite);
+
+                        return (
+                          <tr
+                            key={t.id_tramite}
+                            onClick={() => toggleSelectOneDisponible(t.id_tramite)}
+                            className={`cursor-pointer transition-colors ${
+                              isSelected ? "bg-blue-50/80 font-medium" : "hover:bg-slate-50"
+                            }`}
+                          >
+                            <td className="py-2.5 px-3 text-center" onClick={(e) => e.stopPropagation()}>
+                              <button
+                                type="button"
+                                onClick={() => toggleSelectOneDisponible(t.id_tramite)}
+                                className="p-1"
+                              >
+                                {isSelected ? (
+                                  <CheckSquare className="w-4 h-4 text-blue-600" />
+                                ) : (
+                                  <Square className="w-4 h-4 text-slate-400" />
+                                )}
+                              </button>
+                            </td>
+                            <td className="py-2.5 px-3 whitespace-nowrap">
+                              <div className="font-mono font-bold text-blue-700">{t.numero_quipux}</div>
+                            </td>
+                            <td className="py-2.5 px-3">
+                              <div className="font-semibold text-slate-800 uppercase line-clamp-1">
+                                {t.proveedor_beneficiario}
+                              </div>
+                              {t.asunto && (
+                                <div className="text-[11px] text-slate-500 line-clamp-1 italic">
+                                  {t.asunto}
+                                </div>
+                              )}
+                            </td>
+                            <td className="py-2.5 px-3 text-center font-mono font-bold text-slate-800">
+                              {t.numero_hojas ?? "-"}
+                            </td>
+                            <td className="py-2.5 px-3 text-right font-mono font-bold text-slate-900 whitespace-nowrap">
+                              {formatCurrency(t.monto_total || 0)}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
               )}
             </div>
 
@@ -1428,9 +1813,16 @@ export default function CajasPage() {
                   type="button"
                   onClick={handleAsignarTramitesACaja}
                   disabled={guardandoAsignacion || selectedTramitesIds.length === 0}
-                  className="px-4 py-1.5 text-xs font-bold uppercase text-white bg-blue-600 hover:bg-blue-700 disabled:bg-slate-300 rounded-lg transition-colors shadow-xs"
+                  className="px-4 py-1.5 text-xs font-bold uppercase text-white bg-blue-600 hover:bg-blue-700 disabled:bg-slate-300 rounded-lg transition-colors shadow-xs flex items-center gap-1.5 cursor-pointer"
                 >
-                  {guardandoAsignacion ? "Guardando..." : "Almacenar en Caja"}
+                  {guardandoAsignacion ? (
+                    <>
+                      <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                      <span>Guardando...</span>
+                    </>
+                  ) : (
+                    "Almacenar en Caja"
+                  )}
                 </button>
               </div>
             </div>
@@ -1501,24 +1893,23 @@ export default function CajasPage() {
               </div>
 
               {/* Tabla Oficial de 7 Columnas con Estilo Exacto */}
-              <div className="overflow-x-auto">
-                <table className="w-full text-[11px] border-collapse border border-slate-900 font-sans">
+              <div className="overflow-x-auto w-full max-w-full min-w-0">
+                <table className="min-w-[700px] w-full text-[11px] border-collapse border border-slate-900 font-sans">
                   <thead>
                     <tr className="bg-[#244062] text-white font-bold uppercase border-b border-slate-900">
-                      <th className="border border-slate-900 py-2.5 px-2 text-center w-[4%]">No.</th>
-                      <th className="border border-slate-900 py-2.5 px-2 text-center w-[5%]">Cartón</th>
-                      <th className="border border-slate-900 py-2.5 px-2 text-center w-[11%]">CUR</th>
-                      <th className="border border-slate-900 py-2.5 px-2 text-center w-[6%]">Hojas</th>
-                      <th className="border border-slate-900 py-2.5 px-3.5 text-left w-[36%]">Proveedor y Asunto</th>
-                      <th className="border border-slate-900 py-2.5 px-3 text-right w-[14%]">Valor</th>
-                      <th className="border border-slate-900 py-2.5 px-2 text-center w-[12%]">Fecha y Observaciones</th>
-                      <th className="border border-slate-900 py-2.5 px-2 text-center w-[12%]">Fecha envío de correos</th>
+                      <th className="border border-slate-900 py-2.5 px-2 text-center w-[5%]">NO</th>
+                      <th className="border border-slate-900 py-2.5 px-2 text-center w-[6%]">CARTON</th>
+                      <th className="border border-slate-900 py-2.5 px-2 text-center w-[18%]">NUMERO DE QUIPUX</th>
+                      <th className="border border-slate-900 py-2.5 px-2 text-center w-[13%]">NRO CUR</th>
+                      <th className="border border-slate-900 py-2.5 px-3.5 text-left w-[32%]">PROVEEDOR</th>
+                      <th className="border border-slate-900 py-2.5 px-3 text-right w-[12%]">MONTO</th>
+                      <th className="border border-slate-900 py-2.5 px-2 text-center w-[14%]">OBSERVACION</th>
                     </tr>
                   </thead>
                   <tbody>
                     {!selectedCaja.tramites || selectedCaja.tramites.length === 0 ? (
                       <tr>
-                        <td colSpan={8} className="border border-slate-900 py-6 text-center text-slate-400 italic">
+                        <td colSpan={7} className="border border-slate-900 py-6 text-center text-slate-400 italic">
                           No hay expedientes almacenados en esta caja.
                         </td>
                       </tr>
@@ -1530,31 +1921,36 @@ export default function CajasPage() {
                           t.numero_cur_compromiso,
                         ].filter(Boolean).join(", ") || "-";
 
+                        const carton = (t as any).carton ? String((t as any).carton) : "1";
+
                         return (
                           <tr key={t.id_tramite} className="border-b border-slate-900">
-                            {/* Col 1: No. (Secuencial 1, 2, 3...) */}
-                            <td className="border border-slate-900 py-3.5 px-2 text-center font-bold">
+                            {/* Col 1: NO (Secuencial 1, 2, 3...) */}
+                            <td className="border border-slate-900 py-3 px-2 text-center font-bold">
                               {idx + 1}
                             </td>
-                            {/* Col 2: Cartón (siempre 1) */}
-                            <td className="border border-slate-900 py-3.5 px-2 text-center font-bold">
-                              1
+                            {/* Col 2: CARTON (Predeterminado 1) */}
+                            <td className="border border-slate-900 py-3 px-2 text-center font-bold">
+                              {carton}
                             </td>
-                            <td className="border border-slate-900 py-3.5 px-2 text-center font-bold">
+                            {/* Col 3: NUMERO DE QUIPUX */}
+                            <td className="border border-slate-900 py-3 px-2 text-center font-mono font-medium text-slate-900">
+                              {t.numero_quipux || "-"}
+                            </td>
+                            {/* Col 4: NRO CUR */}
+                            <td className="border border-slate-900 py-3 px-2 text-center font-bold text-slate-900">
                               {curDisplay}
                             </td>
-                            <td className="border border-slate-900 py-3.5 px-2 text-center">
-                              {t.numero_hojas ?? "-"}
+                            {/* Col 5: PROVEEDOR */}
+                            <td className="border border-slate-900 py-3 px-3.5 text-left font-semibold text-slate-900 leading-snug">
+                              {t.proveedor_beneficiario || "-"}
                             </td>
-                            <td className="border border-slate-900 py-3.5 px-3.5 text-left leading-relaxed">
-                              <span className="font-semibold text-slate-900">{t.proveedor_beneficiario}</span>
-                              {t.asunto && <span className="text-slate-800"> - {t.asunto}</span>}
-                            </td>
-                            <td className="border border-slate-900 py-3.5 px-3 text-right font-bold">
+                            {/* Col 6: MONTO */}
+                            <td className="border border-slate-900 py-3 px-3 text-right font-bold text-slate-900">
                               {formatCurrency(t.monto_total || 0)}
                             </td>
-                            <td className="border border-slate-900 py-3.5 px-2 text-center"></td>
-                            <td className="border border-slate-900 py-3.5 px-2 text-center"></td>
+                            {/* Col 7: OBSERVACION (Vacía para anotación física) */}
+                            <td className="border border-slate-900 py-3 px-2 text-center"></td>
                           </tr>
                         );
                       })
@@ -1562,15 +1958,12 @@ export default function CajasPage() {
                   </tbody>
                   <tfoot>
                     <tr className="bg-[#E2E8F0] font-bold text-slate-900 border-t border-slate-900">
-                      <td className="border border-slate-900 py-2.5 px-2 text-center"></td>
-                      <td className="border border-slate-900 py-2.5 px-2 text-center"></td>
-                      <td className="border border-slate-900 py-2.5 px-2"></td>
-                      <td className="border border-slate-900 py-2.5 px-2 text-center"></td>
-                      <td className="border border-slate-900 py-2.5 px-3.5 text-right font-bold">TOTAL GENERAL VALORES:</td>
+                      <td colSpan={5} className="border border-slate-900 py-2.5 px-3.5 text-right font-bold">
+                        TOTAL CAJA:
+                      </td>
                       <td className="border border-slate-900 py-2.5 px-3 text-right font-bold">
                         {formatCurrency(selectedCaja.total_monto || 0)}
                       </td>
-                      <td className="border border-slate-900 py-2.5 px-2"></td>
                       <td className="border border-slate-900 py-2.5 px-2"></td>
                     </tr>
                   </tfoot>

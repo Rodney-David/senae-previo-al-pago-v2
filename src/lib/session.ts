@@ -4,7 +4,10 @@
  * Utiliza Web Crypto API estándar para firma y verificación HMAC-SHA256
  */
 
-const AUTH_SECRET = process.env.AUTH_SECRET || "senae_clave_maestra_seguridad_control_previo_2026";
+export const AUTH_SECRET = process.env.AUTH_SECRET || "senae_clave_maestra_seguridad_control_previo_2026";
+if (!process.env.AUTH_SECRET && process.env.NODE_ENV === "production") {
+  console.error("[SENAE ADVERTENCIA CRÍTICA DE SEGURIDAD] La variable de entorno AUTH_SECRET no está configurada en producción. Usar una clave predeterminada compromete gravemente la seguridad de las sesiones institucionales. Configure AUTH_SECRET de inmediato en el entorno de producción.");
+}
 export const SESSION_COOKIE_NAME = "senae_session";
 
 async function getCryptoKey(): Promise<CryptoKey> {
@@ -29,9 +32,12 @@ function bufferToHex(buffer: ArrayBuffer): string {
 }
 
 function hexToUint8Array(hex: string): Uint8Array {
+  if (hex.length % 2 !== 0) return new Uint8Array(0);
   const bytes = new Uint8Array(hex.length / 2);
   for (let i = 0; i < bytes.length; i++) {
-    bytes[i] = parseInt(hex.substr(i * 2, 2), 16);
+    const val = parseInt(hex.substring(i * 2, i * 2 + 2), 16);
+    if (isNaN(val)) return new Uint8Array(0);
+    bytes[i] = val;
   }
   return bytes;
 }
@@ -119,6 +125,20 @@ export async function verifySessionToken(token: string | undefined | null): Prom
 
     return payload;
   } catch (err) {
+    return null;
+  }
+}
+
+/**
+ * Obtiene la sesión actual desde las cookies en Server Components y Route Handlers
+ */
+export async function getSession(): Promise<SessionPayload | null> {
+  try {
+    const { cookies } = await import("next/headers");
+    const cookieStore = cookies();
+    const token = cookieStore.get(SESSION_COOKIE_NAME)?.value;
+    return await verifySessionToken(token);
+  } catch {
     return null;
   }
 }

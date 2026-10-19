@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
 import { getAuthenticatedUser } from "@/lib/auth";
 import {
   MigracionExcelService,
@@ -13,14 +12,7 @@ export const dynamic = "force-dynamic";
  */
 export async function GET(request: NextRequest) {
   try {
-    let user = await getAuthenticatedUser(request);
-    if (!user) {
-      const adminFallback = await prisma.usuarios.findFirst({
-        where: { rol: "ADMIN", activo: true },
-        include: { areas: true },
-      });
-      if (adminFallback) user = adminFallback;
-    }
+    const user = await getAuthenticatedUser(request);
 
     if (!user) {
       return NextResponse.json({ error: "No autorizado" }, { status: 401 });
@@ -60,14 +52,7 @@ import fs from "fs";
  */
 export async function POST(request: NextRequest) {
   try {
-    let user = await getAuthenticatedUser(request);
-    if (!user) {
-      const adminFallback = await prisma.usuarios.findFirst({
-        where: { rol: "ADMIN", activo: true },
-        include: { areas: true },
-      });
-      if (adminFallback) user = adminFallback;
-    }
+    const user = await getAuthenticatedUser(request);
 
     if (!user) {
       return NextResponse.json({ error: "No autorizado" }, { status: 401 });

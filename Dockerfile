@@ -23,8 +23,18 @@ COPY . .
 ENV NEXT_TELEMETRY_DISABLED=1
 ENV NODE_ENV=production
 
-# Generar cliente de base de datos
-RUN npx prisma generate
+# Argumento para motor de base de datos (por defecto: postgres para despliegue de producción)
+ARG DB_TYPE=postgres
+
+# Conmutar esquema Prisma según motor seleccionado y generar Prisma Client
+RUN if [ -f "scripts/switch-db.js" ]; then \
+      node scripts/switch-db.js ${DB_TYPE}; \
+    else \
+      npx prisma generate; \
+    fi
+
+# Asegurar existencia de directorio de datos
+RUN mkdir -p /app/data
 
 # Construcción de producción standalone
 RUN npm run build

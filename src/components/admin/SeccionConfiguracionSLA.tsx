@@ -100,7 +100,7 @@ export function SeccionConfiguracionSLA() {
   const amarilloMax = dias;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 w-full max-w-full min-w-0">
       {/* Mensaje de feedback */}
       {mensaje && (
         <div

@@ -119,10 +119,10 @@ export default function TramiteDetallePage() {
   const targetUserForEditing = (isReadOnly && !isAdmin) ? null : currentUser;
 
   return (
-    <div className="space-y-6 pb-12">
+    <div className="w-full max-w-full min-w-0 space-y-6 pb-12">
       {/* Top Header Navigation con Área Actual y Custodio Actual */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-5 rounded-xl border border-slate-200 shadow-xs">
-        <div className="flex items-start sm:items-center gap-3">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-4 sm:p-5 rounded-xl border border-slate-200 shadow-xs w-full max-w-full min-w-0">
+        <div className="flex items-start sm:items-center gap-3 min-w-0">
           <button
             type="button"
             onClick={() => router.back()}
@@ -131,7 +131,7 @@ export default function TramiteDetallePage() {
           >
             <ArrowLeft className="w-4 h-4" />
           </button>
-          <div className="space-y-1.5">
+          <div className="space-y-1.5 min-w-0">
             <div className="flex items-center gap-2 flex-wrap">
               <h1 className="text-lg font-bold font-mono text-slate-900 tracking-tight">
                 {tramite.numero_quipux}
@@ -166,7 +166,7 @@ export default function TramiteDetallePage() {
         <button
           onClick={fetchTramite}
           disabled={loading}
-          className="p-2 text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-lg border border-slate-200 transition-colors self-start md:self-center"
+          className="p-2 text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-lg border border-slate-200 transition-colors self-start md:self-center shrink-0"
           title="Actualizar datos del expediente"
         >
           <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin text-blue-600" : ""}`} />
@@ -181,10 +181,10 @@ export default function TramiteDetallePage() {
           onRefresh={fetchTramite}
         />
       ) : (
-        <div className="bg-slate-50 border border-slate-300 rounded-xl p-3.5 px-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-2xs">
-          <div className="flex items-center gap-2.5 text-xs text-slate-700">
+        <div className="bg-slate-50 border border-slate-300 rounded-xl p-3.5 px-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-2xs w-full max-w-full min-w-0">
+          <div className="flex items-center gap-2.5 text-xs text-slate-700 min-w-0">
             <Eye className="w-4 h-4 text-blue-600 shrink-0" />
-            <div>
+            <div className="min-w-0">
               <span className="font-bold uppercase tracking-wide text-slate-800">
                 Modo Consulta (Solo Lectura)
               </span>
@@ -193,7 +193,7 @@ export default function TramiteDetallePage() {
               </p>
             </div>
           </div>
-          <span className="self-start sm:self-auto px-2.5 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider bg-slate-200 text-slate-700 border border-slate-300">
+          <span className="self-start sm:self-auto px-2.5 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider bg-slate-200 text-slate-700 border border-slate-300 shrink-0">
             Solo Lectura
           </span>
         </div>
@@ -212,35 +212,39 @@ export default function TramiteDetallePage() {
         referencias={tramite.tramite_referencias}
         currentUser={targetUserForEditing}
         onRefresh={fetchTramite}
+        isReadOnly={Boolean(isReadOnly && !isAdmin)}
       />
 
-      {/* Card 3: Fase Presupuesto */}
-      <TarjetaPresupuesto
-        tramite={tramite}
-        currentUser={targetUserForEditing}
-        onRefresh={fetchTramite}
-      />
+      {/* Grid de Tarjetas de Fases Financieras */}
+      <div className="grid grid-cols-1 xl:grid-cols-2 gap-5 w-full max-w-full min-w-0">
+        {/* Card 3: Fase Presupuesto */}
+        <TarjetaPresupuesto
+          tramite={tramite}
+          currentUser={targetUserForEditing}
+          onRefresh={fetchTramite}
+        />
 
-      {/* Card 4: Fase Contabilidad */}
-      <TarjetaContabilidad
-        tramite={tramite}
-        currentUser={targetUserForEditing}
-        onRefresh={fetchTramite}
-      />
+        {/* Card 4: Fase Contabilidad */}
+        <TarjetaContabilidad
+          tramite={tramite}
+          currentUser={targetUserForEditing}
+          onRefresh={fetchTramite}
+        />
 
-      {/* Card 5: Fase Tesorería y Pagos */}
-      <TarjetaTesoreria
-        tramite={tramite}
-        currentUser={targetUserForEditing}
-        onRefresh={fetchTramite}
-      />
+        {/* Card 5: Fase Tesorería y Pagos */}
+        <TarjetaTesoreria
+          tramite={tramite}
+          currentUser={targetUserForEditing}
+          onRefresh={fetchTramite}
+        />
 
-      {/* Card 6: Custodia de Archivo */}
-      <TarjetaArchivo
-        tramite={tramite}
-        currentUser={targetUserForEditing}
-        onRefresh={fetchTramite}
-      />
+        {/* Card 6: Custodia de Archivo */}
+        <TarjetaArchivo
+          tramite={tramite}
+          currentUser={targetUserForEditing}
+          onRefresh={fetchTramite}
+        />
+      </div>
 
       {/* Card 7: Bitácora Histórica (Timeline) */}
       <TimelineBitacora

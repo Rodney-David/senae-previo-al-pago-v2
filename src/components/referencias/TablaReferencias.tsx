@@ -11,6 +11,7 @@ interface TablaReferenciasProps {
   referencias?: TramiteReferenciaDTO[];
   onRefresh: () => void;
   currentUser?: UsuarioInstitucional | null;
+  isReadOnly?: boolean;
 }
 
 export const TablaReferencias: React.FC<TablaReferenciasProps> = ({
@@ -18,6 +19,7 @@ export const TablaReferencias: React.FC<TablaReferenciasProps> = ({
   referencias = [],
   onRefresh,
   currentUser,
+  isReadOnly = false,
 }) => {
   const [modalOpen, setModalOpen] = useState(false);
 
@@ -61,13 +63,15 @@ export const TablaReferencias: React.FC<TablaReferenciasProps> = ({
           <span className="text-[11px] font-medium text-slate-400">
             {referencias.length} {referencias.length === 1 ? "documento" : "documentos"}
           </span>
-          <button
-            onClick={() => setModalOpen(true)}
-            className="px-3 py-1 text-xs font-medium bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors flex items-center gap-1 shadow-xs"
-          >
-            <Plus className="w-3.5 h-3.5" />
-            Agregar Referencia
-          </button>
+          {currentUser && !isReadOnly && (
+            <button
+              onClick={() => setModalOpen(true)}
+              className="px-3 py-1 text-xs font-medium bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors flex items-center gap-1 shadow-xs"
+            >
+              <Plus className="w-3.5 h-3.5" />
+              Agregar Referencia
+            </button>
+          )}
         </div>
       </div>
 

@@ -29,15 +29,31 @@ export const TarjetaContabilidad: React.FC<TarjetaContabilidadProps> = ({
       .filter(Boolean);
   };
 
-  const [curDevList, setCurDevList] = useState<string[]>([]);
-  const [curConList, setCurConList] = useState<string[]>([]);
+  // Claves estables para filas dinámicas
+  interface FilaDinamicaContabilidad {
+    id: string;
+    valor: string;
+  }
+
+  const crearFilaDinamica = (prefijo: string, valor: string = ""): FilaDinamicaContabilidad => ({
+    id: `${prefijo}-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
+    valor,
+  });
+
+  const [curDevList, setCurDevList] = useState<FilaDinamicaContabilidad[]>([]);
+  const [curConList, setCurConList] = useState<FilaDinamicaContabilidad[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    setCurDevList(parseCurs(tramite.numero_cur_devengado));
-    setCurConList(parseCurs(tramite.numero_cur_contable));
-  }, [tramite]);
+    if (isEditing) return;
+    setCurDevList(
+      parseCurs(tramite.numero_cur_devengado).map((v) => crearFilaDinamica("cur-dev", v))
+    );
+    setCurConList(
+      parseCurs(tramite.numero_cur_contable).map((v) => crearFilaDinamica("cur-con", v))
+    );
+  }, [tramite, isEditing]);
 
   const canEdit =
     (currentUser?.id_area === 3 || currentUser?.rol === "ADMIN") &&
@@ -72,35 +88,41 @@ export const TarjetaContabilidad: React.FC<TarjetaContabilidadProps> = ({
   }, [isDefaultOpen]);
 
   const handleAddCurDev = () => {
-    setCurDevList((prev) => [...prev, ""]);
+    if (curDevList.some((c) => !c.valor.trim())) {
+      setError("Complete el CUR Devengado actual antes de agregar uno nuevo.");
+      return;
+    }
+    setError(null);
+    setCurDevList((prev) => [...prev, crearFilaDinamica("cur-dev", "")]);
   };
 
-  const handleRemoveCurDev = (index: number) => {
-    setCurDevList((prev) => prev.filter((_, i) => i !== index));
+  const handleRemoveCurDev = (id: string) => {
+    setCurDevList((prev) => prev.filter((item) => item.id !== id));
   };
 
-  const handleUpdateCurDev = (index: number, val: string) => {
-    setCurDevList((prev) => {
-      const updated = [...prev];
-      updated[index] = val;
-      return updated;
-    });
+  const handleUpdateCurDev = (id: string, val: string) => {
+    setCurDevList((prev) =>
+      prev.map((item) => (item.id === id ? { ...item, valor: val } : item))
+    );
   };
 
   const handleAddCurCon = () => {
-    setCurConList((prev) => [...prev, ""]);
+    if (curConList.some((c) => !c.valor.trim())) {
+      setError("Complete el CUR Contable actual antes de agregar uno nuevo.");
+      return;
+    }
+    setError(null);
+    setCurConList((prev) => [...prev, crearFilaDinamica("cur-con", "")]);
   };
 
-  const handleRemoveCurCon = (index: number) => {
-    setCurConList((prev) => prev.filter((_, i) => i !== index));
+  const handleRemoveCurCon = (id: string) => {
+    setCurConList((prev) => prev.filter((item) => item.id !== id));
   };
 
-  const handleUpdateCurCon = (index: number, val: string) => {
-    setCurConList((prev) => {
-      const updated = [...prev];
-      updated[index] = val;
-      return updated;
-    });
+  const handleUpdateCurCon = (id: string, val: string) => {
+    setCurConList((prev) =>
+      prev.map((item) => (item.id === id ? { ...item, valor: val } : item))
+    );
   };
 
   const handleStartEdit = () => {
@@ -108,8 +130,16 @@ export const TarjetaContabilidad: React.FC<TarjetaContabilidadProps> = ({
     // Si están vacíos, iniciamos con una fila vacía para facilidad de tipeo
     const devList = parseCurs(tramite.numero_cur_devengado);
     const conList = parseCurs(tramite.numero_cur_contable);
-    setCurDevList(devList.length > 0 ? devList : [""]);
-    setCurConList(conList.length > 0 ? conList : [""]);
+    setCurDevList(
+      devList.length > 0
+        ? devList.map((v) => crearFilaDinamica("cur-dev", v))
+        : [crearFilaDinamica("cur-dev", "")]
+    );
+    setCurConList(
+      conList.length > 0
+        ? conList.map((v) => crearFilaDinamica("cur-con", v))
+        : [crearFilaDinamica("cur-con", "")]
+    );
     setIsEditing(true);
   };
 
@@ -118,8 +148,13 @@ export const TarjetaContabilidad: React.FC<TarjetaContabilidadProps> = ({
     setLoading(true);
     setError(null);
 
-    const devClean = curDevList.map((s) => s.trim()).filter(Boolean);
-    const conClean = curConList.map((s) => s.trim()).filter(Boolean);
+    // Descartar filas vacías o con puros espacios en blanco antes de guardar
+    const devClean = curDevList
+      .map((s) => s.valor.trim())
+      .filter((s) => s.length > 0);
+    const conClean = curConList
+      .map((s) => s.valor.trim())
+      .filter((s) => s.length > 0);
 
     try {
       const accion = enviarJefe ? "ENVIAR_A_JEFATURA_CONTABILIDAD" : "GUARDAR_DATOS_CONTABILIDAD";
@@ -149,7 +184,7 @@ export const TarjetaContabilidad: React.FC<TarjetaContabilidadProps> = ({
   const curContablesActivos = parseCurs(tramite.numero_cur_contable);
 
   return (
-    <div className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-xs">
+    <div className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-xs w-full max-w-full min-w-0">
       <div
         onClick={() => setIsOpen(!isOpen)}
         className="px-5 py-3.5 bg-slate-900 text-white flex flex-wrap items-center justify-between gap-3 cursor-pointer select-none hover:bg-slate-850 transition-colors"
@@ -196,50 +231,50 @@ export const TarjetaContabilidad: React.FC<TarjetaContabilidadProps> = ({
           )}
 
           {isEditing ? (
-            <form onSubmit={handleSave} className="space-y-5">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <form onSubmit={handleSave} className="space-y-5 w-full max-w-full min-w-0">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 w-full max-w-full min-w-0">
                 {/* Bloque CUR Devengado */}
-                <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 space-y-3">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <label className="text-xs font-bold text-slate-800 uppercase block">
+                <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 sm:p-4 space-y-3 w-full max-w-full min-w-0 overflow-hidden">
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="min-w-0">
+                      <label className="text-xs font-bold text-slate-800 uppercase block truncate">
                         CUR Devengado (CUR DEV)
                       </label>
-                      <span className="text-[11px] text-slate-500">
+                      <span className="text-[11px] text-slate-500 block truncate">
                         Opcional. Puede registrar 1 o más números oficiales.
                       </span>
                     </div>
                     <button
                       type="button"
                       onClick={handleAddCurDev}
-                      className="inline-flex items-center gap-1 text-[11px] font-bold uppercase text-blue-600 hover:text-blue-800 bg-white border border-blue-200 px-2 py-1 rounded-md transition-colors"
+                      className="inline-flex items-center gap-1 text-[11px] font-bold uppercase text-blue-600 hover:text-blue-800 bg-white border border-blue-200 px-2 py-1 rounded-md transition-colors shrink-0 whitespace-nowrap"
                     >
                       <Plus className="w-3 h-3" /> Agregar CUR DEV
                     </button>
                   </div>
 
-                  <div className="space-y-2">
+                  <div className="overflow-x-auto w-full max-w-full min-w-0 space-y-2">
                     {curDevList.length === 0 ? (
                       <p className="text-xs text-slate-400 italic py-2">
                         No hay CUR Devengado asignado (opcional).
                       </p>
                     ) : (
-                      curDevList.map((cur, idx) => (
-                        <div key={idx} className="flex items-center gap-2">
+                      curDevList.map((curItem, idx) => (
+                        <div key={curItem.id} className="flex items-center gap-2 min-w-0">
                           <span className="text-[11px] font-mono font-bold text-slate-400 w-12 shrink-0">
                             CUR {idx + 1}:
                           </span>
                           <input
                             type="text"
-                            value={cur}
-                            onChange={(e) => handleUpdateCurDev(idx, e.target.value)}
+                            value={curItem.valor}
+                            onChange={(e) => handleUpdateCurDev(curItem.id, e.target.value)}
                             placeholder={`ej. CUR-DEV-${idx + 1}`}
-                            className="flex-1 text-xs bg-white border border-slate-300 rounded-lg p-2 font-mono uppercase font-semibold text-slate-900 focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                            className="flex-1 min-w-[120px] text-xs bg-white border border-slate-300 rounded-lg p-2 font-mono uppercase font-semibold text-slate-900 focus:ring-2 focus:ring-blue-500 focus:outline-none"
                           />
                           <button
                             type="button"
-                            onClick={() => handleRemoveCurDev(idx)}
-                            className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
+                            onClick={() => handleRemoveCurDev(curItem.id)}
+                            className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer shrink-0"
                             title="Eliminar CUR"
                           >
                             <Trash2 className="w-3.5 h-3.5" />
@@ -251,47 +286,47 @@ export const TarjetaContabilidad: React.FC<TarjetaContabilidadProps> = ({
                 </div>
 
                 {/* Bloque CUR Contable / Compromiso */}
-                <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 space-y-3">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <label className="text-xs font-bold text-slate-800 uppercase block">
+                <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 sm:p-4 space-y-3 w-full max-w-full min-w-0 overflow-hidden">
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="min-w-0">
+                      <label className="text-xs font-bold text-slate-800 uppercase block truncate">
                         CUR Contable (CUR CON)
                       </label>
-                      <span className="text-[11px] text-slate-500">
+                      <span className="text-[11px] text-slate-500 block truncate">
                         Opcional. Puede registrar 1 o más números oficiales.
                       </span>
                     </div>
                     <button
                       type="button"
                       onClick={handleAddCurCon}
-                      className="inline-flex items-center gap-1 text-[11px] font-bold uppercase text-purple-600 hover:text-purple-800 bg-white border border-purple-200 px-2 py-1 rounded-md transition-colors"
+                      className="inline-flex items-center gap-1 text-[11px] font-bold uppercase text-purple-600 hover:text-purple-800 bg-white border border-purple-200 px-2 py-1 rounded-md transition-colors shrink-0 whitespace-nowrap"
                     >
                       <Plus className="w-3 h-3" /> Agregar CUR CON
                     </button>
                   </div>
 
-                  <div className="space-y-2">
+                  <div className="overflow-x-auto w-full max-w-full min-w-0 space-y-2">
                     {curConList.length === 0 ? (
                       <p className="text-xs text-slate-400 italic py-2">
                         No hay CUR Contable asignado (opcional).
                       </p>
                     ) : (
-                      curConList.map((cur, idx) => (
-                        <div key={idx} className="flex items-center gap-2">
+                      curConList.map((curItem, idx) => (
+                        <div key={curItem.id} className="flex items-center gap-2 min-w-0">
                           <span className="text-[11px] font-mono font-bold text-slate-400 w-12 shrink-0">
                             CUR {idx + 1}:
                           </span>
                           <input
                             type="text"
-                            value={cur}
-                            onChange={(e) => handleUpdateCurCon(idx, e.target.value)}
+                            value={curItem.valor}
+                            onChange={(e) => handleUpdateCurCon(curItem.id, e.target.value)}
                             placeholder={`ej. CUR-CON-${idx + 1}`}
-                            className="flex-1 text-xs bg-white border border-slate-300 rounded-lg p-2 font-mono uppercase font-semibold text-slate-900 focus:ring-2 focus:ring-purple-500 focus:outline-none"
+                            className="flex-1 min-w-[120px] text-xs bg-white border border-slate-300 rounded-lg p-2 font-mono uppercase font-semibold text-slate-900 focus:ring-2 focus:ring-purple-500 focus:outline-none"
                           />
                           <button
                             type="button"
-                            onClick={() => handleRemoveCurCon(idx)}
-                            className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
+                            onClick={() => handleRemoveCurCon(curItem.id)}
+                            className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer shrink-0"
                             title="Eliminar CUR"
                           >
                             <Trash2 className="w-3.5 h-3.5" />
@@ -350,7 +385,7 @@ export const TarjetaContabilidad: React.FC<TarjetaContabilidadProps> = ({
                   <div className="flex flex-wrap gap-2">
                     {curDevengadosActivos.map((cur, idx) => (
                       <span
-                        key={idx}
+                        key={`cur-dev-ro-${idx}-${cur}`}
                         className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-blue-50 border border-blue-200 text-blue-900 font-mono font-bold text-xs"
                       >
                         <span className="text-[10px] text-blue-500 font-normal">#{idx + 1}</span>
@@ -380,7 +415,7 @@ export const TarjetaContabilidad: React.FC<TarjetaContabilidadProps> = ({
                   <div className="flex flex-wrap gap-2">
                     {curContablesActivos.map((cur, idx) => (
                       <span
-                        key={idx}
+                        key={`cur-con-ro-${idx}-${cur}`}
                         className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-purple-50 border border-purple-200 text-purple-900 font-mono font-bold text-xs"
                       >
                         <span className="text-[10px] text-purple-500 font-normal">#{idx + 1}</span>

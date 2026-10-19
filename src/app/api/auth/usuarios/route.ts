@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { sanitizeUsers } from "@/lib/sanitize";
 
 export const dynamic = "force-dynamic";
 
@@ -11,7 +12,7 @@ export async function GET() {
       orderBy: { id_usuario: "asc" },
     });
 
-    return NextResponse.json({ usuarios });
+    return NextResponse.json({ usuarios: sanitizeUsers(usuarios) });
   } catch (error) {
     console.error("Error fetching users list:", error);
     return NextResponse.json(

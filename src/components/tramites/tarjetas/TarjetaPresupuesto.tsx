@@ -24,8 +24,8 @@ export const TarjetaPresupuesto: React.FC<TarjetaPresupuestoProps> = ({
   const [item, setItem] = useState(tramite.item_presupuestario || "");
   const [nroTramite, setNroTramite] = useState(tramite.nro_tramite || "");
   const [periodoPago, setPeriodoPago] = useState(tramite.periodo_pago || "");
-  // Parser para listas de CURs
-  const parseCurs = (val?: string | null): string[] => {
+  // M-02: Parser genérico reutilizable para listas delimitadas (CURs y facturas)
+  const parseDelimitedList = (val?: string | null): string[] => {
     if (!val) return [];
     try {
       const parsed = JSON.parse(val);
@@ -36,22 +36,21 @@ export const TarjetaPresupuesto: React.FC<TarjetaPresupuestoProps> = ({
       .map((s) => s.trim())
       .filter(Boolean);
   };
+  const parseCurs = parseDelimitedList;
+  const parseFacturas = parseDelimitedList;
 
-  // Parser para listas de facturas
-  const parseFacturas = (val?: string | null): string[] => {
-    if (!val) return [];
-    try {
-      const parsed = JSON.parse(val);
-      if (Array.isArray(parsed)) return parsed.map(String).map((s) => s.trim()).filter(Boolean);
-    } catch {}
-    return val
-      .split(/[,;\n]+/)
-      .map((s) => s.trim())
-      .filter(Boolean);
-  };
+  interface FilaDinamicaPresupuesto {
+    id: string;
+    valor: string;
+  }
 
-  const [curCompromisoList, setCurCompromisoList] = useState<string[]>([]);
-  const [facturasList, setFacturasList] = useState<string[]>([]);
+  const crearFilaDinamica = (prefijo: string, valor: string = ""): FilaDinamicaPresupuesto => ({
+    id: `${prefijo}-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
+    valor,
+  });
+
+  const [curCompromisoList, setCurCompromisoList] = useState<FilaDinamicaPresupuesto[]>([]);
+  const [facturasList, setFacturasList] = useState<FilaDinamicaPresupuesto[]>([]);
 
   // Catálogo de ítems presupuestarios
   const [itemsCatalog, setItemsCatalog] = useState<any[]>([]);
@@ -75,14 +74,19 @@ export const TarjetaPresupuesto: React.FC<TarjetaPresupuestoProps> = ({
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    if (isEditing) return;
     setCertificacion(tramite.certificacion_presupuestaria || "");
     setItem(tramite.item_presupuestario || "");
     setNroTramite(tramite.nro_tramite || "");
     setPeriodoPago(tramite.periodo_pago || "");
-    setCurCompromisoList(parseCurs(tramite.numero_cur_compromiso));
-    setFacturasList(parseFacturas(tramite.numero_factura));
+    setCurCompromisoList(
+      parseCurs(tramite.numero_cur_compromiso).map((v) => crearFilaDinamica("cur-com", v))
+    );
+    setFacturasList(
+      parseFacturas(tramite.numero_factura).map((v) => crearFilaDinamica("fac", v))
+    );
     setAnexosList(parseInitialAnexos());
-  }, [tramite]);
+  }, [tramite, isEditing]);
 
   // Cargar catálogo de ítems presupuestarios oficiales
   useEffect(() => {
@@ -171,43 +175,57 @@ export const TarjetaPresupuesto: React.FC<TarjetaPresupuestoProps> = ({
   };
 
   const handleAddFactura = () => {
-    setFacturasList((prev) => [...prev, ""]);
+    if (facturasList.some((f) => !f.valor.trim())) {
+      setError("Complete la fila de Factura actual antes de añadir otra.");
+      return;
+    }
+    setError(null);
+    setFacturasList((prev) => [...prev, crearFilaDinamica("fac", "")]);
   };
 
-  const handleRemoveFactura = (index: number) => {
-    setFacturasList((prev) => prev.filter((_, i) => i !== index));
+  const handleRemoveFactura = (id: string) => {
+    setFacturasList((prev) => prev.filter((item) => item.id !== id));
   };
 
-  const handleUpdateFactura = (index: number, val: string) => {
-    setFacturasList((prev) => {
-      const updated = [...prev];
-      updated[index] = val.toUpperCase();
-      return updated;
-    });
+  const handleUpdateFactura = (id: string, val: string) => {
+    setFacturasList((prev) =>
+      prev.map((item) => (item.id === id ? { ...item, valor: val.toUpperCase() } : item))
+    );
   };
 
   const handleAddCurCompromiso = () => {
-    setCurCompromisoList((prev) => [...prev, ""]);
+    if (curCompromisoList.some((c) => !c.valor.trim())) {
+      setError("Complete el CUR Compromiso actual antes de añadir otro.");
+      return;
+    }
+    setError(null);
+    setCurCompromisoList((prev) => [...prev, crearFilaDinamica("cur-com", "")]);
   };
 
-  const handleRemoveCurCompromiso = (index: number) => {
-    setCurCompromisoList((prev) => prev.filter((_, i) => i !== index));
+  const handleRemoveCurCompromiso = (id: string) => {
+    setCurCompromisoList((prev) => prev.filter((item) => item.id !== id));
   };
 
-  const handleUpdateCurCompromiso = (index: number, val: string) => {
-    setCurCompromisoList((prev) => {
-      const updated = [...prev];
-      updated[index] = val.trimStart();
-      return updated;
-    });
+  const handleUpdateCurCompromiso = (id: string, val: string) => {
+    setCurCompromisoList((prev) =>
+      prev.map((item) => (item.id === id ? { ...item, valor: val.trimStart() } : item))
+    );
   };
 
   const handleStartEdit = () => {
     setIsOpen(true);
     const fList = parseFacturas(tramite.numero_factura);
     const cList = parseCurs(tramite.numero_cur_compromiso);
-    setFacturasList(fList.length > 0 ? fList : [""]);
-    setCurCompromisoList(cList.length > 0 ? cList : [""]);
+    setFacturasList(
+      fList.length > 0
+        ? fList.map((v) => crearFilaDinamica("fac", v))
+        : [crearFilaDinamica("fac", "")]
+    );
+    setCurCompromisoList(
+      cList.length > 0
+        ? cList.map((v) => crearFilaDinamica("cur-com", v))
+        : [crearFilaDinamica("cur-com", "")]
+    );
     setIsEditing(true);
   };
 
@@ -216,8 +234,12 @@ export const TarjetaPresupuesto: React.FC<TarjetaPresupuestoProps> = ({
     setLoading(true);
     setError(null);
 
-    const facturasClean = facturasList.map((s) => s.trim().toUpperCase()).filter(Boolean);
-    const curCompromisoClean = curCompromisoList.map((s) => s.trim()).filter(Boolean);
+    const facturasClean = facturasList
+      .map((s) => s.valor.trim().toUpperCase())
+      .filter((s) => s.length > 0);
+    const curCompromisoClean = curCompromisoList
+      .map((s) => s.valor.trim())
+      .filter((s) => s.length > 0);
 
     // Validación alfanumérica para Nro / Cod Proceso
     if (nroTramite.trim() && !/^[A-Za-z0-9\-_./ ]{1,50}$/.test(nroTramite.trim())) {
@@ -273,7 +295,7 @@ export const TarjetaPresupuesto: React.FC<TarjetaPresupuestoProps> = ({
   const displayedCurCompromisos = parseCurs(tramite.numero_cur_compromiso);
 
   return (
-    <div className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-xs">
+    <div className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-xs w-full max-w-full min-w-0">
       <div
         onClick={() => setIsOpen(!isOpen)}
         className="px-5 py-3.5 bg-slate-900 text-white flex flex-wrap items-center justify-between gap-3 cursor-pointer select-none hover:bg-slate-850 transition-colors"
@@ -320,8 +342,8 @@ export const TarjetaPresupuesto: React.FC<TarjetaPresupuestoProps> = ({
         )}
 
         {isEditing ? (
-          <form onSubmit={handleSave} className="space-y-5">
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+          <form onSubmit={handleSave} className="space-y-5 w-full max-w-full min-w-0">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 w-full max-w-full min-w-0">
               <div>
                 <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
                   Nro / Cod Proceso
@@ -389,50 +411,50 @@ export const TarjetaPresupuesto: React.FC<TarjetaPresupuestoProps> = ({
             </div>
 
             {/* Bloques dinámicos: CUR Compromiso y Facturas (Idéntico a Contabilidad) */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 w-full max-w-full min-w-0">
               {/* Bloque CUR Compromiso */}
-              <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 space-y-3">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <label className="text-xs font-bold text-slate-800 uppercase block">
+              <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 sm:p-4 space-y-3 w-full max-w-full min-w-0 overflow-hidden">
+                <div className="flex items-center justify-between gap-2">
+                  <div className="min-w-0">
+                    <label className="text-xs font-bold text-slate-800 uppercase block truncate">
                       CUR Compromiso (CUR COM)
                     </label>
-                    <span className="text-[11px] text-slate-500">
+                    <span className="text-[11px] text-slate-500 block truncate">
                       Opcional. Puede registrar 1 o más números oficiales.
                     </span>
                   </div>
                   <button
                     type="button"
                     onClick={handleAddCurCompromiso}
-                    className="inline-flex items-center gap-1 text-[11px] font-bold uppercase text-emerald-600 hover:text-emerald-800 bg-white border border-emerald-200 px-2 py-1 rounded-md transition-colors"
+                    className="inline-flex items-center gap-1 text-[11px] font-bold uppercase text-emerald-600 hover:text-emerald-800 bg-white border border-emerald-200 px-2 py-1 rounded-md transition-colors shrink-0 whitespace-nowrap"
                   >
                     <Plus className="w-3 h-3" /> Agregar CUR COM
                   </button>
                 </div>
 
-                <div className="space-y-2">
+                <div className="overflow-x-auto w-full max-w-full min-w-0 space-y-2">
                   {curCompromisoList.length === 0 ? (
                     <p className="text-xs text-slate-400 italic py-2">
                       No hay CUR Compromiso asignado (opcional).
                     </p>
                   ) : (
-                    curCompromisoList.map((cur, idx) => (
-                      <div key={idx} className="flex items-center gap-2">
+                    curCompromisoList.map((curItem, idx) => (
+                      <div key={curItem.id} className="flex items-center gap-2 min-w-0">
                         <span className="text-[11px] font-mono font-bold text-slate-400 w-14 shrink-0">
                           CUR {idx + 1}:
                         </span>
                         <input
                           type="text"
                           inputMode="numeric"
-                          value={cur}
-                          onChange={(e) => handleUpdateCurCompromiso(idx, e.target.value)}
+                          value={curItem.valor}
+                          onChange={(e) => handleUpdateCurCompromiso(curItem.id, e.target.value)}
                           placeholder={`ej. 104230${idx + 1}`}
-                          className="flex-1 text-xs bg-white border border-slate-300 rounded-lg p-2 font-mono uppercase font-semibold text-slate-900 focus:ring-2 focus:ring-emerald-500 focus:outline-none"
+                          className="flex-1 min-w-[120px] text-xs bg-white border border-slate-300 rounded-lg p-2 font-mono uppercase font-semibold text-slate-900 focus:ring-2 focus:ring-emerald-500 focus:outline-none"
                         />
                         <button
                           type="button"
-                          onClick={() => handleRemoveCurCompromiso(idx)}
-                          className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
+                          onClick={() => handleRemoveCurCompromiso(curItem.id)}
+                          className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer shrink-0"
                           title="Eliminar CUR"
                         >
                           <Trash2 className="w-3.5 h-3.5" />
@@ -444,47 +466,47 @@ export const TarjetaPresupuesto: React.FC<TarjetaPresupuestoProps> = ({
               </div>
 
               {/* Bloque Facturas */}
-              <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 space-y-3">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <label className="text-xs font-bold text-slate-800 uppercase block">
+              <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 sm:p-4 space-y-3 w-full max-w-full min-w-0 overflow-hidden">
+                <div className="flex items-center justify-between gap-2">
+                  <div className="min-w-0">
+                    <label className="text-xs font-bold text-slate-800 uppercase block truncate">
                       Facturas del Trámite
                     </label>
-                    <span className="text-[11px] text-slate-500">
+                    <span className="text-[11px] text-slate-500 block truncate">
                       Opcional. Puede registrar 1 o más facturas del expediente.
                     </span>
                   </div>
                   <button
                     type="button"
                     onClick={handleAddFactura}
-                    className="inline-flex items-center gap-1 text-[11px] font-bold uppercase text-blue-600 hover:text-blue-800 bg-white border border-blue-200 px-2 py-1 rounded-md transition-colors"
+                    className="inline-flex items-center gap-1 text-[11px] font-bold uppercase text-blue-600 hover:text-blue-800 bg-white border border-blue-200 px-2 py-1 rounded-md transition-colors shrink-0 whitespace-nowrap"
                   >
                     <Plus className="w-3 h-3" /> Agregar Factura
                   </button>
                 </div>
 
-                <div className="space-y-2">
+                <div className="overflow-x-auto w-full max-w-full min-w-0 space-y-2">
                   {facturasList.length === 0 ? (
                     <p className="text-xs text-slate-400 italic py-2">
                       No hay facturas asignadas (opcional).
                     </p>
                   ) : (
-                    facturasList.map((fac, idx) => (
-                      <div key={idx} className="flex items-center gap-2">
+                    facturasList.map((facItem, idx) => (
+                      <div key={facItem.id} className="flex items-center gap-2 min-w-0">
                         <span className="text-[11px] font-mono font-bold text-slate-400 w-14 shrink-0">
                           FAC {idx + 1}:
                         </span>
                         <input
                           type="text"
-                          value={fac}
-                          onChange={(e) => handleUpdateFactura(idx, e.target.value)}
+                          value={facItem.valor}
+                          onChange={(e) => handleUpdateFactura(facItem.id, e.target.value)}
                           placeholder="ej. 001-002-000123456"
-                          className="flex-1 text-xs bg-white border border-slate-300 rounded-lg p-2 font-mono uppercase font-semibold text-slate-900 focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                          className="flex-1 min-w-[120px] text-xs bg-white border border-slate-300 rounded-lg p-2 font-mono uppercase font-semibold text-slate-900 focus:ring-2 focus:ring-blue-500 focus:outline-none"
                         />
                         <button
                           type="button"
-                          onClick={() => handleRemoveFactura(idx)}
-                          className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
+                          onClick={() => handleRemoveFactura(facItem.id)}
+                          className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer shrink-0"
                           title="Eliminar Factura"
                         >
                           <Trash2 className="w-3.5 h-3.5" />
@@ -542,7 +564,7 @@ export const TarjetaPresupuesto: React.FC<TarjetaPresupuestoProps> = ({
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
                   {anexosList.map((anexo, idx) => (
                     <div
-                      key={idx}
+                      key={`anexo-edit-${idx}-${anexo}`}
                       className="flex items-center justify-between p-2 bg-white border border-slate-200 rounded-lg text-xs"
                     >
                       <span className="text-slate-800 uppercase font-medium truncate pr-2" title={anexo}>
@@ -636,7 +658,7 @@ export const TarjetaPresupuesto: React.FC<TarjetaPresupuestoProps> = ({
                   <div className="flex flex-wrap gap-1.5">
                     {displayedCurCompromisos.map((cur, idx) => (
                       <span
-                        key={idx}
+                        key={`cur-ro-${idx}-${cur}`}
                         className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded text-[11px] font-mono font-bold bg-emerald-50 text-emerald-800 border border-emerald-200 uppercase"
                       >
                         {cur}
@@ -667,7 +689,7 @@ export const TarjetaPresupuesto: React.FC<TarjetaPresupuestoProps> = ({
                   <div className="flex flex-wrap gap-1.5">
                     {displayedFacturas.map((fac, idx) => (
                       <span
-                        key={idx}
+                        key={`fac-ro-${idx}-${fac}`}
                         className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded text-[11px] font-mono font-bold bg-blue-50 text-blue-800 border border-blue-200 uppercase"
                       >
                         <Receipt className="w-3 h-3 text-blue-600" />
@@ -692,7 +714,7 @@ export const TarjetaPresupuesto: React.FC<TarjetaPresupuestoProps> = ({
                 <div className="flex flex-wrap gap-2">
                   {displayedAnexos.map((anexo, idx) => (
                     <span
-                      key={idx}
+                      key={`anexo-ro-${idx}-${anexo}`}
                       className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-medium bg-slate-100 text-slate-800 border border-slate-200 uppercase"
                     >
                       <FileText className="w-3 h-3 text-blue-600" />

@@ -62,12 +62,20 @@ export default function LoginPage() {
         localStorage.removeItem("senae_user_session");
       } catch (e) {}
 
-      // 2. Comprobar parámetros de URL informativos
+      // 2. Comprobar parámetros de URL informativos y sanear callbackUrl
       const params = new URLSearchParams(window.location.search);
       if (params.get("reason") === "inactivity") {
         setInfoMessage("Su sesión se cerró automáticamente por 30 minutos de inactividad.");
       } else if (params.get("expired") === "1") {
         setInfoMessage("Su sesión anterior ha finalizado. Ingrese nuevamente sus credenciales.");
+      }
+
+      // C-06: Sanitizar callbackUrl contra Open Redirect
+      const callbackParam = params.get("callbackUrl");
+      if (callbackParam && (!callbackParam.startsWith("/") || callbackParam.startsWith("//"))) {
+        const safeUrl = new URL(window.location.href);
+        safeUrl.searchParams.delete("callbackUrl");
+        window.history.replaceState({}, "", safeUrl.toString());
       }
 
       // 3. Blindaje anti-anidación: si la URL del navegador no es /login (ej. RSC redirect interno)
@@ -122,13 +130,14 @@ export default function LoginPage() {
         return;
       }
 
-      // Sesión iniciada con éxito -> Guardar en caché y redirigir directamente al escritorio
-      if (data.user) {
-        try {
-          localStorage.setItem("senae_user_session", JSON.stringify(data.user));
-        } catch (e) {}
-      }
-      window.location.href = "/escritorio";
+      // M-08 & C-06: Redirección limpia (la autenticación está protegida por la cookie HTTPOnly)
+      const currentParams = new URLSearchParams(window.location.search);
+      const targetUrl = currentParams.get("callbackUrl");
+      const safeRedirect = targetUrl && targetUrl.startsWith("/") && !targetUrl.startsWith("//")
+        ? targetUrl
+        : "/escritorio";
+
+      window.location.href = safeRedirect;
     } catch (err: any) {
       setError(err.message || "Error al conectar con el servidor institucional.");
     } finally {
