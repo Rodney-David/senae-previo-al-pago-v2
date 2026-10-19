@@ -97,8 +97,16 @@ export const TabAuditoriaTramites: React.FC<TabAuditoriaTramitesProps> = ({
 
     // Mediana Reloj B (Trabajo real en días hábiles)
     const tiemposB = tramites
-      .filter((t) => t.reloj_b?.aplica && typeof t.reloj_b.dias_laborables_efectivos === "number")
-      .map((t) => t.reloj_b!.dias_laborables_efectivos as number);
+      .map((t: any) =>
+        t.reloj_b?.aplica && typeof t.reloj_b.dias_laborables_efectivos === "number"
+          ? t.reloj_b.dias_laborables_efectivos
+          : typeof t.tiempo_real_trabajado_dias === "number"
+          ? t.tiempo_real_trabajado_dias
+          : typeof t.dias_habiles_efectivos === "number"
+          ? t.dias_habiles_efectivos
+          : null
+      )
+      .filter((n): n is number => typeof n === "number" && !isNaN(n));
     const medianaRelojB = tiemposB.length > 0 ? calcularMediana(tiemposB) : null;
 
     // Trámites Finalizados vs En Curso
@@ -467,6 +475,14 @@ export const TabAuditoriaTramites: React.FC<TabAuditoriaTramitesProps> = ({
                         {t.reloj_b?.aplica && typeof t.reloj_b.dias_laborables_efectivos === "number" ? (
                           <span className="inline-block font-mono font-bold text-blue-800 bg-blue-100/90 px-3 py-1 rounded-lg text-xs border border-blue-300 shadow-2xs">
                             {t.reloj_b.dias_laborables_efectivos} días
+                          </span>
+                        ) : typeof (t as any).tiempo_real_trabajado_dias === "number" ? (
+                          <span className="inline-block font-mono font-bold text-blue-800 bg-blue-100/90 px-3 py-1 rounded-lg text-xs border border-blue-300 shadow-2xs">
+                            {(t as any).tiempo_real_trabajado_dias} días
+                          </span>
+                        ) : typeof (t as any).dias_habiles_efectivos === "number" ? (
+                          <span className="inline-block font-mono font-bold text-blue-800 bg-blue-100/90 px-3 py-1 rounded-lg text-xs border border-blue-300 shadow-2xs">
+                            {(t as any).dias_habiles_efectivos} días
                           </span>
                         ) : (
                           <span className="inline-block font-mono font-medium text-slate-400 bg-slate-100 px-2.5 py-1 rounded-lg text-xs">

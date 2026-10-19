@@ -70,6 +70,7 @@ export async function GET(request: NextRequest) {
       rendimientoFuncionarios,
       areasCatalogo,
       usuariosCatalogo,
+      tiposCatalogo,
       slaConfig,
     ] = await Promise.all([
       obtenerAuditoriaTramites(filtros, { pagina: 1, limite: 10000 }),
@@ -83,6 +84,11 @@ export async function GET(request: NextRequest) {
         where: { activo: true },
         select: { id_usuario: true, nombre_completo: true, cargo: true, id_area: true, iniciales: true },
         orderBy: { nombre_completo: "asc" },
+      }),
+      prisma.tipos_tramite.findMany({
+        where: { activo: true },
+        select: { id_tipo_tramite: true, nombre: true, codigo: true },
+        orderBy: { nombre: "asc" },
       }),
       getSLAConfig(),
     ]);
@@ -549,6 +555,7 @@ export async function GET(request: NextRequest) {
       },
       catalogo_areas: areasCatalogo,
       catalogo_usuarios: usuariosCatalogo,
+      catalogo_tipos_tramite: tiposCatalogo,
       sla_config: slaConfig,
       reporte_ingresos_custodia: {
         resumen: {
