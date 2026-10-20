@@ -15,6 +15,7 @@ import {
   calcularTiemposTramite,
   evaluarCalidadDato,
   normalizarFeriadosSet,
+  calcularDiasHabilesBrutos,
   parseDate,
   toIsoDateOnly,
   ResultadoTiemposTramite,
@@ -34,7 +35,10 @@ export interface FiltrosReportesTiempos {
   codigo_proceso_canonico?: string;
   id_area?: number | string;
   id_funcionario?: number | string;
+  modo_funcionario?: "TODOS" | "CUSTODIO_ACTUAL" | "ANALISTA_HISTORICO" | string;
   estado_general?: string;
+  sub_estado?: string;
+  tipo_gestion?: string;
   calidad_dato?: "TODOS" | "COMPLETO" | "HISTORICO_PARCIAL" | "INCOMPLETO" | string;
   estado_filtro?: "TODOS" | "COMPLETADOS" | "EN_CURSO" | string;
   busqueda?: string;
@@ -156,10 +160,41 @@ export interface RendimientoFuncionarioItem {
   area?: string;
   area_nombre: string;
   id_area: number;
+
+  // Dimensión 1: Productividad Histórica del Analista (id_analista_presupuesto_previo)
+  total_asignados_historico: number;
+  total_despachados: number;
+  mediana_dias_presupuesto: number;
+  promedio_dias_presupuesto: number;
+  en_observacion_pausados: number;
+  porcentaje_productividad: number;
+  porcentaje_cumplimiento_sla_presupuesto: number;
+  productividad_historica: {
+    total_asignados_historico: number;
+    total_despachados: number;
+    mediana_dias_presupuesto: number;
+    promedio_dias_presupuesto: number;
+    en_observacion_pausados: number;
+    porcentaje_productividad: number;
+    porcentaje_cumplimiento_sla_presupuesto: number;
+  };
+
+  // Dimensión 2: Carga Activa Hoy / Pendientes (id_custodio_actual en estados REVISION, OBSERVADO, DFI)
+  pendientes_en_revision: number;
+  pendientes_observados: number;
+  pendientes_dfi: number;
+  total_pendientes_custodia: number;
+  carga_activa: {
+    pendientes_en_revision: number;
+    pendientes_observados: number;
+    pendientes_dfi: number;
+    total_pendientes_custodia: number;
+  };
+
+  // Campos retrocompatibles existentes:
   total_asignados: number;
   total_recibidos?: number;
   tramites_despachados?: number;
-  total_despachados: number;
   despachados?: number;
   total_en_curso: number;
   en_curso?: number;
@@ -418,6 +453,16 @@ function construirWherePrisma(filtros: FiltrosReportesTiempos) {
     // Cuando sea "TODOS", no aplicar filtro de padre_gestion
   }
 
+  // 1.1 Tipo de Gestión ("PAGO", "ARCHIVO", "EXPEDIENTE", "JUSTIFICACION", etc.)
+  if (filtros.tipo_gestion && filtros.tipo_gestion !== "TODOS") {
+    where.tipo_gestion = filtros.tipo_gestion.trim();
+  }
+
+  // 1.2 Sub-estado ("JUSTIFICACION_CONTABILIDAD", "EN_CONTABILIDAD", "ESPERA_FACTURA", "OBSERVADO", etc.)
+  if (filtros.sub_estado && filtros.sub_estado !== "TODOS") {
+    where.sub_estado = filtros.sub_estado.trim();
+  }
+
   // 2. Criterio de Fecha y Rango Temporal
   const criterio = (filtros.criterio_fecha || "INGRESO").toUpperCase();
   let fDesde: Date | undefined;
@@ -466,15 +511,22 @@ function construirWherePrisma(filtros: FiltrosReportesTiempos) {
     where.id_area_actual = Number(filtros.id_area);
   }
 
-  // 5. Funcionario (custodio actual o analista)
+  // 5. Funcionario con modo_funcionario opcional ("TODOS" | "CUSTODIO_ACTUAL" | "ANALISTA_HISTORICO")
   if (filtros.id_funcionario && filtros.id_funcionario !== "TODOS") {
     const idFunc = Number(filtros.id_funcionario);
-    andConditions.push({
-      OR: [
-        { id_custodio_actual: idFunc },
-        { id_analista_presupuesto_previo: idFunc },
-      ],
-    });
+    const modo = (filtros.modo_funcionario || "TODOS").toUpperCase();
+    if (modo === "CUSTODIO_ACTUAL") {
+      where.id_custodio_actual = idFunc;
+    } else if (modo === "ANALISTA_HISTORICO") {
+      where.id_analista_presupuesto_previo = idFunc;
+    } else {
+      andConditions.push({
+        OR: [
+          { id_custodio_actual: idFunc },
+          { id_analista_presupuesto_previo: idFunc },
+        ],
+      });
+    }
   }
 
   // 6. Estado General Oficial (CONTABILIDAD, PAGADO, DFI, REVISION, ARCHIVO, DEVUELTO, etc.)
@@ -589,6 +641,7 @@ export async function obtenerAuditoriaTramites(
     where: { activo: true },
     select: { fecha: true },
   });
+  const feriadosSet = normalizarFeriadosSet(feriados);
 
   // Consultar todos los trámites que cumplen las condiciones base
   const tramitesDb = await prisma.tramites.findMany({
@@ -675,21 +728,49 @@ export async function obtenerAuditoriaTramites(
 
     const analistaInfo = resolverAnalistaTramite(t, res, usuariosMap, inicialesMap);
 
-    // Semáforo SLA institucional
+    // Semáforo SLA institucional diferenciado
     let semaforo: "VERDE" | "AMBAR" | "ROJO" | "EXENTO" | "PENDIENTE" = "VERDE";
     const esExento =
       t.estado_general === "INSUBSISTENTE" ||
       t.estado_general === "DEVUELTO" ||
       t.estado_general === "ANULADO" ||
-      Boolean(t.es_devuelto);
+      Boolean(t.es_devuelto) ||
+      (t.estado_general === "ARCHIVO" && t.tipo_gestion === "ARCHIVO");
+
+    const esPausadoOObservado =
+      t.estado_general === "OBSERVADO" ||
+      t.estado_general === "OBSERVADO_72H" ||
+      Boolean(t.esta_pausado) ||
+      t.sub_estado === "ESPERA_FACTURA" ||
+      t.sub_estado === "OBSERVADO";
 
     if (esExento) {
       semaforo = "EXENTO";
+    } else if (esPausadoOObservado) {
+      // Estado pausado u observado: nunca ROJO para no castigar el porcentaje SLA por causas externas/falta de factura
+      semaforo = "PENDIENTE";
     } else {
-      const diasComparar =
-        res.calidad_dato === "COMPLETO" && typeof res.reloj_b.dias_laborables_efectivos === "number"
-          ? res.reloj_b.dias_laborables_efectivos
-          : res.historico_parcial?.total_habiles_brutos ?? res.reloj_a.dias_laborables_trabajo;
+      // Evaluar SLA general comparando tiempo hábil desde fecha_entrega_control_previo hasta fecha_autorizacion_pago (sin incluir días previos de Secretaría DFI)
+      let diasComparar = 0;
+      const fEnt = parseDate(t.fecha_entrega_control_previo);
+      const fAut = parseDate(t.fecha_autorizacion_pago) || parseDate(t.fecha_pago);
+
+      if (fEnt && fAut && fAut.getTime() >= fEnt.getTime()) {
+        diasComparar = calcularDiasHabilesBrutos(fEnt, fAut, feriadosSet);
+      } else if (fEnt && res.en_curso) {
+        diasComparar = calcularDiasHabilesBrutos(fEnt, new Date(), feriadosSet);
+      } else if (res.historico_parcial) {
+        // En histórico parcial: tramo presupuesto + tramo contabilidad/tesorería (excluyendo tramo secretaría)
+        const pres = res.historico_parcial.tramo_presupuesto_habiles ?? 0;
+        const cont = res.historico_parcial.tramo_contabilidad_tesoreria_habiles ?? 0;
+        diasComparar = pres + cont;
+      } else if (res.calidad_dato === "COMPLETO" && typeof res.reloj_b.dias_laborables_efectivos === "number") {
+        // En reloj B completo: descontar fase secretaría de días efectivos
+        const sec = typeof res.reloj_b.fase_secretaria_dias === "number" ? res.reloj_b.fase_secretaria_dias : 0;
+        diasComparar = Math.max(0, res.reloj_b.dias_laborables_efectivos - sec);
+      } else {
+        diasComparar = res.tiempo_real_trabajado_dias;
+      }
 
       if (diasComparar > SLA_LIMITE) {
         semaforo = "ROJO";
@@ -832,6 +913,7 @@ export async function obtenerRendimientoFuncionarios(filtros: FiltrosReportesTie
     where: { activo: true },
     select: { fecha: true },
   });
+  const feriadosSet = normalizarFeriadosSet(feriados);
 
   const tramitesDb = await prisma.tramites.findMany({
     where,
@@ -881,24 +963,42 @@ export async function obtenerRendimientoFuncionarios(filtros: FiltrosReportesTie
     7: 2.0, // Distritos
   };
 
-  // Estructura de acumulación por usuario
-  const mapaFuncionarios = new Map<
-    number,
-    {
-      id_usuario: number;
-      nombre_completo: string;
-      cargo: string;
-      iniciales: string | null;
-      area_nombre: string;
-      id_area: number;
-      total_asignados: number;
-      total_despachados: number;
-      total_en_curso: number;
-      dias_despacho_lista: number[];
-      a_tiempo: number;
-      con_retraso: number;
-      tramites_ids: number[];
-      tramites_resumen: Array<{
+  function crearEntradaFuncionario(
+    id_usuario: number,
+    nombre_completo: string,
+    cargo: string,
+    iniciales: string | null,
+    area_nombre: string,
+    id_area: number
+  ) {
+    return {
+      id_usuario,
+      nombre_completo,
+      cargo,
+      iniciales,
+      area_nombre,
+      id_area,
+      // Dimensión 1: Productividad Histórica del Analista (id_analista_presupuesto_previo)
+      total_asignados_historico: 0,
+      total_despachados: 0,
+      en_observacion_pausados: 0,
+      dias_presupuesto_lista: [] as number[],
+      despachados_a_tiempo_presupuesto: 0,
+
+      // Dimensión 2: Carga Activa Hoy / Pendientes (id_custodio_actual en estados REVISION, OBSERVADO, DFI)
+      pendientes_en_revision: 0,
+      pendientes_observados: 0,
+      pendientes_dfi: 0,
+      total_pendientes_custodia: 0,
+
+      // Compatibilidad
+      total_asignados: 0,
+      total_en_curso: 0,
+      dias_despacho_lista: [] as number[],
+      a_tiempo: 0,
+      con_retraso: 0,
+      tramites_ids: [] as number[],
+      tramites_resumen: [] as Array<{
         id_tramite: number;
         numero_quipux: string;
         proveedor: string;
@@ -907,28 +1007,26 @@ export async function obtenerRendimientoFuncionarios(filtros: FiltrosReportesTie
         estado_general: string;
         cumple_sla: boolean;
         alerta_inconsistencia: boolean;
-      }>;
-    }
-  >();
+      }>,
+    };
+  }
+
+  type FuncionarioAcumulador = ReturnType<typeof crearEntradaFuncionario>;
+  const mapaFuncionarios = new Map<number, FuncionarioAcumulador>();
 
   // Inicializar todos los analistas y jefes activos
   for (const u of usuariosDb) {
-    mapaFuncionarios.set(u.id_usuario, {
-      id_usuario: u.id_usuario,
-      nombre_completo: u.nombre_completo,
-      cargo: u.cargo,
-      iniciales: u.iniciales,
-      area_nombre: u.areas?.nombre || "Sin Área",
-      id_area: u.id_area,
-      total_asignados: 0,
-      total_despachados: 0,
-      total_en_curso: 0,
-      dias_despacho_lista: [],
-      a_tiempo: 0,
-      con_retraso: 0,
-      tramites_ids: [],
-      tramites_resumen: [],
-    });
+    mapaFuncionarios.set(
+      u.id_usuario,
+      crearEntradaFuncionario(
+        u.id_usuario,
+        u.nombre_completo,
+        u.cargo,
+        u.iniciales,
+        u.areas?.nombre || "Sin Área",
+        u.id_area
+      )
+    );
   }
 
   // Estructura para sección de "Trámites con análisis compartido"
@@ -981,7 +1079,50 @@ export async function obtenerRendimientoFuncionarios(filtros: FiltrosReportesTie
 
     const res = calcularTiemposTramite(input, feriados);
 
-    // Si tiene análisis compartido: SEPARAR EN SECCIÓN EXCLUSIVA
+    const estadoUpper = (t.estado_general || "").toUpperCase();
+    const subEstadoUpper = (t.sub_estado || "").toUpperCase();
+    const estaPausado = Boolean(t.esta_pausado);
+
+    // -------------------------------------------------------------
+    // DIMENSIÓN 2: CARGA ACTIVA HOY / PENDIENTES (por id_custodio_actual)
+    // -------------------------------------------------------------
+    if (t.id_custodio_actual) {
+      let targetCustodio = mapaFuncionarios.get(t.id_custodio_actual);
+      if (!targetCustodio) {
+        const u = usuariosMap.get(t.id_custodio_actual);
+        targetCustodio = crearEntradaFuncionario(
+          t.id_custodio_actual,
+          u?.nombre_completo || "Funcionario",
+          u?.cargo || "Custodio",
+          u?.iniciales || null,
+          u?.areas?.nombre || "Sin Área",
+          u?.id_area || 1
+        );
+        mapaFuncionarios.set(t.id_custodio_actual, targetCustodio);
+      }
+
+      if (res.en_curso) {
+        targetCustodio.total_pendientes_custodia++;
+      }
+
+      if (estadoUpper === "REVISION") {
+        targetCustodio.pendientes_en_revision++;
+      } else if (
+        estadoUpper === "OBSERVADO" ||
+        estadoUpper === "OBSERVADO_72H" ||
+        subEstadoUpper === "OBSERVADO" ||
+        subEstadoUpper === "ESPERA_FACTURA" ||
+        estaPausado
+      ) {
+        targetCustodio.pendientes_observados++;
+      } else if (estadoUpper === "DFI") {
+        targetCustodio.pendientes_dfi++;
+      }
+    }
+
+    // -------------------------------------------------------------
+    // VERIFICACIÓN DE ANÁLISIS COMPARTIDO
+    // -------------------------------------------------------------
     if (res.es_analista_compartido) {
       const etiquetaAnalistas =
         res.analistas_detectados && res.analistas_detectados.length > 0
@@ -1020,72 +1161,85 @@ export async function obtenerRendimientoFuncionarios(filtros: FiltrosReportesTie
       continue;
     }
 
-    // Trámite con analista individual: Atribuir al analista correspondiente
+    // -------------------------------------------------------------
+    // DIMENSIÓN 1: PRODUCTIVIDAD HISTÓRICA DEL ANALISTA INDIVIDUAL
+    // -------------------------------------------------------------
     const analista = resolverAnalistaTramite(t, res, usuariosMap, inicialesMap);
     if (!analista.id_usuario) continue;
 
     let target = mapaFuncionarios.get(analista.id_usuario);
     if (!target) {
-      target = {
-        id_usuario: analista.id_usuario,
-        nombre_completo: analista.nombre,
-        cargo: analista.cargo,
-        iniciales: null,
-        area_nombre: "Área",
-        id_area: 1,
-        total_asignados: 0,
-        total_despachados: 0,
-        total_en_curso: 0,
-        dias_despacho_lista: [],
-        a_tiempo: 0,
-        con_retraso: 0,
-        tramites_ids: [],
-        tramites_resumen: [],
-      };
+      target = crearEntradaFuncionario(
+        analista.id_usuario,
+        analista.nombre,
+        analista.cargo,
+        null,
+        "Área",
+        2
+      );
       mapaFuncionarios.set(analista.id_usuario, target);
     }
 
+    target.total_asignados_historico++;
     target.total_asignados++;
     target.tramites_ids.push(t.id_tramite);
 
-    const slaLimite = slaPorArea[target.id_area] || 2.5;
+    // Calcular tramo de presupuesto hábiles
+    let diasPresupuesto: number | null = res.historico_parcial?.tramo_presupuesto_habiles ?? null;
+    if (diasPresupuesto === null && typeof res.reloj_b.fase_presupuesto_dias === "number") {
+      diasPresupuesto = res.reloj_b.fase_presupuesto_dias;
+    }
+    if (diasPresupuesto === null) {
+      const fEnt = parseDate(t.fecha_entrega_control_previo);
+      const fAprob = parseDate(t.fecha_aprobacion_presupuesto);
+      const fPago = parseDate(t.fecha_pago);
 
-    // Calcular días de despacho del analista
-    let diasDespacho = 1.0;
-    if (target.id_area === 2) {
-      // Presupuesto
-      diasDespacho =
-        res.historico_parcial?.tramo_presupuesto_habiles ??
-        (typeof res.reloj_b.fase_presupuesto_dias === "number"
-          ? res.reloj_b.fase_presupuesto_dias
-          : res.reloj_a.dias_laborables_trabajo);
-    } else if (target.id_area === 3) {
-      // Contabilidad
-      diasDespacho =
-        typeof res.reloj_b.fase_contabilidad_dias === "number"
-          ? res.reloj_b.fase_contabilidad_dias
-          : res.historico_parcial?.tramo_contabilidad_tesoreria_habiles ??
-            res.reloj_a.dias_laborables_trabajo;
-    } else {
-      diasDespacho = res.reloj_a.dias_laborables_trabajo;
+      // Regla anti-distorsión por regularización posterior: si fecha_pago < fecha_aprobacion_presupuesto, fin es fecha_pago
+      let fFinPres = fAprob;
+      if (fPago && fAprob && fPago.getTime() < fAprob.getTime()) {
+        fFinPres = fPago;
+      }
+
+      if (fEnt && fFinPres && fFinPres.getTime() >= fEnt.getTime()) {
+        diasPresupuesto = calcularDiasHabilesBrutos(fEnt, fFinPres, feriadosSet);
+      } else if (fEnt && res.en_curso) {
+        diasPresupuesto = calcularDiasHabilesBrutos(fEnt, new Date(), feriadosSet);
+      } else {
+        diasPresupuesto = 1.0;
+      }
     }
 
-    if (diasDespacho === null || isNaN(diasDespacho) || diasDespacho < 0.1) {
-      diasDespacho = 0.5;
+    if (diasPresupuesto === null || isNaN(diasPresupuesto) || diasPresupuesto < 0) {
+      diasPresupuesto = 0.5;
     }
 
-    const cumple = diasDespacho <= slaLimite;
+    const esDespachado = ["PAGADO", "CONTABILIDAD", "ARCHIVO", "DEVUELTO", "INSUBSISTENTE", "ANULADO"].includes(estadoUpper);
+    const esObservadoPausado =
+      estadoUpper === "OBSERVADO" ||
+      estadoUpper === "OBSERVADO_72H" ||
+      subEstadoUpper === "OBSERVADO" ||
+      subEstadoUpper === "ESPERA_FACTURA" ||
+      estaPausado;
 
-    if (res.en_curso) {
-      target.total_en_curso++;
-    } else {
+    if (esObservadoPausado) {
+      target.en_observacion_pausados++;
+    }
+
+    const slaLimite = slaPorArea[target.id_area] || 2.0;
+    const cumple = diasPresupuesto <= slaLimite;
+
+    if (esDespachado) {
       target.total_despachados++;
-      target.dias_despacho_lista.push(diasDespacho);
+      target.dias_presupuesto_lista.push(diasPresupuesto);
+      target.dias_despacho_lista.push(diasPresupuesto);
       if (cumple) {
         target.a_tiempo++;
+        target.despachados_a_tiempo_presupuesto++;
       } else {
         target.con_retraso++;
       }
+    } else {
+      target.total_en_curso++;
     }
 
     target.tramites_resumen.push({
@@ -1093,23 +1247,59 @@ export async function obtenerRendimientoFuncionarios(filtros: FiltrosReportesTie
       numero_quipux: t.numero_quipux,
       proveedor: t.proveedor_beneficiario || "N/A",
       monto_total: Number(t.monto_total || 0),
-      dias_despacho: Number(diasDespacho.toFixed(1)),
+      dias_despacho: Number(diasPresupuesto.toFixed(1)),
       estado_general: t.estado_general,
       cumple_sla: cumple,
       alerta_inconsistencia: res.alerta_inconsistencia,
     });
   }
 
-  // Consolidar métricas para cada analista
+  // Consolidar métricas para cada funcionario
   const listaFuncionarios: RendimientoFuncionarioItem[] = Array.from(mapaFuncionarios.values())
-    .filter((f) => f.total_asignados > 0 || f.id_area === 2 || f.id_area === 3) // Mostrar activos o de áreas operativas
+    .filter(
+      (f) =>
+        f.total_asignados_historico > 0 ||
+        f.total_pendientes_custodia > 0 ||
+        f.total_asignados > 0 ||
+        f.id_area === 2 ||
+        f.id_area === 3
+    )
     .map((f) => {
-      const slaLimite = slaPorArea[f.id_area] || 2.5;
-      const mediana = calcularMediana(f.dias_despacho_lista);
-      const promedio = calcularPromedio(f.dias_despacho_lista);
-      const p90 = calcularPercentil(f.dias_despacho_lista, 90);
+      const slaLimite = slaPorArea[f.id_area] || 2.0;
+      const medianaPresupuesto = calcularMediana(f.dias_presupuesto_lista);
+      const promedioPresupuesto = calcularPromedio(f.dias_presupuesto_lista);
+      const p90 = calcularPercentil(f.dias_presupuesto_lista, 90);
+
+      // porcentaje_productividad: (total_despachados / Math.max(1, total_asignados_historico - en_observacion_pausados)) * 100
+      const baseProductividad = Math.max(1, f.total_asignados_historico - f.en_observacion_pausados);
+      const porcentajeProductividad = Math.min(
+        100,
+        Number(((f.total_despachados / baseProductividad) * 100).toFixed(1))
+      );
+      const porcentajeCumplimientoSlaPres =
+        f.total_despachados > 0
+          ? Math.round((f.despachados_a_tiempo_presupuesto / f.total_despachados) * 100)
+          : 100;
+
       const evaluados = f.a_tiempo + f.con_retraso;
       const tasa = evaluados > 0 ? Math.round((f.a_tiempo / evaluados) * 100) : 100;
+
+      const prodHistorica = {
+        total_asignados_historico: f.total_asignados_historico,
+        total_despachados: f.total_despachados,
+        mediana_dias_presupuesto: medianaPresupuesto,
+        promedio_dias_presupuesto: promedioPresupuesto,
+        en_observacion_pausados: f.en_observacion_pausados,
+        porcentaje_productividad: porcentajeProductividad,
+        porcentaje_cumplimiento_sla_presupuesto: porcentajeCumplimientoSlaPres,
+      };
+
+      const cargaActiva = {
+        pendientes_en_revision: f.pendientes_en_revision,
+        pendientes_observados: f.pendientes_observados,
+        pendientes_dfi: f.pendientes_dfi,
+        total_pendientes_custodia: f.total_pendientes_custodia,
+      };
 
       return {
         id_usuario: f.id_usuario,
@@ -1120,18 +1310,36 @@ export async function obtenerRendimientoFuncionarios(filtros: FiltrosReportesTie
         area: f.area_nombre,
         area_nombre: f.area_nombre,
         id_area: f.id_area,
+
+        // Dimensión 1: Productividad Histórica del Analista (id_analista_presupuesto_previo)
+        total_asignados_historico: f.total_asignados_historico,
+        total_despachados: f.total_despachados,
+        mediana_dias_presupuesto: medianaPresupuesto,
+        promedio_dias_presupuesto: promedioPresupuesto,
+        en_observacion_pausados: f.en_observacion_pausados,
+        porcentaje_productividad: porcentajeProductividad,
+        porcentaje_cumplimiento_sla_presupuesto: porcentajeCumplimientoSlaPres,
+        productividad_historica: prodHistorica,
+
+        // Dimensión 2: Carga Activa Hoy / Pendientes (id_custodio_actual en estados REVISION, OBSERVADO, DFI)
+        pendientes_en_revision: f.pendientes_en_revision,
+        pendientes_observados: f.pendientes_observados,
+        pendientes_dfi: f.pendientes_dfi,
+        total_pendientes_custodia: f.total_pendientes_custodia,
+        carga_activa: cargaActiva,
+
+        // Campos retrocompatibles
         total_asignados: f.total_asignados,
         total_recibidos: f.total_asignados,
         tramites_despachados: f.total_despachados,
-        total_despachados: f.total_despachados,
         despachados: f.total_despachados,
         total_en_curso: f.total_en_curso,
         en_curso: f.total_en_curso,
-        tiempo_promedio_trabajo_dias: promedio,
-        tiempo_promedio_dias: promedio,
-        tiempo_mediana_trabajo_dias: mediana,
-        mediana_dias_despacho: mediana,
-        mediana_dias: mediana,
+        tiempo_promedio_trabajo_dias: promedioPresupuesto,
+        tiempo_promedio_dias: promedioPresupuesto,
+        tiempo_mediana_trabajo_dias: medianaPresupuesto,
+        mediana_dias_despacho: medianaPresupuesto,
+        mediana_dias: medianaPresupuesto,
         p90_dias_despacho: p90,
         p90_dias: p90,
         tasa_cumplimiento: tasa,
@@ -1142,7 +1350,11 @@ export async function obtenerRendimientoFuncionarios(filtros: FiltrosReportesTie
         tramites_resumen: f.tramites_resumen,
       };
     })
-    .sort((a, b) => b.total_asignados - a.total_asignados);
+    .sort(
+      (a, b) =>
+        b.total_asignados_historico - a.total_asignados_historico ||
+        b.total_pendientes_custodia - a.total_pendientes_custodia
+    );
 
   // Consolidar sección de análisis compartido
   const diasTodosCompartidos = tramitesCompartidos.map((c) => c.dias_despacho);
@@ -1186,7 +1398,7 @@ export async function obtenerRendimientoFuncionarios(filtros: FiltrosReportesTie
     analisis_compartido: seccionCompartida,
     kpis_globales: {
       total_analistas: listaFuncionarios.length,
-      total_tramites_evaluados: listaFuncionarios.reduce((sum, f) => sum + f.total_asignados, 0),
+      total_tramites_evaluados: listaFuncionarios.reduce((sum, f) => sum + f.total_asignados_historico, 0),
       mediana_general_dias: calcularMediana(todosLosDias),
       p90_general_dias: calcularPercentil(todosLosDias, 90),
       tasa_cumplimiento_general:
@@ -1196,6 +1408,8 @@ export async function obtenerRendimientoFuncionarios(filtros: FiltrosReportesTie
                 listaFuncionarios.length
             )
           : 100,
+      total_pendientes_revision: listaFuncionarios.reduce((sum, f) => sum + f.pendientes_en_revision, 0),
+      total_pendientes_observados: listaFuncionarios.reduce((sum, f) => sum + f.pendientes_observados, 0),
     },
   };
 }

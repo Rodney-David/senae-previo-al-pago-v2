@@ -70,43 +70,90 @@ export default function AdministracionPage() {
   const [newFeriadoDesc, setNewFeriadoDesc] = useState("");
   const [newFeriadoTipo, setNewFeriadoTipo] = useState("NACIONAL");
 
-  // Filtro Auditoría
+  // Filtro y Paginación Auditoría Remota
   const [auditSearch, setAuditSearch] = useState("");
+  const [debouncedAuditSearch, setDebouncedAuditSearch] = useState("");
+  const [auditPage, setAuditPage] = useState(1);
+  const [auditTotal, setAuditTotal] = useState(0);
+  const [auditTotalPages, setAuditTotalPages] = useState(1);
+  const [auditLoading, setAuditLoading] = useState(false);
 
   const [saving, setSaving] = useState(false);
   const [feedback, setFeedback] = useState<{ type: "success" | "error"; text: string } | null>(
     null
   );
 
+  const fetchAuditoria = async (page = 1, search = "") => {
+    setAuditLoading(true);
+    try {
+      const params = new URLSearchParams();
+      params.set("page", page.toString());
+      params.set("limit", "100");
+      if (search.trim()) {
+        params.set("search", search.trim());
+      }
+      const res = await fetch(`/api/admin/auditoria?${params.toString()}`);
+      const data = await res.json();
+      if (data.movimientos || data.data) {
+        setAuditoria(data.movimientos || data.data);
+      }
+      if (data.meta) {
+        setAuditTotal(data.meta.total);
+        setAuditTotalPages(data.meta.totalPages);
+        setAuditPage(data.meta.page);
+      } else if (data.total !== undefined) {
+        setAuditTotal(data.total);
+        setAuditTotalPages(data.totalPages || Math.ceil(data.total / 100) || 1);
+        setAuditPage(page);
+      }
+    } catch (err) {
+      console.error("Error loading auditoria:", err);
+    } finally {
+      setAuditLoading(false);
+    }
+  };
+
   const fetchData = async () => {
     setLoading(true);
     try {
-      const [uRes, fRes, pRes, aRes] = await Promise.all([
+      const [uRes, fRes, pRes] = await Promise.all([
         fetch("/api/admin/usuarios"),
         fetch("/api/admin/feriados"),
         fetch("/api/admin/procesos"),
-        fetch("/api/admin/auditoria"),
       ]);
-      const [uData, fData, pData, aData] = await Promise.all([
+      const [uData, fData, pData] = await Promise.all([
         uRes.json(),
         fRes.json(),
         pRes.json(),
-        aRes.json(),
       ]);
       if (uData.usuarios) setUsuarios(uData.usuarios);
       if (fData.feriados) setFeriados(fData.feriados);
       if (pData.tipos) setProcesos(pData.tipos);
-      if (aData.movimientos) setAuditoria(aData.movimientos);
     } catch (err) {
       console.error("Error loading admin data:", err);
     } finally {
       setLoading(false);
     }
+    fetchAuditoria(auditPage, debouncedAuditSearch);
   };
 
   useEffect(() => {
     fetchData();
   }, []);
+
+  // Debounce de 300ms para búsqueda remota en auditoría
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedAuditSearch(auditSearch);
+      setAuditPage(1);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [auditSearch]);
+
+  // Consulta remota de auditoría cuando cambia la página o búsqueda debounced
+  useEffect(() => {
+    fetchAuditoria(auditPage, debouncedAuditSearch);
+  }, [auditPage, debouncedAuditSearch]);
 
   // Guardar o Editar Usuario
   const handleSaveUsuario = async (e: React.FormEvent) => {
@@ -249,19 +296,7 @@ export default function AdministracionPage() {
     }
   };
 
-  const filteredAuditoria = auditoria.filter((mov) => {
-    if (!auditSearch.trim()) return true;
-    const term = auditSearch.toLowerCase();
-    return (
-      mov.tramites?.codigo_tramite?.toLowerCase().includes(term) ||
-      mov.tramites?.numero_quipux?.toLowerCase().includes(term) ||
-      mov.tipo_accion?.toLowerCase().includes(term) ||
-      mov.comentarios?.toLowerCase().includes(term) ||
-      mov.usuarios_historial_movimientos_id_usuario_entregaTousuarios?.nombre_completo
-        ?.toLowerCase()
-        .includes(term)
-    );
-  });
+  const filteredAuditoria = auditoria;
 
   return (
     <div className="space-y-6 w-full max-w-full min-w-0">
@@ -805,22 +840,41 @@ export default function AdministracionPage() {
           {auditSubTab === "bitacora" && (
             <div className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-2xs space-y-4">
               <div className="p-4 bg-slate-50 border-b border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
-                <div className="flex items-center gap-2">
-                  <History className="w-4 h-4 text-blue-600" />
+                <div className="flex flex-wrap items-center gap-2">
+                  <History className="w-4 h-4 text-blue-600 shrink-0" />
                   <span className="font-bold text-slate-800 uppercase">
                     Registro Cronológico de Acciones y Movimientos Institucionales
                   </span>
+                  <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-blue-50 text-blue-700 border border-blue-200">
+                    {auditTotal.toLocaleString()} movimientos
+                  </span>
                 </div>
 
-                <div className="relative w-full sm:w-80">
-                  <Search className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
-                  <input
-                    type="text"
-                    value={auditSearch}
-                    onChange={(e) => setAuditSearch(e.target.value)}
-                    placeholder="BUSCAR POR QUIPUX, ACCIÓN, USUARIO..."
-                    className="w-full pl-9 pr-3 py-1.5 text-xs bg-white border border-slate-300 rounded-lg font-medium uppercase focus:ring-2 focus:ring-blue-500 shadow-2xs"
-                  />
+                <div className="flex items-center gap-2">
+                  <div className="relative w-full sm:w-80">
+                    <Search className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
+                    <input
+                      type="text"
+                      value={auditSearch}
+                      onChange={(e) => setAuditSearch(e.target.value)}
+                      placeholder="BUSCAR POR QUIPUX, ACCIÓN, USUARIO..."
+                      className="w-full pl-9 pr-8 py-1.5 text-xs bg-white border border-slate-300 rounded-lg font-medium uppercase focus:ring-2 focus:ring-blue-500 shadow-2xs"
+                    />
+                    {auditSearch && (
+                      <button
+                        onClick={() => setAuditSearch("")}
+                        className="absolute right-2.5 top-2.5 text-slate-400 hover:text-slate-600"
+                        title="Limpiar búsqueda"
+                      >
+                        <X className="w-3.5 h-3.5" />
+                      </button>
+                    )}
+                  </div>
+                  {auditLoading && (
+                    <span title="Consultando..." className="flex items-center">
+                      <RefreshCw className="w-4 h-4 text-blue-600 animate-spin shrink-0" />
+                    </span>
+                  )}
                 </div>
               </div>
 
@@ -836,36 +890,84 @@ export default function AdministracionPage() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
-                    {filteredAuditoria.map((mov) => (
-                      <tr key={mov.id_movimiento} className="hover:bg-slate-50">
-                        <td className="py-2.5 px-4 font-mono text-[11px] text-slate-500">
-                          {formatDate(mov.fecha_hora)}
-                        </td>
-                        <td className="py-2.5 px-4 font-mono font-bold text-blue-900">
-                          {mov.tramites?.numero_quipux}
-                        </td>
-                        <td className="py-2.5 px-4">
-                          <span className="inline-block px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-slate-100 text-slate-800 border border-slate-200 uppercase">
-                            {mov.tipo_accion}
-                          </span>
-                        </td>
-                        <td className="py-2.5 px-4">
-                          <div className="font-semibold text-slate-800 uppercase">
-                            {mov.usuarios_historial_movimientos_id_usuario_entregaTousuarios
-                              ?.nombre_completo || "SISTEMA"}
-                          </div>
-                          <div className="text-[10px] text-slate-500 uppercase">
-                            {mov.areas_historial_movimientos_id_area_origenToareas?.nombre ||
-                              "DFI"}
-                          </div>
-                        </td>
-                        <td className="py-2.5 px-4 text-slate-700 uppercase text-[11px] leading-snug">
-                          {mov.comentarios || "Sin comentarios"}
+                    {filteredAuditoria.length === 0 ? (
+                      <tr>
+                        <td colSpan={5} className="py-12 text-center text-slate-500 text-xs">
+                          {auditLoading ? (
+                            <div className="flex items-center justify-center gap-2 text-slate-600 font-semibold uppercase">
+                              <RefreshCw className="w-4 h-4 text-blue-600 animate-spin" />
+                              Consultando bitácora institucional...
+                            </div>
+                          ) : (
+                            <div className="text-slate-500 font-medium uppercase">
+                              No se encontraron movimientos registrados con el término &ldquo;{auditSearch}&rdquo;.
+                            </div>
+                          )}
                         </td>
                       </tr>
-                    ))}
+                    ) : (
+                      filteredAuditoria.map((mov) => (
+                        <tr key={mov.id_movimiento} className="hover:bg-slate-50 transition-colors">
+                          <td className="py-2.5 px-4 font-mono text-[11px] text-slate-500">
+                            {formatDate(mov.fecha_hora)}
+                          </td>
+                          <td className="py-2.5 px-4 font-mono font-bold text-blue-900">
+                            {mov.tramites?.numero_quipux}
+                          </td>
+                          <td className="py-2.5 px-4">
+                            <span className="inline-block px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-slate-100 text-slate-800 border border-slate-200 uppercase">
+                              {mov.tipo_accion}
+                            </span>
+                          </td>
+                          <td className="py-2.5 px-4">
+                            <div className="font-semibold text-slate-800 uppercase">
+                              {mov.usuarios_historial_movimientos_id_usuario_entregaTousuarios
+                                ?.nombre_completo || "SISTEMA"}
+                            </div>
+                            <div className="text-[10px] text-slate-500 uppercase">
+                              {mov.areas_historial_movimientos_id_area_origenToareas?.nombre ||
+                                "DFI"}
+                            </div>
+                          </td>
+                          <td className="py-2.5 px-4 text-slate-700 uppercase text-[11px] leading-snug">
+                            {mov.comentarios || "Sin comentarios"}
+                          </td>
+                        </tr>
+                      ))
+                    )}
                   </tbody>
                 </table>
+              </div>
+
+              {/* Controles de Paginación */}
+              <div className="p-3 bg-slate-50 border-t border-slate-200 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs">
+                <div className="text-slate-600 font-medium">
+                  Página <span className="font-bold text-slate-900">{auditPage}</span> de{" "}
+                  <span className="font-bold text-slate-900">{auditTotalPages}</span> — Total:{" "}
+                  <span className="font-bold text-blue-700">{auditTotal.toLocaleString()} movimientos</span>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setAuditPage((prev) => Math.max(1, prev - 1))}
+                    disabled={auditPage <= 1 || auditLoading}
+                    className="px-3.5 py-1.5 rounded-lg border border-slate-300 bg-white font-semibold text-slate-700 hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed transition-colors shadow-2xs uppercase text-[11px]"
+                  >
+                    Anterior
+                  </button>
+                  <span className="px-2 font-mono text-xs text-slate-700 font-bold">
+                    {auditPage} / {auditTotalPages}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setAuditPage((prev) => Math.min(auditTotalPages, prev + 1))}
+                    disabled={auditPage >= auditTotalPages || auditLoading}
+                    className="px-3.5 py-1.5 rounded-lg border border-slate-300 bg-white font-semibold text-slate-700 hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed transition-colors shadow-2xs uppercase text-[11px]"
+                  >
+                    Siguiente
+                  </button>
+                </div>
               </div>
             </div>
           )}

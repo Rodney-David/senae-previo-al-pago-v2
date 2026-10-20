@@ -36,9 +36,9 @@ export async function GET(request: NextRequest) {
       }
     } else if (modulosParam) {
       const modClean = modulosParam.toLowerCase();
-      if (modClean === "desempeno" || modClean === "funcionarios") {
+      if (modClean.includes("desempeno") || modClean.includes("funcionarios")) {
         tipoLibro = "FUNCIONARIOS";
-      } else if (modClean === "tiempos" || modClean === "procesos") {
+      } else if (modClean.includes("tiempos") || modClean.includes("procesos")) {
         tipoLibro = "PROCESOS";
       } else {
         tipoLibro = "TRAMITES";
@@ -63,29 +63,48 @@ export async function GET(request: NextRequest) {
       usuarioGenerador = searchParams.get("usuario")!;
     }
 
+    // Helper para sanitizar parámetros y descartar "", "TODOS", "TODAS", "ALL"
+    const cleanParam = (val: string | null | undefined): string | undefined => {
+      if (!val) return undefined;
+      const trimmed = val.trim();
+      const upper = trimmed.toUpperCase();
+      if (trimmed === "" || upper === "TODOS" || upper === "TODAS" || upper === "ALL") {
+        return undefined;
+      }
+      return trimmed;
+    };
+
     // 3. Normalizar filtros de consulta y soportar padre_gestion = "TODOS" | "PAGO" | "GARANTIA"
+    // Si padre_gestion es "TODOS" (o no se especifica), exportar tanto PAGO como GARANTÍA
     const padreParam = searchParams.get("padre_gestion")?.trim().toUpperCase();
-    let padreGestionFiltro: "TODOS" | "PAGO" | "GARANTIA" = "PAGO";
+    let padreGestionFiltro: "TODOS" | "PAGO" | "GARANTIA" = "TODOS";
     if (padreParam === "GARANTIA") {
       padreGestionFiltro = "GARANTIA";
-    } else if (padreParam === "TODOS" || padreParam === "ALL") {
-      padreGestionFiltro = "TODOS";
-    } else {
+    } else if (padreParam === "PAGO") {
       padreGestionFiltro = "PAGO";
+    } else {
+      padreGestionFiltro = "TODOS";
     }
 
     const filtros: FiltrosReportesTiempos = {
-      fecha_desde: searchParams.get("fecha_desde") || undefined,
-      fecha_hasta: searchParams.get("fecha_hasta") || undefined,
+      fecha_desde: cleanParam(searchParams.get("fecha_desde")),
+      fecha_hasta: cleanParam(searchParams.get("fecha_hasta")),
+      criterio_fecha: cleanParam(searchParams.get("criterio_fecha")),
       padre_gestion: padreGestionFiltro,
-      id_area: searchParams.get("id_area") || undefined,
-      id_funcionario: searchParams.get("id_usuario") || searchParams.get("id_funcionario") || undefined,
-      id_tipo_tramite: searchParams.get("id_tipo_tramite") || searchParams.get("proceso") || undefined,
-      codigo_proceso_canonico: searchParams.get("codigo_proceso_canonico") || undefined,
-      estado_general: searchParams.get("estado_general") || undefined,
-      calidad_dato: searchParams.get("calidad_dato") || undefined,
-      estado_filtro: searchParams.get("estado_filtro") || undefined,
-      busqueda: searchParams.get("busqueda") || undefined,
+      id_area: cleanParam(searchParams.get("id_area")),
+      id_funcionario:
+        cleanParam(searchParams.get("id_usuario")) ||
+        cleanParam(searchParams.get("id_funcionario")),
+      id_tipo_tramite:
+        cleanParam(searchParams.get("id_tipo_tramite")) ||
+        cleanParam(searchParams.get("proceso")),
+      codigo_proceso_canonico: cleanParam(searchParams.get("codigo_proceso_canonico")),
+      estado_general:
+        cleanParam(searchParams.get("estado_general")) ||
+        cleanParam(searchParams.get("estado")),
+      calidad_dato: cleanParam(searchParams.get("calidad_dato")),
+      estado_filtro: cleanParam(searchParams.get("estado_filtro")),
+      busqueda: cleanParam(searchParams.get("busqueda")),
     };
 
     const now = new Date();

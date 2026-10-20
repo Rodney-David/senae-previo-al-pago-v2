@@ -1,0 +1,918 @@
+{
+  "erratas2025": [
+    {
+      "numFila": 16,
+      "codigo_tramite": "TRM-2026-P-0015",
+      "quipux": "SENAE-CDCA-2026-0013-M",
+      "excel_crudo": {
+        "rec": "SENAE-CZPC-2025-0957-M",
+        "ent": "2025-12-30T00:00:00.000Z",
+        "jco": "2026-01-07T00:00:00.000Z",
+        "pag": "Catálogo Electrónico"
+      },
+      "bd_fechas": {
+        "rec": "2026-01-03T12:00:00.000Z",
+        "ent": "2026-01-12T12:00:00.000Z",
+        "jco": "2026-02-17T12:00:00.000Z",
+        "pag": "2026-02-17T12:00:00.000Z"
+      },
+      "calidad_dato": "HISTORICO_PARCIAL",
+      "alerta_inconsistencia": true,
+      "motivos_alerta": [
+        "Fecha de recepción física registrada en fin de semana"
+      ],
+      "propuestas_correccion": [
+        "Verificar fecha real de radicación física"
+      ],
+      "tiempo_total_calendario_dias": 45,
+      "tiempo_real_trabajado_dias": 25,
+      "tramo_presupuesto_habiles": 25,
+      "tramo_secretaria_habiles": 6,
+      "tramo_contabilidad_tesoreria_habiles": 0
+    },
+    {
+      "numFila": 79,
+      "codigo_tramite": "TRM-2026-P-0078",
+      "quipux": "SENAE-DNR-2026-0018-M",
+      "excel_crudo": {
+        "rec": "SENAE-DNH-2026-0055-M",
+        "ent": "2026-01-23T00:00:00.000Z",
+        "jco": "2026-01-23T00:00:00.000Z",
+        "pag": "Viáticos"
+      },
+      "bd_fechas": {
+        "rec": "2026-01-19T12:00:00.000Z",
+        "ent": "2026-01-19T12:00:00.000Z",
+        "jco": "2026-02-24T12:00:00.000Z",
+        "pag": "2026-02-24T12:00:00.000Z"
+      },
+      "calidad_dato": "HISTORICO_PARCIAL",
+      "alerta_inconsistencia": false,
+      "motivos_alerta": [],
+      "propuestas_correccion": [],
+      "tiempo_total_calendario_dias": 36,
+      "tiempo_real_trabajado_dias": 25,
+      "tramo_presupuesto_habiles": 25,
+      "tramo_secretaria_habiles": 0,
+      "tramo_contabilidad_tesoreria_habiles": 0
+    },
+    {
+      "numFila": 80,
+      "codigo_tramite": "TRM-2026-P-0079",
+      "quipux": "SENAE-DDE-2026-0057-M",
+      "excel_crudo": {
+        "rec": "SENAE-DNH-2026-0061-M",
+        "ent": "2026-01-23T00:00:00.000Z",
+        "jco": "2026-01-23T00:00:00.000Z",
+        "pag": "Viáticos"
+      },
+      "bd_fechas": {
+        "rec": "2026-01-19T12:00:00.000Z",
+        "ent": "2026-01-21T12:00:00.000Z",
+        "jco": "2026-01-25T12:00:00.000Z",
+        "pag": "2026-02-02T12:00:00.000Z"
+      },
+      "calidad_dato": "HISTORICO_PARCIAL",
+      "alerta_inconsistencia": false,
+      "motivos_alerta": [],
+      "propuestas_correccion": [],
+      "tiempo_total_calendario_dias": 14,
+      "tiempo_real_trabajado_dias": 9,
+      "tramo_presupuesto_habiles": 3,
+      "tramo_secretaria_habiles": 3,
+      "tramo_contabilidad_tesoreria_habiles": 6
+    },
+    {
+      "numFila": 82,
+      "codigo_tramite": "TRM-2026-P-0081",
+      "quipux": "SENAE-DDE-2026-0061-M",
+      "excel_crudo": {
+        "rec": "SENAE-JDS-2026-0005-M",
+        "ent": "2026-01-22T00:00:00.000Z",
+        "jco": "2026-01-22T00:00:00.000Z",
+        "pag": "Servicios Básicos"
+      },
+      "bd_fechas": {
+        "rec": "2026-01-19T12:00:00.000Z",
+        "ent": "2026-01-21T12:00:00.000Z",
+        "jco": "2026-01-27T12:00:00.000Z",
+        "pag": "2026-01-29T12:00:00.000Z"
+      },
+      "calidad_dato": "HISTORICO_PARCIAL",
+      "alerta_inconsistencia": false,
+      "motivos_alerta": [],
+      "propuestas_correccion": [],
+      "tiempo_total_calendario_dias": 10,
+      "tiempo_real_trabajado_dias": 7,
+      "tramo_presupuesto_habiles": 5,
+      "tramo_secretaria_habiles": 3,
+      "tramo_contabilidad_tesoreria_habiles": 3
+    },
+    {
+      "numFila": 93,
+      "codigo_tramite": "TRM-2026-P-0092",
+      "quipux": "SENAE-CDGU-2026-0141-M",
+      "excel_crudo": {
+        "rec": "SENAE-DDE-2026-0061-M",
+        "ent": "2026-01-20T00:00:00.000Z",
+        "jco": "2026-01-22T00:00:00.000Z",
+        "pag": "Tasas"
+      },
+      "bd_fechas": {
+        "rec": "2026-01-21T12:00:00.000Z",
+        "ent": "2026-01-22T12:00:00.000Z",
+        "jco": "2026-01-29T12:00:00.000Z",
+        "pag": "2026-01-29T12:00:00.000Z"
+      },
+      "calidad_dato": "HISTORICO_PARCIAL",
+      "alerta_inconsistencia": false,
+      "motivos_alerta": [],
+      "propuestas_correccion": [],
+      "tiempo_total_calendario_dias": 8,
+      "tiempo_real_trabajado_dias": 6,
+      "tramo_presupuesto_habiles": 6,
+      "tramo_secretaria_habiles": 2,
+      "tramo_contabilidad_tesoreria_habiles": 0
+    },
+    {
+      "numFila": 126,
+      "codigo_tramite": "TRM-2026-P-0125",
+      "quipux": "SENAE-DAM-2026-0030-M",
+      "excel_crudo": {
+        "rec": "SENAE-DNH-2026-0081-M",
+        "ent": "2026-01-27T00:00:00.000Z",
+        "jco": "2026-01-28T00:00:00.000Z",
+        "pag": "Horas Extras"
+      },
+      "bd_fechas": {
+        "rec": "2026-01-26T12:00:00.000Z",
+        "ent": "2026-01-27T12:00:00.000Z",
+        "jco": "2026-04-15T12:00:00.000Z",
+        "pag": "2026-04-15T12:00:00.000Z"
+      },
+      "calidad_dato": "HISTORICO_PARCIAL",
+      "alerta_inconsistencia": false,
+      "motivos_alerta": [],
+      "propuestas_correccion": [],
+      "tiempo_total_calendario_dias": 79,
+      "tiempo_real_trabajado_dias": 54,
+      "tramo_presupuesto_habiles": 54,
+      "tramo_secretaria_habiles": 2,
+      "tramo_contabilidad_tesoreria_habiles": 0
+    },
+    {
+      "numFila": 130,
+      "codigo_tramite": "TRM-2026-P-0129",
+      "quipux": "SENAE-ADFC-2026-0022-M",
+      "excel_crudo": {
+        "rec": "SENAE-ADFC-2026-0022-M",
+        "ent": "2026-01-28T00:00:00.000Z",
+        "jco": "2026-01-28T00:00:00.000Z",
+        "pag": "Tasas"
+      },
+      "bd_fechas": {
+        "rec": "2026-01-27T12:00:00.000Z",
+        "ent": "2026-01-27T12:00:00.000Z",
+        "jco": "2026-01-29T12:00:00.000Z",
+        "pag": "2026-02-02T12:00:00.000Z"
+      },
+      "calidad_dato": "HISTORICO_PARCIAL",
+      "alerta_inconsistencia": false,
+      "motivos_alerta": [],
+      "propuestas_correccion": [],
+      "tiempo_total_calendario_dias": 6,
+      "tiempo_real_trabajado_dias": 5,
+      "tramo_presupuesto_habiles": 3,
+      "tramo_secretaria_habiles": 0,
+      "tramo_contabilidad_tesoreria_habiles": 3
+    },
+    {
+      "numFila": 131,
+      "codigo_tramite": "TRM-2026-P-0130",
+      "quipux": "SENAE-CDGU-2026-0173-M",
+      "excel_crudo": {
+        "rec": "SENAE-CDGU-2026-0173-M",
+        "ent": "2026-01-28T00:00:00.000Z",
+        "jco": "2026-01-28T00:00:00.000Z",
+        "pag": "Servicios Básicos"
+      },
+      "bd_fechas": {
+        "rec": "2026-01-27T12:00:00.000Z",
+        "ent": "2026-01-27T12:00:00.000Z",
+        "jco": "2026-01-29T12:00:00.000Z",
+        "pag": "2026-02-01T12:00:00.000Z"
+      },
+      "calidad_dato": "HISTORICO_PARCIAL",
+      "alerta_inconsistencia": false,
+      "motivos_alerta": [],
+      "propuestas_correccion": [],
+      "tiempo_total_calendario_dias": 5,
+      "tiempo_real_trabajado_dias": 4,
+      "tramo_presupuesto_habiles": 3,
+      "tramo_secretaria_habiles": 0,
+      "tramo_contabilidad_tesoreria_habiles": 2
+    },
+    {
+      "numFila": 136,
+      "codigo_tramite": "TRM-2026-P-0135",
+      "quipux": "SENAE-ADFL-2026-0020-M",
+      "excel_crudo": {
+        "rec": "SENAE-ADFL-2026-0020-M",
+        "ent": "2026-01-28T00:00:00.000Z",
+        "jco": "2026-01-28T00:00:00.000Z",
+        "pag": "Servicios Básicos"
+      },
+      "bd_fechas": {
+        "rec": "2026-01-27T12:00:00.000Z",
+        "ent": "2026-01-27T12:00:00.000Z",
+        "jco": "2026-01-29T12:00:00.000Z",
+        "pag": "2026-02-01T12:00:00.000Z"
+      },
+      "calidad_dato": "HISTORICO_PARCIAL",
+      "alerta_inconsistencia": false,
+      "motivos_alerta": [],
+      "propuestas_correccion": [],
+      "tiempo_total_calendario_dias": 5,
+      "tiempo_real_trabajado_dias": 4,
+      "tramo_presupuesto_habiles": 3,
+      "tramo_secretaria_habiles": 0,
+      "tramo_contabilidad_tesoreria_habiles": 2
+    },
+    {
+      "numFila": 232,
+      "codigo_tramite": "TRM-2026-P-0231",
+      "quipux": "SENAE-JCO-2026-0024-M",
+      "excel_crudo": {
+        "rec": "SENAE-CZPT-2026-0378-M\nSENAE-CZPT-2026-0429-M",
+        "ent": "2026-02-09T00:00:00.000Z",
+        "jco": "2026-02-11T00:00:00.000Z",
+        "pag": "Infima Cuantía"
+      },
+      "bd_fechas": {
+        "rec": "2026-02-08T12:00:00.000Z",
+        "ent": "2026-02-08T12:00:00.000Z",
+        "jco": "2026-02-11T12:00:00.000Z",
+        "pag": "2026-02-12T12:00:00.000Z"
+      },
+      "calidad_dato": "HISTORICO_PARCIAL",
+      "alerta_inconsistencia": true,
+      "motivos_alerta": [
+        "Fecha de recepción física registrada en fin de semana"
+      ],
+      "propuestas_correccion": [
+        "Verificar fecha real de radicación física"
+      ],
+      "tiempo_total_calendario_dias": 4,
+      "tiempo_real_trabajado_dias": 4,
+      "tramo_presupuesto_habiles": 3,
+      "tramo_secretaria_habiles": 0,
+      "tramo_contabilidad_tesoreria_habiles": 2
+    },
+    {
+      "numFila": 305,
+      "codigo_tramite": "TRM-2026-P-0304",
+      "quipux": "SENAE-CDCA-2026-0194-M",
+      "excel_crudo": {
+        "rec": "SENAE-CDGU-2026-0288-M",
+        "ent": "2026-02-24T00:00:00.000Z",
+        "jco": "2026-02-24T00:00:00.000Z",
+        "pag": "Servicios Básicos"
+      },
+      "bd_fechas": {
+        "rec": "2026-02-19T12:00:00.000Z",
+        "ent": "2026-02-19T12:00:00.000Z",
+        "jco": "2026-03-03T12:00:00.000Z",
+        "pag": "2026-03-03T12:00:00.000Z"
+      },
+      "calidad_dato": "HISTORICO_PARCIAL",
+      "alerta_inconsistencia": false,
+      "motivos_alerta": [],
+      "propuestas_correccion": [],
+      "tiempo_total_calendario_dias": 12,
+      "tiempo_real_trabajado_dias": 9,
+      "tramo_presupuesto_habiles": 9,
+      "tramo_secretaria_habiles": 0,
+      "tramo_contabilidad_tesoreria_habiles": 0
+    }
+  ],
+  "decimales": [
+    {
+      "numFila": 692,
+      "quipux": "SENAE-JIT-2026-0039-M",
+      "descripcion": "Decimal 16.57 en FECHA RECIBE JCO",
+      "excel_crudo": {
+        "rec": "SENAE-DNH-2026-0579-M",
+        "ent": "2026-04-27T00:00:00.000Z",
+        "jco": "2026-04-28T00:00:00.000Z",
+        "pag": "Obligaciones con el IESS "
+      },
+      "bd_fechas": {
+        "rec": "2026-04-28T12:00:00.000Z",
+        "ent": "2026-04-28T12:00:00.000Z",
+        "jco": null,
+        "pag": "2026-05-31T12:00:00.000Z"
+      },
+      "calidad_dato": "HISTORICO_PARCIAL",
+      "alerta_inconsistencia": false,
+      "motivos_alerta": [],
+      "tiempo_total_calendario_dias": 33,
+      "tramo_presupuesto_habiles": 23,
+      "tramo_contabilidad_tesoreria_habiles": null
+    },
+    {
+      "numFila": 544,
+      "quipux": "SENAE-AIGU-2026-0064-M",
+      "descripcion": "Serial 46112 en FECHA DE PAGO",
+      "excel_crudo": {
+        "rec": "SENAE-DNR-2026-0108-M",
+        "ent": "2026-03-31T00:00:00.000Z",
+        "jco": "2026-03-31T00:00:00.000Z",
+        "pag": "Caja Chica"
+      },
+      "bd_fechas": {
+        "rec": "2026-03-28T12:00:00.000Z",
+        "ent": "2026-03-29T12:00:00.000Z",
+        "jco": "2026-03-30T12:00:00.000Z",
+        "pag": "2026-03-31T12:00:00.000Z"
+      },
+      "calidad_dato": "HISTORICO_PARCIAL",
+      "alerta_inconsistencia": true,
+      "motivos_alerta": [
+        "Fecha de recepción física registrada en fin de semana"
+      ],
+      "tiempo_total_calendario_dias": 3,
+      "tramo_presupuesto_habiles": 1,
+      "tramo_contabilidad_tesoreria_habiles": 2
+    }
+  ],
+  "totalRegularizacionesBD": 25,
+  "regularizacionesPedidos": [
+    {
+      "numFila": 4,
+      "codigo_tramite": "TRM-2026-P-0003",
+      "quipux": "SENAE-DDE-2025-0757-M",
+      "bd_fechas": {
+        "rec": "2025-12-17T12:00:00.000Z",
+        "ent": "2025-12-21T12:00:00.000Z",
+        "jco": "2026-02-24T12:00:00.000Z",
+        "pag": "2026-02-24T12:00:00.000Z"
+      },
+      "tramo_presupuesto_habiles": 44,
+      "tramo_contabilidad_tesoreria_habiles": 0,
+      "tiempo_real_trabajado_dias": 44,
+      "tiempo_total_calendario_dias": 69,
+      "alerta_inconsistencia": false,
+      "motivos_alerta": []
+    },
+    {
+      "numFila": 21,
+      "codigo_tramite": "TRM-2026-P-0020",
+      "quipux": "SENAE-JSPA-2026-0005-M",
+      "bd_fechas": {
+        "rec": "2026-01-05T12:00:00.000Z",
+        "ent": "2026-01-06T12:00:00.000Z",
+        "jco": "2026-02-24T12:00:00.000Z",
+        "pag": "2026-02-22T12:00:00.000Z"
+      },
+      "tramo_presupuesto_habiles": 32,
+      "tramo_contabilidad_tesoreria_habiles": 0,
+      "tiempo_real_trabajado_dias": 32,
+      "tiempo_total_calendario_dias": 48,
+      "alerta_inconsistencia": false,
+      "motivos_alerta": []
+    },
+    {
+      "numFila": 27,
+      "codigo_tramite": "TRM-2026-P-0026",
+      "quipux": "SENAE-ASJT-2026-0002-M",
+      "bd_fechas": {
+        "rec": "2026-01-06T12:00:00.000Z",
+        "ent": "2026-01-11T12:00:00.000Z",
+        "jco": "2026-03-04T12:00:00.000Z",
+        "pag": "2026-03-09T12:00:00.000Z"
+      },
+      "tramo_presupuesto_habiles": 36,
+      "tramo_contabilidad_tesoreria_habiles": 4,
+      "tiempo_real_trabajado_dias": 39,
+      "tiempo_total_calendario_dias": 62,
+      "alerta_inconsistencia": false,
+      "motivos_alerta": []
+    },
+    {
+      "numFila": 48,
+      "codigo_tramite": "TRM-2026-P-0047",
+      "quipux": "SENAE-DNH-2026-0031-M",
+      "bd_fechas": {
+        "rec": "2026-01-13T12:00:00.000Z",
+        "ent": "2026-01-13T12:00:00.000Z",
+        "jco": null,
+        "pag": null
+      },
+      "tramo_presupuesto_habiles": 0,
+      "tramo_contabilidad_tesoreria_habiles": null,
+      "tiempo_real_trabajado_dias": 0,
+      "tiempo_total_calendario_dias": 0,
+      "alerta_inconsistencia": false,
+      "motivos_alerta": []
+    },
+    {
+      "numFila": 113,
+      "codigo_tramite": "TRM-2026-P-0112",
+      "quipux": "SENAE-DNH-2026-0077-M",
+      "bd_fechas": {
+        "rec": "2026-01-25T12:00:00.000Z",
+        "ent": "2026-01-27T12:00:00.000Z",
+        "jco": "2026-02-22T12:00:00.000Z",
+        "pag": "2026-02-23T12:00:00.000Z"
+      },
+      "tramo_presupuesto_habiles": 17,
+      "tramo_contabilidad_tesoreria_habiles": 1,
+      "tiempo_real_trabajado_dias": 18,
+      "tiempo_total_calendario_dias": 29,
+      "alerta_inconsistencia": true,
+      "motivos_alerta": [
+        "Fecha de recepción física registrada en fin de semana"
+      ]
+    },
+    {
+      "numFila": 134,
+      "codigo_tramite": "TRM-2026-P-0133",
+      "quipux": "SENAE-DDH-2026-0066-M",
+      "bd_fechas": {
+        "rec": "2026-01-27T12:00:00.000Z",
+        "ent": "2026-01-27T12:00:00.000Z",
+        "jco": "2026-01-29T12:00:00.000Z",
+        "pag": "2026-02-02T12:00:00.000Z"
+      },
+      "tramo_presupuesto_habiles": 3,
+      "tramo_contabilidad_tesoreria_habiles": 3,
+      "tiempo_real_trabajado_dias": 5,
+      "tiempo_total_calendario_dias": 6,
+      "alerta_inconsistencia": false,
+      "motivos_alerta": []
+    }
+  ],
+  "observados": {
+    "total": 35,
+    "pago": 17,
+    "garantia": 18,
+    "todosPausados": true,
+    "detalles": [
+      {
+        "codigo_tramite": "TRM-2026-P-0300",
+        "quipux": "SENAE-DCVA-2026-0036-M",
+        "padre": "PAGO",
+        "estado_general": "OBSERVADO",
+        "sub_estado": "OBSERVADO",
+        "esta_pausado": true,
+        "motivo_pausa": "Expediente con observaciones en trámite",
+        "dias_pausa": 163,
+        "tiempo_real_trabajado_dias": 0,
+        "tramo_presupuesto_habiles": 0,
+        "alerta_sla": "PENDIENTE"
+      },
+      {
+        "codigo_tramite": "TRM-2026-P-0455",
+        "quipux": "SENAE-DDZN-2026-0120-M",
+        "padre": "PAGO",
+        "estado_general": "OBSERVADO",
+        "sub_estado": "OBSERVADO",
+        "esta_pausado": true,
+        "motivo_pausa": "Expediente con observaciones en trámite",
+        "dias_pausa": 152,
+        "tiempo_real_trabajado_dias": 0,
+        "tramo_presupuesto_habiles": 0,
+        "alerta_sla": "PENDIENTE"
+      },
+      {
+        "codigo_tramite": "TRM-2026-P-0503",
+        "quipux": "SENAE-CDLA-2026-0007-M",
+        "padre": "PAGO",
+        "estado_general": "OBSERVADO",
+        "sub_estado": "OBSERVADO",
+        "esta_pausado": true,
+        "motivo_pausa": "se recibe posesión efectiva",
+        "dias_pausa": 148,
+        "tiempo_real_trabajado_dias": 0,
+        "tramo_presupuesto_habiles": 0,
+        "alerta_sla": "PENDIENTE"
+      },
+      {
+        "codigo_tramite": "TRM-2026-P-0657",
+        "quipux": "SENAE-OTI-2026-0053-M",
+        "padre": "PAGO",
+        "estado_general": "OBSERVADO",
+        "sub_estado": "OBSERVADO",
+        "esta_pausado": true,
+        "motivo_pausa": "Expediente con observaciones en trámite",
+        "dias_pausa": 130,
+        "tiempo_real_trabajado_dias": 0,
+        "tramo_presupuesto_habiles": 0,
+        "alerta_sla": "PENDIENTE"
+      },
+      {
+        "codigo_tramite": "TRM-2026-P-0707",
+        "quipux": "SENAE-CDLO-2026-0753-M",
+        "padre": "PAGO",
+        "estado_general": "OBSERVADO",
+        "sub_estado": "ESPERA_FACTURA",
+        "esta_pausado": true,
+        "motivo_pausa": "Expediente con observaciones en trámite",
+        "dias_pausa": 123,
+        "tiempo_real_trabajado_dias": 0,
+        "tramo_presupuesto_habiles": 0,
+        "alerta_sla": "PENDIENTE"
+      },
+      {
+        "codigo_tramite": "TRM-2026-P-0716",
+        "quipux": "SENAE-DDT-2026-0402-M",
+        "padre": "PAGO",
+        "estado_general": "OBSERVADO",
+        "sub_estado": "OBSERVADO",
+        "esta_pausado": true,
+        "motivo_pausa": "Expediente con observaciones en trámite",
+        "dias_pausa": 138,
+        "tiempo_real_trabajado_dias": 0,
+        "tramo_presupuesto_habiles": 0,
+        "alerta_sla": "PENDIENTE"
+      },
+      {
+        "codigo_tramite": "TRM-2026-P-0857",
+        "quipux": "SENAE-ADFE-2026-0144-M",
+        "padre": "PAGO",
+        "estado_general": "OBSERVADO",
+        "sub_estado": "OBSERVADO",
+        "esta_pausado": true,
+        "motivo_pausa": "Expediente con observaciones en trámite",
+        "dias_pausa": 80,
+        "tiempo_real_trabajado_dias": 0,
+        "tramo_presupuesto_habiles": 0,
+        "alerta_sla": "PENDIENTE"
+      },
+      {
+        "codigo_tramite": "TRM-2026-P-0858",
+        "quipux": "SENAE-ADFE-2026-0145-M",
+        "padre": "PAGO",
+        "estado_general": "OBSERVADO",
+        "sub_estado": "OBSERVADO",
+        "esta_pausado": true,
+        "motivo_pausa": "Expediente con observaciones en trámite",
+        "dias_pausa": 80,
+        "tiempo_real_trabajado_dias": 0,
+        "tramo_presupuesto_habiles": 0,
+        "alerta_sla": "PENDIENTE"
+      },
+      {
+        "codigo_tramite": "TRM-2026-P-1002",
+        "quipux": "SENAE-DT-2026-0559-M",
+        "padre": "PAGO",
+        "estado_general": "OBSERVADO",
+        "sub_estado": "OBSERVADO",
+        "esta_pausado": true,
+        "motivo_pausa": "pendiente de revision de la DFI",
+        "dias_pausa": 89,
+        "tiempo_real_trabajado_dias": 0,
+        "tramo_presupuesto_habiles": 0,
+        "alerta_sla": "PENDIENTE"
+      },
+      {
+        "codigo_tramite": "TRM-2026-P-1003",
+        "quipux": "SENAE-DT-2026-0561-M",
+        "padre": "PAGO",
+        "estado_general": "OBSERVADO",
+        "sub_estado": "OBSERVADO",
+        "esta_pausado": true,
+        "motivo_pausa": "pendiente de revision de la DFI",
+        "dias_pausa": 89,
+        "tiempo_real_trabajado_dias": 0,
+        "tramo_presupuesto_habiles": 0,
+        "alerta_sla": "PENDIENTE"
+      },
+      {
+        "codigo_tramite": "TRM-2026-P-1004",
+        "quipux": "SENAE-DT-2026-0572-M",
+        "padre": "PAGO",
+        "estado_general": "OBSERVADO",
+        "sub_estado": "OBSERVADO",
+        "esta_pausado": true,
+        "motivo_pausa": "pendiente de revision de la DFI",
+        "dias_pausa": 89,
+        "tiempo_real_trabajado_dias": 0,
+        "tramo_presupuesto_habiles": 0,
+        "alerta_sla": "PENDIENTE"
+      },
+      {
+        "codigo_tramite": "TRM-2026-P-1013",
+        "quipux": "SENAE-DT-2026-0570-M",
+        "padre": "PAGO",
+        "estado_general": "OBSERVADO",
+        "sub_estado": "OBSERVADO",
+        "esta_pausado": true,
+        "motivo_pausa": "pendiente de revision de la DFI",
+        "dias_pausa": 89,
+        "tiempo_real_trabajado_dias": 0,
+        "tramo_presupuesto_habiles": 0,
+        "alerta_sla": "PENDIENTE"
+      },
+      {
+        "codigo_tramite": "TRM-2026-P-1014",
+        "quipux": "SENAE-DT-2026-0569-M",
+        "padre": "PAGO",
+        "estado_general": "OBSERVADO",
+        "sub_estado": "OBSERVADO",
+        "esta_pausado": true,
+        "motivo_pausa": "pendiente de revision de la DFI",
+        "dias_pausa": 89,
+        "tiempo_real_trabajado_dias": 0,
+        "tramo_presupuesto_habiles": 0,
+        "alerta_sla": "PENDIENTE"
+      },
+      {
+        "codigo_tramite": "TRM-2026-P-1015",
+        "quipux": "SENAE-DT-2026-0568-M",
+        "padre": "PAGO",
+        "estado_general": "OBSERVADO",
+        "sub_estado": "OBSERVADO",
+        "esta_pausado": true,
+        "motivo_pausa": "pendiente de revision de la DFI",
+        "dias_pausa": 89,
+        "tiempo_real_trabajado_dias": 0,
+        "tramo_presupuesto_habiles": 0,
+        "alerta_sla": "PENDIENTE"
+      },
+      {
+        "codigo_tramite": "TRM-2026-P-1016",
+        "quipux": "SENAE-DT-2026-0566-M",
+        "padre": "PAGO",
+        "estado_general": "OBSERVADO",
+        "sub_estado": "OBSERVADO",
+        "esta_pausado": true,
+        "motivo_pausa": "pendiente de revision de la DFI",
+        "dias_pausa": 89,
+        "tiempo_real_trabajado_dias": 0,
+        "tramo_presupuesto_habiles": 0,
+        "alerta_sla": "PENDIENTE"
+      },
+      {
+        "codigo_tramite": "TRM-2026-P-1017",
+        "quipux": "SENAE-DT-2026-0563-M",
+        "padre": "PAGO",
+        "estado_general": "OBSERVADO",
+        "sub_estado": "OBSERVADO",
+        "esta_pausado": true,
+        "motivo_pausa": "pendiente de revision de la DFI",
+        "dias_pausa": 89,
+        "tiempo_real_trabajado_dias": 0,
+        "tramo_presupuesto_habiles": 0,
+        "alerta_sla": "PENDIENTE"
+      },
+      {
+        "codigo_tramite": "TRM-2026-P-1041",
+        "quipux": "SENAE-ADFE-2026-0202-M",
+        "padre": "PAGO",
+        "estado_general": "OBSERVADO",
+        "sub_estado": "OBSERVADO",
+        "esta_pausado": true,
+        "motivo_pausa": "Expediente con observaciones en trámite",
+        "dias_pausa": 87,
+        "tiempo_real_trabajado_dias": 0,
+        "tramo_presupuesto_habiles": 0,
+        "alerta_sla": "PENDIENTE"
+      },
+      {
+        "codigo_tramite": "TRM-2026-G-0008",
+        "quipux": "SENAE-DJJG-2026-0012-M",
+        "padre": "GARANTIA",
+        "estado_general": "OBSERVADO",
+        "sub_estado": "OBSERVADO",
+        "esta_pausado": true,
+        "motivo_pausa": "Garantía con observaciones en trámite",
+        "dias_pausa": 199,
+        "tiempo_real_trabajado_dias": 0,
+        "tramo_presupuesto_habiles": 0,
+        "alerta_sla": "PENDIENTE"
+      },
+      {
+        "codigo_tramite": "TRM-2026-G-0023",
+        "quipux": "SENAE-DDC-2026-0088-E",
+        "padre": "GARANTIA",
+        "estado_general": "OBSERVADO",
+        "sub_estado": "OBSERVADO",
+        "esta_pausado": true,
+        "motivo_pausa": "Solicitud de Acto de ejecución SENAE-DFI-2026-0569-M",
+        "dias_pausa": 190,
+        "tiempo_real_trabajado_dias": 0,
+        "tramo_presupuesto_habiles": 0,
+        "alerta_sla": "PENDIENTE"
+      },
+      {
+        "codigo_tramite": "TRM-2026-G-0043",
+        "quipux": "SENAE-DJJG-2026-0574-M",
+        "padre": "GARANTIA",
+        "estado_general": "OBSERVADO",
+        "sub_estado": "OBSERVADO",
+        "esta_pausado": true,
+        "motivo_pausa": "Se solicita certificado bancario al OCE con SENAE-JPR-2026-790-TEMP.\nSe solicita devolución de caución con SENAE-JPR-2026-707-TEMP\n Se solicita acto de ejecución con SENAE-DFI-2026-0741-M",
+        "dias_pausa": 183,
+        "tiempo_real_trabajado_dias": 0,
+        "tramo_presupuesto_habiles": 0,
+        "alerta_sla": "PENDIENTE"
+      },
+      {
+        "codigo_tramite": "TRM-2026-G-0211",
+        "quipux": "SENAE-DJJG-2026-0274-M",
+        "padre": "GARANTIA",
+        "estado_general": "OBSERVADO",
+        "sub_estado": "OBSERVADO",
+        "esta_pausado": true,
+        "motivo_pausa": "se elabora aclaración a juridico   SENAE-DFI-2026-0373-M",
+        "dias_pausa": 150,
+        "tiempo_real_trabajado_dias": 0,
+        "tramo_presupuesto_habiles": 0,
+        "alerta_sla": "PENDIENTE"
+      },
+      {
+        "codigo_tramite": "TRM-2026-G-0215",
+        "quipux": "SENAE-JGAG-2026-0151-M",
+        "padre": "GARANTIA",
+        "estado_general": "OBSERVADO",
+        "sub_estado": "OBSERVADO",
+        "esta_pausado": true,
+        "motivo_pausa": "SE PROCEDE A DEJAR SIN EFECTO EL MEMORANDO SENAE-JGAG-2026-0151-M CON EL MEMORANDO SENAE-JGAG-2026-0165-M YA QUE LA DEVOLUCION DE LA GARANTIA FUE ATENDIDA CON EL MEMORANDO SENAE-JGAG-2026-0096-M",
+        "dias_pausa": 148,
+        "tiempo_real_trabajado_dias": 0,
+        "tramo_presupuesto_habiles": 0,
+        "alerta_sla": "PENDIENTE"
+      },
+      {
+        "codigo_tramite": "TRM-2026-G-0305",
+        "quipux": "SENAE-DSG-2026-6042-E",
+        "padre": "GARANTIA",
+        "estado_general": "OBSERVADO",
+        "sub_estado": "OBSERVADO",
+        "esta_pausado": true,
+        "motivo_pausa": "Se solicita Memorando de ejecución",
+        "dias_pausa": 142,
+        "tiempo_real_trabajado_dias": 0,
+        "tramo_presupuesto_habiles": 0,
+        "alerta_sla": "PENDIENTE"
+      },
+      {
+        "codigo_tramite": "TRM-2026-G-0307",
+        "quipux": "SENAE-SZCA-2026-1517-E",
+        "padre": "GARANTIA",
+        "estado_general": "OBSERVADO",
+        "sub_estado": "OBSERVADO",
+        "esta_pausado": true,
+        "motivo_pausa": "Solicitud de memorando de ejecución SENAE-DFI-2026-0333-M",
+        "dias_pausa": 141,
+        "tiempo_real_trabajado_dias": 0,
+        "tramo_presupuesto_habiles": 0,
+        "alerta_sla": "PENDIENTE"
+      },
+      {
+        "codigo_tramite": "TRM-2026-G-0339",
+        "quipux": "SENAE-DPP-2026-0228-M",
+        "padre": "GARANTIA",
+        "estado_general": "OBSERVADO",
+        "sub_estado": "OBSERVADO",
+        "esta_pausado": true,
+        "motivo_pausa": "Garantía con observaciones en trámite",
+        "dias_pausa": 128,
+        "tiempo_real_trabajado_dias": 0,
+        "tramo_presupuesto_habiles": 0,
+        "alerta_sla": "PENDIENTE"
+      },
+      {
+        "codigo_tramite": "TRM-2026-G-0340",
+        "quipux": "SENAE-DDC-2026-0692-E",
+        "padre": "GARANTIA",
+        "estado_general": "OBSERVADO",
+        "sub_estado": "OBSERVADO",
+        "esta_pausado": true,
+        "motivo_pausa": "Solicitud de Acto de ejecución\nSENAE-DFI-2026-0415-M",
+        "dias_pausa": 136,
+        "tiempo_real_trabajado_dias": 0,
+        "tramo_presupuesto_habiles": 0,
+        "alerta_sla": "PENDIENTE"
+      },
+      {
+        "codigo_tramite": "TRM-2026-G-0348",
+        "quipux": "SENAE-DDC-2026-0756-E",
+        "padre": "GARANTIA",
+        "estado_general": "OBSERVADO",
+        "sub_estado": "OBSERVADO",
+        "esta_pausado": true,
+        "motivo_pausa": "Se solicito Memorando de Ejecución mediante SENAE-DFI-2026-0376-E",
+        "dias_pausa": 128,
+        "tiempo_real_trabajado_dias": 0,
+        "tramo_presupuesto_habiles": 0,
+        "alerta_sla": "PENDIENTE"
+      },
+      {
+        "codigo_tramite": "TRM-2026-G-0396",
+        "quipux": "SENAE-DSG-2026-9494-E",
+        "padre": "GARANTIA",
+        "estado_general": "OBSERVADO",
+        "sub_estado": "OBSERVADO",
+        "esta_pausado": true,
+        "motivo_pausa": "Falta papeleta / Correo del 11-06-2026/SENAE-JPR-2026-690-TEMP",
+        "dias_pausa": 100,
+        "tiempo_real_trabajado_dias": 0,
+        "tramo_presupuesto_habiles": 0,
+        "alerta_sla": "PENDIENTE"
+      },
+      {
+        "codigo_tramite": "TRM-2026-G-0453",
+        "quipux": "SENAE-DDC-2026-1006-M",
+        "padre": "GARANTIA",
+        "estado_general": "OBSERVADO",
+        "sub_estado": "OBSERVADO",
+        "esta_pausado": true,
+        "motivo_pausa": "Se solicita memorando de ejecución SENAE-DFI-2026-0699-M",
+        "dias_pausa": 98,
+        "tiempo_real_trabajado_dias": 0,
+        "tramo_presupuesto_habiles": 0,
+        "alerta_sla": "PENDIENTE"
+      },
+      {
+        "codigo_tramite": "TRM-2026-G-0480",
+        "quipux": "SENAE-DPP-2026-0333-M",
+        "padre": "GARANTIA",
+        "estado_general": "OBSERVADO",
+        "sub_estado": "OBSERVADO",
+        "esta_pausado": true,
+        "motivo_pausa": "Se solicita aclaración de acto de ejecución SENAE-DFI-2026-0651-M",
+        "dias_pausa": 100,
+        "tiempo_real_trabajado_dias": 0,
+        "tramo_presupuesto_habiles": 0,
+        "alerta_sla": "PENDIENTE"
+      },
+      {
+        "codigo_tramite": "TRM-2026-G-0491",
+        "quipux": "SENAE-DDC-2026-1121-E",
+        "padre": "GARANTIA",
+        "estado_general": "OBSERVADO",
+        "sub_estado": "OBSERVADO",
+        "esta_pausado": true,
+        "motivo_pausa": "Se solicita Acto de ejecución con SENAE-DFI-2026-0738-M",
+        "dias_pausa": 95,
+        "tiempo_real_trabajado_dias": 0,
+        "tramo_presupuesto_habiles": 0,
+        "alerta_sla": "PENDIENTE"
+      },
+      {
+        "codigo_tramite": "TRM-2026-G-0498",
+        "quipux": "SENAE-DSG-2026-10467-E",
+        "padre": "GARANTIA",
+        "estado_general": "OBSERVADO",
+        "sub_estado": "OBSERVADO",
+        "esta_pausado": true,
+        "motivo_pausa": "se solicita memorando de ejecución\nSENAE-DFI-2026-0649-M",
+        "dias_pausa": 92,
+        "tiempo_real_trabajado_dias": 0,
+        "tramo_presupuesto_habiles": 0,
+        "alerta_sla": "PENDIENTE"
+      },
+      {
+        "codigo_tramite": "TRM-2026-G-0506",
+        "quipux": "SENAE-DPP-2026-0369-M",
+        "padre": "GARANTIA",
+        "estado_general": "OBSERVADO",
+        "sub_estado": "OBSERVADO",
+        "esta_pausado": true,
+        "motivo_pausa": "Se envio correo electrónico de fecha 18-08-2026, para que la Dirección Administrativa Financiera indique el número de la liquidación a la que será abonada la caución, considerando se dispone lo siguiente \" 8.2 En cuanto a la caución se dispone sea abonada a la obligación determiada conforme el artículo 324 del COGEP...\"",
+        "dias_pausa": 88,
+        "tiempo_real_trabajado_dias": 0,
+        "tramo_presupuesto_habiles": 0,
+        "alerta_sla": "PENDIENTE"
+      },
+      {
+        "codigo_tramite": "TRM-2026-G-0520",
+        "quipux": "SENAE-DDQ-2026-0701-M",
+        "padre": "GARANTIA",
+        "estado_general": "OBSERVADO",
+        "sub_estado": "OBSERVADO",
+        "esta_pausado": true,
+        "motivo_pausa": "Se envio correo electrónico de fecha 17-08-2026, realice un alcance considerando se dispone lo siguiente \" Que, la Dirección Financiera Aduanera proceda a : Dejar sin efecto la liquidación Nro. 34628572 del 08 de marzo del 2017\", no obstante la Dirección Financiera Aduanera no tiene el ámbito de sus competencias la anulación de liquidaciones de este concepto y perteneciente a otro Distrito.",
+        "dias_pausa": 85,
+        "tiempo_real_trabajado_dias": 0,
+        "tramo_presupuesto_habiles": 0,
+        "alerta_sla": "PENDIENTE"
+      },
+      {
+        "codigo_tramite": "TRM-2026-G-0536",
+        "quipux": "SENAE-DSG-2026-11384-E",
+        "padre": "GARANTIA",
+        "estado_general": "OBSERVADO",
+        "sub_estado": "OBSERVADO",
+        "esta_pausado": true,
+        "motivo_pausa": "Se generó documento de respuesta No. SENAE-JPR-2026-599-TEMP",
+        "dias_pausa": 80,
+        "tiempo_real_trabajado_dias": 0,
+        "tramo_presupuesto_habiles": 0,
+        "alerta_sla": "PENDIENTE"
+      }
+    ]
+  }
+}

@@ -41,9 +41,9 @@ export interface AnalistaInfo {
 
 export function parseTokensAnalistas(texto: string): string[] {
   if (!texto) return [];
-  return texto
+  return String(texto)
     .split(/[,/;\-]+/)
-    .map((s) => s.trim().toUpperCase())
+    .map((s) => s.trim().replace(/[^A-Za-z0-9]/g, "").toUpperCase())
     .filter((s) => s.length > 0);
 }
 
@@ -105,22 +105,64 @@ export function normalizarCiudad(ciudadRaw: any): string {
 }
 
 /**
- * Parsea fechas con estricto formato ecuatoriano (DD/MM/YYYY) e inmunidad ante huso horario.
+ * Ajusta errata común de inicio de año (2025 -> 2026) cuando los trámites corresponden al ejercicio 2026.
  */
-export function parseFechaEcuador(val: any): Date | null {
-  if (!val) return null;
-
-  // Si ya es un objeto Date
-  if (val instanceof Date && !isNaN(val.getTime())) {
-    return new Date(Date.UTC(val.getFullYear(), val.getMonth(), val.getDate(), 12, 0, 0));
+function ajustarErrataAnioNuevo(
+  d: Date | null,
+  fechaReferenciaIngreso?: Date | null,
+  contextoTexto?: string | null
+): Date | null {
+  if (!d) return null;
+  const y = d.getUTCFullYear();
+  const m = d.getUTCMonth(); // 0 = Enero, 1 = Febrero
+  // Si la fecha parseada cae en enero o febrero de 2025 (month <= 1)
+  if (y === 2025 && (m === 0 || m === 1)) {
+    const tieneRef2026 =
+      (fechaReferenciaIngreso && fechaReferenciaIngreso.getUTCFullYear() === 2026) ||
+      (contextoTexto && contextoTexto.includes("-2026-"));
+    if (tieneRef2026) {
+      return new Date(Date.UTC(2026, m, d.getUTCDate(), 12, 0, 0));
+    }
   }
+  return d;
+}
 
-  // Si es un número serial de Excel (ej: 46112 -> 2026-03-31)
+/**
+ * Parsea fechas con estricto formato ecuatoriano (DD/MM/YYYY) e inmunidad ante huso horario.
+ * Incluye blindaje ante seriales corruptos de Excel (< 45292) y corrección automática de errata 2025 -> 2026.
+ */
+export function parseFechaEcuador(
+  val: any,
+  fechaReferenciaIngreso?: Date | null,
+  contextoTexto?: string | null
+): Date | null {
+  if (val === null || val === undefined) return null;
+
+  // Si es un número serial de Excel menor a 45292 (01/01/2024), como 16.57 en fila 692, retornar null
   if (typeof val === "number") {
+    if (val < 45292) return null;
     const ms = Math.round((val - 25569) * 86400000);
     const d = new Date(ms);
     if (!isNaN(d.getTime())) {
-      return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate(), 12, 0, 0));
+      const candidate = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate(), 12, 0, 0));
+      return ajustarErrataAnioNuevo(candidate, fechaReferenciaIngreso, contextoTexto);
+    }
+    return null;
+  }
+
+  // Si ya es un objeto Date
+  if (val instanceof Date && !isNaN(val.getTime())) {
+    const candidate = new Date(Date.UTC(val.getFullYear(), val.getMonth(), val.getDate(), 12, 0, 0));
+    return ajustarErrataAnioNuevo(candidate, fechaReferenciaIngreso, contextoTexto);
+  }
+
+  // Si es objeto celda de ExcelJS con formula o resultado
+  if (typeof val === "object") {
+    if (val.result !== undefined && val.result !== null) {
+      return parseFechaEcuador(val.result, fechaReferenciaIngreso, contextoTexto);
+    }
+    if (val.text) {
+      return parseFechaEcuador(val.text, fechaReferenciaIngreso, contextoTexto);
     }
   }
 
@@ -128,6 +170,22 @@ export function parseFechaEcuador(val: any): Date | null {
   if (typeof val === "string") {
     const trimmed = val.trim();
     if (!trimmed || trimmed === "N/A" || trimmed === "-" || trimmed === ".") return null;
+
+    // Si es un string puramente numérico (ej: "16.57" o serial corrupto menor a 45292)
+    const num = Number(trimmed);
+    if (!isNaN(num) && !trimmed.includes("/") && !trimmed.includes("-") && !trimmed.includes(".")) {
+      if (num < 45292) return null;
+      const ms = Math.round((num - 25569) * 86400000);
+      const d = new Date(ms);
+      if (!isNaN(d.getTime())) {
+        const candidate = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate(), 12, 0, 0));
+        return ajustarErrataAnioNuevo(candidate, fechaReferenciaIngreso, contextoTexto);
+      }
+      return null;
+    }
+    if (!isNaN(num) && trimmed.includes(".") && !trimmed.includes("/") && !trimmed.includes("-")) {
+      if (num < 45292) return null;
+    }
 
     // Patrón estricto DD/MM/YYYY o DD-MM-YYYY
     const match = trimmed.match(/^(\d{1,2})[/.-](\d{1,2})[/.-](\d{2,5})$/);
@@ -142,14 +200,16 @@ export function parseFechaEcuador(val: any): Date | null {
       else if (y === 22026) y = 2026; // Errata '22/5/22026'
 
       if (m >= 0 && m <= 11 && d >= 1 && d <= 31) {
-        return new Date(Date.UTC(y, m, d, 12, 0, 0));
+        const candidate = new Date(Date.UTC(y, m, d, 12, 0, 0));
+        return ajustarErrataAnioNuevo(candidate, fechaReferenciaIngreso, contextoTexto);
       }
     }
 
     // Fallback ISO o formato parseable estándar
     const parsed = new Date(trimmed);
     if (!isNaN(parsed.getTime())) {
-      return new Date(Date.UTC(parsed.getFullYear(), parsed.getMonth(), parsed.getDate(), 12, 0, 0));
+      const candidate = new Date(Date.UTC(parsed.getFullYear(), parsed.getMonth(), parsed.getDate(), 12, 0, 0));
+      return ajustarErrataAnioNuevo(candidate, fechaReferenciaIngreso, contextoTexto);
     }
   }
 
@@ -614,6 +674,7 @@ export class MigracionExcelService {
       const filasPago: Array<{
         filaOriginal: number;
         colNum: string;
+        tipoGestion: string;
         quipuxRaw: string;
         ciudad: string;
         fechaRecepcion: Date;
@@ -642,6 +703,7 @@ export class MigracionExcelService {
       for (let r = 5; r <= wsPago.rowCount; r++) {
         const row = wsPago.getRow(r);
         const colNum = (row.getCell(1).text || "").trim();
+        const tipoRaw = (row.getCell(2).text || "").trim();
         const quipuxRaw = (row.getCell(4).text || "").trim();
         if (!colNum && !quipuxRaw) {
           consecutiveEmpty++;
@@ -650,16 +712,74 @@ export class MigracionExcelService {
         }
         consecutiveEmpty = 0;
 
-        const fechaRecepcion = parseFechaEcuador(row.getCell(5).value) || new Date("2026-01-05T12:00:00.000Z");
+        // Normalización de Columna 2 (TIPO) -> tipo_gestion
+        let tipoGestion = "PAGO";
+        const tipoNorm = tipoRaw.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase();
+        if (tipoNorm.includes("ARCHIV")) {
+          tipoGestion = "ARCHIVO";
+        } else if (tipoNorm.includes("EXPEDIENT")) {
+          tipoGestion = "EXPEDIENTE";
+        } else if (tipoNorm.includes("JUSTIFIC")) {
+          tipoGestion = "JUSTIFICACION";
+        } else {
+          tipoGestion = "PAGO";
+        }
+
+        // Blindaje de lectura en Columna 14 (PERIODO) ante posibles celdas corruptas de ExcelJS
+        let periodoVal: string | null = null;
+        try {
+          const c14 = row.getCell(14);
+          const rawText = c14.text || "";
+          periodoVal = rawText.trim() || String(c14.value ?? "").trim() || null;
+        } catch {
+          try {
+            periodoVal = String(row.getCell(14).value ?? "").trim() || null;
+          } catch {
+            periodoVal = null;
+          }
+        }
+        if (periodoVal === "" || periodoVal === "N/A" || periodoVal === "-" || periodoVal === ".") {
+          periodoVal = null;
+        }
+
+        // Parseo de fechas con corrección automática de errata de año Nuevo (2025 -> 2026)
+        let fechaEntregaAnalista = parseFechaEcuador(row.getCell(6).value, null, quipuxRaw);
+        let fechaRecepcion = parseFechaEcuador(row.getCell(5).value, null, quipuxRaw);
+
+        // Para FECHA RECEPCIÓN en PAGO: si year === 2025 y mes es enero o febrero (m === 0 || m === 1)
+        // y FECHA ENTREGA AL ANALISTA es de enero/febrero 2026 (filas Nº 16 y Nº 232) o quipux contiene -2026-:
+        if (
+          fechaRecepcion &&
+          fechaRecepcion.getUTCFullYear() === 2025 &&
+          (fechaRecepcion.getUTCMonth() === 0 || fechaRecepcion.getUTCMonth() === 1)
+        ) {
+          const entregaEs2026EneFeb =
+            fechaEntregaAnalista &&
+            fechaEntregaAnalista.getUTCFullYear() === 2026 &&
+            (fechaEntregaAnalista.getUTCMonth() === 0 || fechaEntregaAnalista.getUTCMonth() === 1);
+          if (entregaEs2026EneFeb || quipuxRaw.includes("-2026-")) {
+            fechaRecepcion = new Date(Date.UTC(2026, fechaRecepcion.getUTCMonth(), fechaRecepcion.getUTCDate(), 12, 0, 0));
+          }
+        }
+        if (!fechaRecepcion) {
+          fechaRecepcion = new Date("2026-01-05T12:00:00.000Z");
+        }
+
+        fechaEntregaAnalista = parseFechaEcuador(row.getCell(6).value, fechaRecepcion, quipuxRaw);
+        const fechaRecibeJco = parseFechaEcuador(row.getCell(18).value, fechaRecepcion, quipuxRaw);
+        const fechaPago = parseFechaEcuador(row.getCell(20).value, fechaRecepcion, quipuxRaw);
+        const fechaDevolucion = parseFechaEcuador(row.getCell(24).value, fechaRecepcion, quipuxRaw);
+
         filasPago.push({
           filaOriginal: r,
           colNum,
+          tipoGestion,
           quipuxRaw,
           ciudad: normalizarCiudad(row.getCell(3).text),
           fechaRecepcion,
-          fechaEntregaAnalista: parseFechaEcuador(row.getCell(6).value),
-          fechaRecibeJco: parseFechaEcuador(row.getCell(18).value),
-          fechaPago: parseFechaEcuador(row.getCell(20).value),
+          fechaEntregaAnalista,
+          fechaRecibeJco,
+          fechaPago,
           tipoContratacion: (row.getCell(7).text || "").trim(),
           contrato: (row.getCell(8).text || "").trim(),
           certPresup: (row.getCell(9).text || "").trim(),
@@ -667,14 +787,14 @@ export class MigracionExcelService {
           descripcion: (row.getCell(11).text || "").trim(),
           ruc: sanitizarRuc(row.getCell(12).text),
           proveedor: (row.getCell(13).text || "").trim() || "SENAE - GESTIÓN INTERNA / TALENTO HUMANO",
-          periodo: (row.getCell(14).text || "").trim() || null,
+          periodo: periodoVal,
           factura: (row.getCell(15).text || "").trim() || null,
           valor: parseMontoEcuador(row.getCell(16).value),
           curDev: (row.getCell(17).text || "").trim() || null,
           inicialesAnalista: (row.getCell(21).text || "").trim(),
           estadoRaw: (row.getCell(22).text || "DFI").trim(),
           novedades: (row.getCell(23).text || "").trim() || null,
-          fechaDevolucion: parseFechaEcuador(row.getCell(24).value),
+          fechaDevolucion,
           memoDevolucion: (row.getCell(25).text || "").trim() || null,
         });
       }
@@ -718,7 +838,7 @@ export class MigracionExcelService {
               const idTipoTramite = mapearTipoTramitePago(item.tipoContratacion, item.descripcion);
               const esAltaCuantia = item.valor >= 10000;
 
-              // Clasificación exacta en los 7 estados oficiales inmutables
+              // Clasificación exacta en los 7 estados oficiales inmutables según orden jerárquico maestro
               const estLower = item.estadoRaw.toLowerCase();
               let estadoGeneral = "DFI";
               let subEstado = "DERIVADO_A_DFI";
@@ -729,29 +849,17 @@ export class MigracionExcelService {
               let autorizadoPago = false;
               let fechaUltimoMovimiento = item.fechaRecepcion;
 
-              // 1. PAGADO
-              if (item.fechaPago) {
-                estadoGeneral = "PAGADO";
-                subEstado = "PAGO_EFECTIVO";
-                autorizadoPago = true;
-                idAreaActual = 4; // Tesorería
-                idCustodioActual = 8; // Econ. Margarita Alarcón
-                fechaUltimoMovimiento = item.fechaPago;
-              }
-              // 2. ARCHIVO
-              else if (estLower.includes("archiv")) {
+              // 1. ARCHIVO: Si el texto de la columna ESTADO contiene "archiv"
+              if (estLower.includes("archiv")) {
                 estadoGeneral = "ARCHIVO";
                 subEstado = "ARCHIVADO_DEFINITIVO";
                 idAreaActual = 6; // Archivo Central
                 idCustodioActual = 10; // Sr. Manuel Ramos
                 fechaUltimoMovimiento = item.fechaRecepcion;
               }
-              // 3. DEVUELTO
-              else if (
-                estLower.includes("devuel") ||
-                item.fechaDevolucion ||
-                (item.memoDevolucion && item.memoDevolucion.toLowerCase().includes("devuel"))
-              ) {
+              // 2. DEVUELTO: Si el texto contiene "devuel" O si existe fecha válida en FECHA DE DEVOLUCIÓN
+              // (PROHIBIDO usar memoDevolucion para forzar DEVUELTO cuando el estado dice otra cosa)
+              else if (estLower.includes("devuel") || item.fechaDevolucion) {
                 estadoGeneral = "DEVUELTO";
                 subEstado = "DEVUELTO_FORMALMENTE";
                 esDevuelto = true;
@@ -759,10 +867,36 @@ export class MigracionExcelService {
                 idCustodioActual = 2; // Lorena Zambrano
                 fechaUltimoMovimiento = item.fechaDevolucion || item.fechaRecepcion;
               }
-              // 4. CONTABILIDAD (Control Previo / Justificación)
+              // 3. PAGADO: Si existe fecha válida en FECHA DE PAGO y no cayó en Archivo ni Devuelto
+              else if (item.fechaPago) {
+                estadoGeneral = "PAGADO";
+                subEstado = "PAGO_EFECTIVO";
+                autorizadoPago = true;
+                idAreaActual = 4; // Tesorería
+                idCustodioActual = 8; // Econ. Margarita Alarcón
+                fechaUltimoMovimiento = item.fechaPago;
+              }
+              // 4. OBSERVADO: Si el texto contiene "observad" o "factura"
+              else if (estLower.includes("observad") || estLower.includes("factura")) {
+                estadoGeneral = "OBSERVADO";
+                subEstado = estLower.includes("factura") ? "ESPERA_FACTURA" : "OBSERVADO";
+                estaPausado = true;
+                idAreaActual = 2; // Presupuesto
+                idCustodioActual = idAnalista;
+                fechaUltimoMovimiento = item.fechaEntregaAnalista || item.fechaRecepcion;
+              }
+              // 5. REVISION: Si el texto contiene "presupuesto" o "revisi"
+              else if (estLower.includes("presupuesto") || estLower.includes("revisi")) {
+                estadoGeneral = "REVISION";
+                subEstado = estLower.includes("presupuesto") ? "EN_REVISION_PRESUPUESTO" : "EN_REVISION";
+                idAreaActual = 2; // Presupuesto
+                idCustodioActual = idAnalista;
+                fechaUltimoMovimiento = item.fechaEntregaAnalista || item.fechaRecepcion;
+              }
+              // 6. CONTABILIDAD: Si contiene "justificaci", "contabil" O si existe fechaRecibeJco
               else if (
-                estLower.includes("contabil") ||
                 estLower.includes("justificaci") ||
+                estLower.includes("contabil") ||
                 item.fechaRecibeJco
               ) {
                 estadoGeneral = "CONTABILIDAD";
@@ -774,29 +908,19 @@ export class MigracionExcelService {
                 fechaUltimoMovimiento =
                   item.fechaRecibeJco || item.fechaEntregaAnalista || item.fechaRecepcion;
               }
-              // 5. OBSERVADO / ESPERA DE FACTURA
-              else if (estLower.includes("observad") || estLower.includes("factura")) {
-                estadoGeneral = "OBSERVADO";
-                subEstado = estLower.includes("factura") ? "ESPERA_FACTURA" : "OBSERVADO";
-                estaPausado = true;
-                idAreaActual = 2; // Presupuesto
-                idCustodioActual = idAnalista;
-                fechaUltimoMovimiento = item.fechaEntregaAnalista || item.fechaRecepcion;
-              }
-              // 6. EN REVISIÓN EN PRESUPUESTO
-              else if (estLower.includes("presupuesto") || estLower.includes("revisi")) {
-                estadoGeneral = "REVISION";
-                subEstado = "EN_REVISION_PRESUPUESTO";
-                idAreaActual = 2; // Presupuesto
-                idCustodioActual = idAnalista;
-                fechaUltimoMovimiento = item.fechaEntregaAnalista || item.fechaRecepcion;
-              }
-              // 7. EN DFI
+              // 7. DFI: Fallback cuando la columna ESTADO dice "DFI" y no tiene fechaPago ni fechaRecibeJco
               else {
                 estadoGeneral = "DFI";
                 subEstado = "DERIVADO_A_DFI";
                 idAreaActual = 1;
-                idCustodioActual = 1; // Directora Financiera
+                const tieneAnalistaAsignado = infoAnalistas.cadenaAnalistas.length > 0;
+                const esSinEfecto = item.novedades && item.novedades.toLowerCase().includes("sin efecto");
+                if (tieneAnalistaAsignado && !esSinEfecto) {
+                  idCustodioActual = idAnalista;
+                  idAreaActual = infoAnalistas.ultimoAnalista ? infoAnalistas.ultimoAnalista.id_area : 1;
+                } else {
+                  idCustodioActual = 1; // Directora Financiera
+                }
                 fechaUltimoMovimiento =
                   item.fechaRecibeJco || item.fechaEntregaAnalista || item.fechaRecepcion;
               }
@@ -810,10 +934,12 @@ export class MigracionExcelService {
                   fecha_memorando: item.fechaRecepcion,
                   fecha_recepcion_fisica: item.fechaRecepcion,
                   fecha_entrega_control_previo: item.fechaEntregaAnalista,
+                  fecha_aprobacion_presupuesto: item.fechaRecibeJco || null,
+                  id_analista_presupuesto_previo: idAnalista || null,
                   id_tipo_tramite: idTipoTramite,
                   tipo_flujo: "PAGO",
                   padre_gestion: "PAGO",
-                  tipo_gestion: "PAGO",
+                  tipo_gestion: item.tipoGestion,
                   area_requirente: "Dirección Financiera Aduanera",
                   ciudad: item.ciudad,
                   asunto:
@@ -850,6 +976,7 @@ export class MigracionExcelService {
                   motivo_observacion: item.novedades,
                   motivo_devolucion:
                     item.memoDevolucion || (esDevuelto ? item.novedades : null),
+                  anexos: item.inicialesAnalista ? `Analista: ${item.inicialesAnalista}` : null,
                   fecha_ingreso: item.fechaRecepcion,
                   fecha_ultimo_movimiento: fechaUltimoMovimiento,
                   fecha_ultima_modificacion: new Date(),
@@ -1048,7 +1175,21 @@ export class MigracionExcelService {
         }
         consecutiveEmpty = 0;
 
-        const fechaIngreso = parseFechaEcuador(row.getCell(5).value) || new Date("2026-01-05T12:00:00.000Z");
+        let fechaIngreso = parseFechaEcuador(row.getCell(5).value, null, quipuxRaw);
+
+        // Errata de año nuevo en recepción/ingreso si quipux dice 2026
+        if (
+          fechaIngreso &&
+          fechaIngreso.getUTCFullYear() === 2025 &&
+          (fechaIngreso.getUTCMonth() === 0 || fechaIngreso.getUTCMonth() === 1) &&
+          quipuxRaw.includes("-2026-")
+        ) {
+          fechaIngreso = new Date(Date.UTC(2026, fechaIngreso.getUTCMonth(), fechaIngreso.getUTCDate(), 12, 0, 0));
+        }
+        if (!fechaIngreso) {
+          fechaIngreso = new Date("2026-01-05T12:00:00.000Z");
+        }
+
         filasGarantia.push({
           filaOriginal: r,
           colNum,
@@ -1056,19 +1197,19 @@ export class MigracionExcelService {
           ciudad: normalizarCiudad(row.getCell(3).text),
           quipuxRaw,
           fechaIngreso,
-          fechaEntregaAnalista: parseFechaEcuador(row.getCell(6).value),
+          fechaEntregaAnalista: parseFechaEcuador(row.getCell(6).value, fechaIngreso, quipuxRaw),
           descripcion: (row.getCell(7).text || "").trim(),
           nroLiquidacion: (row.getCell(8).text || "").trim() || null,
           beneficiario: (row.getCell(9).text || "").trim() || "BENEFICIARIO DE GARANTÍA",
           valor: parseMontoEcuador(row.getCell(10).value),
           curContable: (row.getCell(11).text || "").trim() || null,
-          fechaRecibeJco: parseFechaEcuador(row.getCell(12).value),
-          fechaRecibeJac: parseFechaEcuador(row.getCell(13).value),
-          fechaSolPago: parseFechaEcuador(row.getCell(14).value),
+          fechaRecibeJco: parseFechaEcuador(row.getCell(12).value, fechaIngreso, quipuxRaw),
+          fechaRecibeJac: parseFechaEcuador(row.getCell(13).value, fechaIngreso, quipuxRaw),
+          fechaSolPago: parseFechaEcuador(row.getCell(14).value, fechaIngreso, quipuxRaw),
           inicialesAnalista: (row.getCell(15).text || "").trim(),
           estadoRaw: (row.getCell(16).text || "DFI").trim(),
           novedades: (row.getCell(17).text || "").trim() || null,
-          fechaDevolucion: parseFechaEcuador(row.getCell(18).value),
+          fechaDevolucion: parseFechaEcuador(row.getCell(18).value, fechaIngreso, quipuxRaw),
           memoDevolucion: (row.getCell(19).text || "").trim() || null,
         });
       }
@@ -1116,7 +1257,7 @@ export class MigracionExcelService {
               const numeroJuicio = extraerNumeroJuicio(item.descripcion);
               const esAltaCuantia = item.valor >= 10000;
 
-              // Clasificación exacta en los 7 estados oficiales inmutables (Garantías)
+              // Clasificación exacta en los 7 estados oficiales inmutables según orden jerárquico maestro (Garantías)
               const estLower = item.estadoRaw.toLowerCase();
               let estadoGeneral = "DFI";
               let subEstado = "DERIVADO_A_DFI";
@@ -1127,29 +1268,16 @@ export class MigracionExcelService {
               let autorizadoPago = false;
               let fechaUltimoMovimiento = item.fechaIngreso;
 
-              // 1. PAGADO / SOLICITUD DE PAGO
-              if (item.fechaSolPago) {
-                estadoGeneral = "PAGADO";
-                subEstado = "PAGO_EFECTIVO";
-                autorizadoPago = true;
-                idAreaActual = 5; // Cobranzas y Garantías
-                idCustodioActual = 9; // Abg. Roberto Intriago
-                fechaUltimoMovimiento = item.fechaSolPago;
-              }
-              // 2. ARCHIVO
-              else if (estLower.includes("archiv")) {
+              // 1. ARCHIVO
+              if (estLower.includes("archiv")) {
                 estadoGeneral = "ARCHIVO";
                 subEstado = "ARCHIVADO_DEFINITIVO";
                 idAreaActual = 6;
                 idCustodioActual = 10;
                 fechaUltimoMovimiento = item.fechaIngreso;
               }
-              // 3. DEVUELTO
-              else if (
-                estLower.includes("devuel") ||
-                item.fechaDevolucion ||
-                (item.memoDevolucion && item.memoDevolucion.toLowerCase().includes("devuel"))
-              ) {
+              // 2. DEVUELTO: Si el texto contiene "devuel" O si existe fecha válida en FECHA DE DEVOLUCIÓN
+              else if (estLower.includes("devuel") || item.fechaDevolucion) {
                 estadoGeneral = "DEVUELTO";
                 subEstado = "DEVUELTO_FORMALMENTE";
                 esDevuelto = true;
@@ -1157,42 +1285,64 @@ export class MigracionExcelService {
                 idCustodioActual = 2;
                 fechaUltimoMovimiento = item.fechaDevolucion || item.fechaIngreso;
               }
-              // 4. CONTABILIDAD (Pase a JCO o estado Contabilidad)
-              else if (estLower.includes("contabil") || item.fechaRecibeJco) {
-                estadoGeneral = "CONTABILIDAD";
-                subEstado = "EN_CONTABILIDAD";
-                idAreaActual = 3;
-                idCustodioActual = 6;
-                fechaUltimoMovimiento =
-                  item.fechaRecibeJco || item.fechaEntregaAnalista || item.fechaIngreso;
+              // 3. PAGADO: Si existe fechaSolPago y no cayó en Archivo ni Devuelto
+              else if (item.fechaSolPago) {
+                estadoGeneral = "PAGADO";
+                subEstado = "PAGO_EFECTIVO";
+                autorizadoPago = true;
+                idAreaActual = 5; // Cobranzas y Garantías
+                idCustodioActual = 9; // Abg. Roberto Intriago
+                fechaUltimoMovimiento = item.fechaSolPago;
               }
-              // 5. OBSERVADO
-              else if (estLower.includes("observad")) {
+              // 4. OBSERVADO: Si contiene "observad" o "factura"
+              else if (estLower.includes("observad") || estLower.includes("factura")) {
                 estadoGeneral = "OBSERVADO";
-                subEstado = "OBSERVADO";
+                subEstado = estLower.includes("factura") ? "ESPERA_FACTURA" : "OBSERVADO";
                 estaPausado = true;
                 idAreaActual = 5;
                 idCustodioActual = idAnalista;
                 fechaUltimoMovimiento = item.fechaEntregaAnalista || item.fechaIngreso;
               }
-              // 6. EN REVISIÓN / PRESUPUESTO
+              // 5. REVISION: Si contiene "revisión", "revision" o "presupuesto"
               else if (
                 estLower.includes("revisión") ||
                 estLower.includes("revision") ||
                 estLower.includes("presupuesto")
               ) {
                 estadoGeneral = "REVISION";
-                subEstado = "EN_REVISION_PRESUPUESTO";
+                subEstado = estLower.includes("presupuesto") ? "EN_REVISION_PRESUPUESTO" : "EN_REVISION";
                 idAreaActual = 2;
                 idCustodioActual = idAnalista;
                 fechaUltimoMovimiento = item.fechaEntregaAnalista || item.fechaIngreso;
               }
-              // 7. EN DFI
+              // 6. CONTABILIDAD: Si contiene "justificaci", "contabil" O si existe fechaRecibeJco
+              else if (
+                estLower.includes("justificaci") ||
+                estLower.includes("contabil") ||
+                item.fechaRecibeJco
+              ) {
+                estadoGeneral = "CONTABILIDAD";
+                subEstado = estLower.includes("justificaci")
+                  ? "JUSTIFICACION_CONTABILIDAD"
+                  : "EN_CONTABILIDAD";
+                idAreaActual = 3;
+                idCustodioActual = 6;
+                fechaUltimoMovimiento =
+                  item.fechaRecibeJco || item.fechaEntregaAnalista || item.fechaIngreso;
+              }
+              // 7. DFI: Fallback cuando la columna ESTADO dice "DFI"
               else {
                 estadoGeneral = "DFI";
                 subEstado = "DERIVADO_A_DFI";
                 idAreaActual = 1;
-                idCustodioActual = 1;
+                const tieneAnalistaAsignado = infoAnalistas.cadenaAnalistas.length > 0;
+                const esSinEfecto = item.novedades && item.novedades.toLowerCase().includes("sin efecto");
+                if (tieneAnalistaAsignado && !esSinEfecto) {
+                  idCustodioActual = idAnalista;
+                  idAreaActual = infoAnalistas.ultimoAnalista ? infoAnalistas.ultimoAnalista.id_area : 5;
+                } else {
+                  idCustodioActual = 1;
+                }
                 fechaUltimoMovimiento =
                   item.fechaRecibeJco || item.fechaEntregaAnalista || item.fechaIngreso;
               }
@@ -1206,6 +1356,8 @@ export class MigracionExcelService {
                   fecha_memorando: item.fechaIngreso,
                   fecha_recepcion_fisica: item.fechaIngreso,
                   fecha_entrega_control_previo: item.fechaEntregaAnalista,
+                  fecha_aprobacion_presupuesto: item.fechaRecibeJco || null,
+                  id_analista_presupuesto_previo: idAnalista || null,
                   id_tipo_tramite: idTipoTramite,
                   tipo_flujo: "GARANTIA",
                   padre_gestion: "GARANTIA",
@@ -1240,6 +1392,7 @@ export class MigracionExcelService {
                   motivo_observacion: item.novedades,
                   motivo_devolucion:
                     item.memoDevolucion || (esDevuelto ? item.novedades : null),
+                  anexos: item.inicialesAnalista ? `Analista: ${item.inicialesAnalista}` : null,
                   fecha_ingreso: item.fechaIngreso,
                   fecha_ultimo_movimiento: fechaUltimoMovimiento,
                   fecha_ultima_modificacion: new Date(),

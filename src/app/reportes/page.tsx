@@ -309,20 +309,69 @@ export default function ReportesPage() {
     }));
   }, [procesosRaw]);
 
-  // Exportar Excel a través de /api/reportes/exportar
+  // Exportar Excel a través de /api/reportes/exportar con filtros activos y padre_gestion
   const handleExportarExcel = (modulo: "tramites" | "funcionarios" | "procesos" | "consolidado") => {
     let modulosParam = "custodia,tiempos,desempeno,carga,indicadores";
-    if (modulo === "tramites") modulosParam = "custodia";
-    else if (modulo === "funcionarios") modulosParam = "desempeno,carga";
-    else if (modulo === "procesos") modulosParam = "tiempos,indicadores";
+    let tipoLibroParam = "TRAMITES";
+    if (modulo === "tramites") {
+      modulosParam = "custodia";
+      tipoLibroParam = "TRAMITES";
+    } else if (modulo === "funcionarios") {
+      modulosParam = "desempeno,carga";
+      tipoLibroParam = "FUNCIONARIOS";
+    } else if (modulo === "procesos") {
+      modulosParam = "tiempos,indicadores";
+      tipoLibroParam = "PROCESOS";
+    }
 
-    const params = new URLSearchParams({
-      fecha_desde: fechaDesde,
-      fecha_hasta: fechaHasta,
-      modulos: modulosParam,
-      id_area: area,
-      id_usuario: funcionario,
-    });
+    const params = new URLSearchParams();
+    params.set("tipo_libro", tipoLibroParam);
+    params.set("modulos", modulosParam);
+
+    // 1. Padre de gestión ("TODOS" | "PAGO" | "GARANTIA")
+    params.set("padre_gestion", padreGestion || "TODOS");
+
+    // 2. Filtros temporales y criterio de fecha
+    if (fechaDesde) params.set("fecha_desde", fechaDesde);
+    if (fechaHasta) params.set("fecha_hasta", fechaHasta);
+    if (criterioFecha) params.set("criterio_fecha", criterioFecha);
+
+    // 3. Área (solo si no es TODAS ni TODOS)
+    if (area && area !== "TODAS" && area !== "TODOS") {
+      params.set("id_area", area);
+    }
+
+    // 4. Funcionario (solo si no es TODOS)
+    if (funcionario && funcionario !== "TODOS") {
+      params.set("id_usuario", funcionario);
+      params.set("id_funcionario", funcionario);
+    }
+
+    // 5. Proceso canónico / tipo de trámite (solo si no es TODOS)
+    if (procesoCanonico && procesoCanonico !== "TODOS") {
+      params.set("proceso", procesoCanonico);
+      params.set("id_tipo_tramite", procesoCanonico);
+    }
+
+    // 6. Estado oficial (solo si no es TODOS)
+    if (estadoOficial && estadoOficial !== "TODOS") {
+      params.set("estado_general", estadoOficial);
+    }
+
+    // 7. Calidad del dato (solo si no es TODOS)
+    if (calidadDato && calidadDato !== "TODOS") {
+      params.set("calidad_dato", calidadDato);
+    }
+
+    // 8. Filtro rápido de estado (solo si no es TODOS)
+    if (filtroEstadoRapido && filtroEstadoRapido !== "TODOS") {
+      params.set("estado_filtro", filtroEstadoRapido);
+    }
+
+    // 9. Búsqueda libre
+    if (busqueda && busqueda.trim()) {
+      params.set("busqueda", busqueda.trim());
+    }
 
     window.open(`/api/reportes/exportar?${params.toString()}`, "_blank");
   };

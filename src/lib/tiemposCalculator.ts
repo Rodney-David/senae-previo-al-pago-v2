@@ -127,6 +127,7 @@ export interface ResultadoTiemposTramite {
   // Indicadores clave requeridos
   tiempo_total_calendario_dias: number;
   tiempo_real_trabajado_dias: number;
+  tramo_presupuesto_habiles?: number | null;
 
   // Desglose explicativo
   dias_pausa: number;
@@ -323,6 +324,12 @@ export function evaluarCalidadDato(
     propuestas.push("Revisar posible cruce de expedientes o comprobante de pago");
   }
 
+  // 5. Fecha de recepción física en fin de semana
+  if (rec && esFinDeSemana(rec)) {
+    motivos.push("Fecha de recepción física registrada en fin de semana");
+    propuestas.push("Verificar fecha real de radicación física");
+  }
+
   // 7. Determinar si es COMPLETO o HISTORICO_PARCIAL
   // Es HISTORICO_PARCIAL si su código es TRM-2026-* o si sus movimientos provienen exclusivamente de la migración
   const esMigrado =
@@ -471,6 +478,79 @@ export function calcularParticionTiempo(
 }
 
 /**
+ * Calcula los días hábiles del tramo de Presupuesto (Desempeño del Funcionario de Presupuesto).
+ * - Inicio: fecha_entrega_control_previo (o fecha_recepcion_fisica si falta entrega).
+ * - Fin: fecha_recibe_jco (fecha_aprobacion_presupuesto o movimiento PASE_A_CONTABILIDAD).
+ * - Regla anti-distorsión por regularización posterior: si fecha_pago < fecha_recibe_jco, el fin es fecha_pago.
+ * - Si sigue en REVISION (sin fecha_recibe_jco ni fecha_pago), días hábiles transcurridos hasta hoy.
+ * - Si está en OBSERVADO (esta_pausado = true), congelar en días hábiles previos a observación (o 0 si no hay fecha separada).
+ */
+export function calcularTramoPresupuestoHabiles(
+  tramite: TramiteCalculoInput,
+  feriadosSet: Set<string>,
+  fechaReferenciaHoy: Date = new Date()
+): number | null {
+  const ent = parseDate(tramite.fecha_entrega_control_previo);
+  const rec = parseDate(tramite.fecha_recepcion_fisica) || parseDate(tramite.fecha_ingreso);
+  const inicioPresupuesto = ent || rec;
+
+  if (!inicioPresupuesto) return null;
+
+  let jco = parseDate(tramite.fecha_aprobacion_presupuesto);
+  if (!jco && tramite.historial_movimientos) {
+    const movPase = tramite.historial_movimientos.find(m => m.tipo_accion === "PASE_A_CONTABILIDAD");
+    if (movPase) jco = parseDate(movPase.fecha_hora);
+  }
+
+  const pag = parseDate(tramite.fecha_pago) || parseDate(tramite.fecha_autorizacion_pago);
+  const estUpper = (tramite.estado_general || "").toUpperCase();
+  const estaPausado = tramite.esta_pausado === true || estUpper === "OBSERVADO";
+
+  // Si el trámite está en OBSERVADO (esta_pausado = true), congelar el conteo
+  if (estaPausado) {
+    let fechaObservacion: Date | null = null;
+    if (tramite.historial_movimientos) {
+      const movObs = tramite.historial_movimientos.find(
+        m => m.tipo_accion.includes("OBSERV") || m.tipo_accion.includes("PAUSA")
+      );
+      if (movObs && movObs.fecha_hora) {
+        fechaObservacion = parseDate(movObs.fecha_hora);
+      }
+    }
+    if (fechaObservacion && fechaObservacion.getTime() >= inicioPresupuesto.getTime()) {
+      return calcularDiasHabilesBrutos(inicioPresupuesto, fechaObservacion, feriadosSet);
+    }
+    // Si no hay fecha de observación separada en el Excel histórico: congelar en 0
+    return 0;
+  }
+
+  // Regla anti-distorsión por regularización posterior:
+  // Si un trámite tiene fecha_pago y fecha_recibe_jco, pero fecha_pago < fecha_recibe_jco,
+  // el fin del tramo de Presupuesto para efectos de SLA es fecha_pago
+  let finPresupuesto: Date | null = null;
+  if (pag && jco && pag.getTime() < jco.getTime()) {
+    finPresupuesto = pag;
+  } else if (jco) {
+    finPresupuesto = jco;
+  } else if (pag) {
+    finPresupuesto = pag;
+  } else if (estUpper === "REVISION" || !["PAGADO", "ARCHIVO", "DEVUELTO", "INSUBSISTENTE", "ANULADO"].includes(estUpper)) {
+    // Si el trámite sigue en REVISION (sin fecha_recibe_jco ni fecha_pago), calcular hasta hoy
+    finPresupuesto = fechaReferenciaHoy;
+  } else if (tramite.fecha_ultimo_movimiento) {
+    finPresupuesto = parseDate(tramite.fecha_ultimo_movimiento);
+  }
+
+  if (!finPresupuesto) return null;
+
+  if (finPresupuesto.getTime() < inicioPresupuesto.getTime()) {
+    return 0;
+  }
+
+  return calcularDiasHabilesBrutos(inicioPresupuesto, finPresupuesto, feriadosSet);
+}
+
+/**
  * Función principal que calcula ambos relojes, genera segmentos y verifica la invariante.
  */
 export function calcularTiemposTramite(
@@ -499,28 +579,56 @@ export function calcularTiemposTramite(
   const estadosFinales = ["PAGADO", "ARCHIVO", "DEVUELTO", "INSUBSISTENTE", "ANULADO"];
   const enCurso = !estadosFinales.includes(tramite.estado_general.toUpperCase());
 
-  // 2. Si es HISTORICO_PARCIAL: calcular únicamente los 3 tramos hábiles brutos
+  // 2. Si es HISTORICO_PARCIAL: calcular métricas oficiales de migración
   if (evaluacion.calidad === "HISTORICO_PARCIAL") {
     let tramoSec: number | null = null;
     let tramoPres: number | null = null;
     let tramoContTes: number | null = null;
-    let totalHabiles: number | null = null;
-    let totalCal: number | null = null;
 
     if (rec && ent && ent.getTime() >= rec.getTime()) {
       tramoSec = calcularDiasHabilesBrutos(rec, ent, feriadosSet);
-    }
-    if (ent && jco && jco.getTime() >= ent.getTime()) {
-      tramoPres = calcularDiasHabilesBrutos(ent, jco, feriadosSet);
-    }
-    if (jco && pag && pag.getTime() >= jco.getTime()) {
-      tramoContTes = calcularDiasHabilesBrutos(jco, pag, feriadosSet);
+    } else if (rec && !ent && enCurso) {
+      tramoSec = calcularDiasHabilesBrutos(rec, fechaReferenciaHoy, feriadosSet);
     }
 
-    if (rec && pag && pag.getTime() >= rec.getTime()) {
-      totalHabiles = calcularDiasHabilesBrutos(rec, pag, feriadosSet);
-      totalCal = Number(((pag.getTime() - rec.getTime()) / (24 * 60 * 60 * 1000)).toFixed(1));
+    tramoPres = calcularTramoPresupuestoHabiles(tramite, feriadosSet, fechaReferenciaHoy);
+
+    if (jco && pag) {
+      if (pag.getTime() >= jco.getTime()) {
+        tramoContTes = calcularDiasHabilesBrutos(jco, pag, feriadosSet);
+      } else {
+        // Regularización posterior: el pago se ejecutó antes del registro JCO
+        tramoContTes = 0;
+      }
+    } else if (jco && enCurso) {
+      tramoContTes = calcularDiasHabilesBrutos(jco, fechaReferenciaHoy, feriadosSet);
     }
+
+    // Fecha de cierre para tiempo total calendario
+    let fechaFinHist: Date;
+    if (pag) {
+      fechaFinHist = pag;
+    } else if (enCurso) {
+      fechaFinHist = fechaReferenciaHoy;
+    } else {
+      let fechaCierre: Date | null = parseDate(tramite.fecha_ultimo_movimiento);
+      if (!fechaCierre && tramite.historial_movimientos && tramite.historial_movimientos.length > 0) {
+        const fechasValidas = tramite.historial_movimientos
+          .map(m => parseDate(m.fecha_hora))
+          .filter((d): d is Date => d !== null)
+          .sort((a, b) => b.getTime() - a.getTime());
+        if (fechasValidas.length > 0) fechaCierre = fechasValidas[0];
+      }
+      fechaFinHist = fechaCierre || fechaReferenciaHoy;
+    }
+
+    const totalCalCalculado = rec && fechaFinHist.getTime() >= rec.getTime()
+      ? Number(((fechaFinHist.getTime() - rec.getTime()) / (24 * 60 * 60 * 1000)).toFixed(1))
+      : 0;
+
+    const totalHabilesCalculado = rec && fechaFinHist.getTime() >= rec.getTime()
+      ? calcularDiasHabilesBrutos(rec, fechaFinHist, feriadosSet)
+      : 0;
 
     let estadoCierre: "PAGADO" | "SIN_FECHA_PAGO" | "EN_CURSO" | "ARCHIVADO_SIN_PAGO" = "PAGADO";
     if (!pag) {
@@ -537,21 +645,62 @@ export function calcularTiemposTramite(
       tramo_secretaria_habiles: tramoSec,
       tramo_presupuesto_habiles: tramoPres,
       tramo_contabilidad_tesoreria_habiles: tramoContTes,
-      total_habiles_brutos: totalHabiles,
-      total_calendario_dias: totalCal,
+      total_habiles_brutos: totalHabilesCalculado,
+      total_calendario_dias: totalCalCalculado,
       estado_cierre: estadoCierre,
       nota_metodologica:
         "Días hábiles brutos (excluye fines de semana y feriados). Incluye esperas no registradas. Reloj B no aplica.",
     };
 
+    // SLA y Tiempo Real Trabajado:
+    // Desde fecha_entrega_control_previo hasta fecha_autorizacion_pago (o fecha_pago)
+    // No sumar tramo_secretaria_habiles dentro de tiempo_real_trabajado_dias
+    let tiempoRealTrabajadoHist = 0;
+    let diasEsperaPagoHist = 0;
+    let diasPausaHist = 0;
+
+    const esExento =
+      tramite.estado_general.toUpperCase() === "DEVUELTO" ||
+      tramite.estado_general.toUpperCase() === "INSUBSISTENTE" ||
+      (tramite.estado_general.toUpperCase() === "ARCHIVO" && tramite.tipo_gestion === "ARCHIVO");
+
+    if (esExento) {
+      tiempoRealTrabajadoHist = 0;
+    } else {
+      const inicioSla = ent || rec;
+      const fechaAutPago = parseDate(tramite.fecha_autorizacion_pago);
+      const finSla = fechaAutPago || pag || fechaFinHist;
+
+      if (inicioSla && finSla && finSla.getTime() >= inicioSla.getTime()) {
+        let habilesSla = calcularDiasHabilesBrutos(inicioSla, finSla, feriadosSet);
+
+        if (fechaAutPago && pag && pag.getTime() > fechaAutPago.getTime()) {
+          diasEsperaPagoHist = calcularDiasHabilesBrutos(fechaAutPago, pag, feriadosSet);
+        }
+
+        if (tramite.esta_pausado || tramite.estado_general.toUpperCase() === "OBSERVADO") {
+          if (tramoPres === 0 && !tramite.historial_movimientos?.some(m => m.tipo_accion.includes("OBSERV"))) {
+            diasPausaHist = habilesSla;
+            habilesSla = 0;
+          } else {
+            diasPausaHist = 1.0;
+          }
+        }
+
+        tiempoRealTrabajadoHist = Math.max(0, Number(habilesSla.toFixed(1)));
+      }
+    }
+
+    const diasNoLabHist = Math.max(0, Number((totalCalCalculado - totalHabilesCalculado).toFixed(1)));
+
     const relojA: MetricasRelojA = {
-      total_calendario_dias: totalCal || 0,
-      dias_laborables_trabajo: totalHabiles || 0,
+      total_calendario_dias: totalCalCalculado,
+      dias_laborables_trabajo: totalHabilesCalculado,
       dias_pausa_factura: 0,
-      dias_pausa_observado: 0,
-      dias_no_laborables: totalCal && totalHabiles ? Math.max(0, totalCal - totalHabiles) : 0,
-      dias_post_autorizacion: 0,
-      dias_exento: 0,
+      dias_pausa_observado: diasPausaHist,
+      dias_no_laborables: diasNoLabHist,
+      dias_post_autorizacion: diasEsperaPagoHist,
+      dias_exento: esExento ? totalCalCalculado : 0,
       invariante_cumplida: true,
       diferencia_invariante: 0,
     };
@@ -565,24 +714,6 @@ export function calcularTiemposTramite(
       fase_dfi_dias: "n/d",
       fase_tesoreria_dias: "n/d",
     };
-
-    const fechaFinHist = pag || (enCurso ? fechaReferenciaHoy : (parseDate(tramite.fecha_ultimo_movimiento) || fechaReferenciaHoy));
-    const totalCalCalculado = rec && pag && pag.getTime() >= rec.getTime()
-      ? Number(((pag.getTime() - rec.getTime()) / (24 * 60 * 60 * 1000)).toFixed(1))
-      : Number(((fechaFinHist.getTime() - (rec ? rec.getTime() : fechaFinHist.getTime())) / (24 * 60 * 60 * 1000)).toFixed(1));
-
-    const totalHabilesCalculado = rec
-      ? calcularDiasHabilesBrutos(rec, pag && pag.getTime() >= rec.getTime() ? pag : fechaFinHist, feriadosSet)
-      : 0;
-
-    let diasEsperaPagoHist = 0;
-    if (tramite.fecha_autorizacion_pago && pag && pag.getTime() >= parseDate(tramite.fecha_autorizacion_pago)!.getTime()) {
-      diasEsperaPagoHist = calcularDiasHabilesBrutos(parseDate(tramite.fecha_autorizacion_pago)!, pag, feriadosSet);
-    }
-
-    const diasPausaHist = tramite.esta_pausado ? 1.0 : 0.0;
-    const diasNoLabHist = Math.max(0, Number((totalCalCalculado - totalHabilesCalculado).toFixed(1)));
-    const tiempoRealTrabajadoHist = Math.max(0, Number((totalHabilesCalculado - diasEsperaPagoHist - diasPausaHist).toFixed(1)));
 
     return {
       id_tramite: tramite.id_tramite,
@@ -600,6 +731,7 @@ export function calcularTiemposTramite(
 
       tiempo_total_calendario_dias: totalCalCalculado,
       tiempo_real_trabajado_dias: tiempoRealTrabajadoHist,
+      tramo_presupuesto_habiles: tramoPres,
       dias_pausa: diasPausaHist,
       dias_no_laborables: diasNoLabHist,
       dias_espera_pago: diasEsperaPagoHist,
@@ -618,14 +750,22 @@ export function calcularTiemposTramite(
 
   // 3. Caso COMPLETO o INCOMPLETO con línea de tiempo real
   const fechaInicio = rec || fechaReferenciaHoy;
-  let fechaFin = pag;
+  let fechaFin: Date;
 
-  if (!fechaFin) {
-    if (enCurso) {
-      fechaFin = fechaReferenciaHoy;
-    } else {
-      fechaFin = parseDate(tramite.fecha_ultimo_movimiento) || fechaReferenciaHoy;
+  if (pag) {
+    fechaFin = pag;
+  } else if (enCurso) {
+    fechaFin = fechaReferenciaHoy;
+  } else {
+    let fechaCierre: Date | null = parseDate(tramite.fecha_ultimo_movimiento);
+    if (!fechaCierre && tramite.historial_movimientos && tramite.historial_movimientos.length > 0) {
+      const fechasValidas = tramite.historial_movimientos
+        .map(m => parseDate(m.fecha_hora))
+        .filter((d): d is Date => d !== null)
+        .sort((a, b) => b.getTime() - a.getTime());
+      if (fechasValidas.length > 0) fechaCierre = fechasValidas[0];
     }
+    fechaFin = fechaCierre || fechaReferenciaHoy;
   }
 
   // Construcción de segmentos a partir de historial_movimientos
@@ -750,17 +890,44 @@ export function calcularTiemposTramite(
 
   // Cálculo de Reloj B (Tiempo de Trabajo Real en días hábiles efectivos)
   // Hasta la autorización de pago en Tesorería
+  const faseSecDias = calcularFaseDias(segmentos, ["SECRETARIA", "INGRESO_EXPEDIENTE", "RADICACION"], feriadosSet);
+  const fasePresDias = calcularFaseDias(segmentos, ["PRESUPUESTO", "ASIGNAR_ANALISTA_PRESUPUESTO", "VISTO_BUENO_PRESUPUESTO", "DESPACHO_LOTE_PRESUPUESTO"], feriadosSet);
+  const faseContDias = calcularFaseDias(segmentos, ["CONTABILIDAD", "ASIGNAR_ANALISTA_CONTABLE", "DEVENGADO_REGISTRADO", "APROBACION_CONTABLE", "DERIVAR_A_CONTABILIDAD"], feriadosSet);
+  const faseDfiDias = calcularFaseDias(segmentos, ["DFI", "AUTORIZAR_PAGO_DFI"], feriadosSet);
+  const faseTesDias = calcularFaseDias(segmentos, ["TESORERIA", "PROGRAMAR_Y_PAGAR_MEF_BCE", "PAGO_CONFIRMADO"], feriadosSet);
+
   const relojB: MetricasRelojB = {
     aplica: evaluacion.calidad === "COMPLETO",
     dias_laborables_efectivos: trabCal,
-    fase_secretaria_dias: calcularFaseDias(segmentos, ["SECRETARIA", "INGRESO_EXPEDIENTE", "RADICACION"], feriadosSet),
-    fase_presupuesto_dias: calcularFaseDias(segmentos, ["PRESUPUESTO", "ASIGNAR_ANALISTA_PRESUPUESTO", "VISTO_BUENO_PRESUPUESTO", "DESPACHO_LOTE_PRESUPUESTO"], feriadosSet),
-    fase_contabilidad_dias: calcularFaseDias(segmentos, ["CONTABILIDAD", "ASIGNAR_ANALISTA_CONTABLE", "DEVENGADO_REGISTRADO", "APROBACION_CONTABLE", "DERIVAR_A_CONTABILIDAD"], feriadosSet),
-    fase_dfi_dias: calcularFaseDias(segmentos, ["DFI", "AUTORIZAR_PAGO_DFI"], feriadosSet),
-    fase_tesoreria_dias: calcularFaseDias(segmentos, ["TESORERIA", "PROGRAMAR_Y_PAGAR_MEF_BCE", "PAGO_CONFIRMADO"], feriadosSet),
+    fase_secretaria_dias: faseSecDias,
+    fase_presupuesto_dias: fasePresDias,
+    fase_contabilidad_dias: faseContDias,
+    fase_dfi_dias: faseDfiDias,
+    fase_tesoreria_dias: faseTesDias,
   };
 
   const diasPausaComp = Number((pausaFactCal + pausaObsCal).toFixed(1));
+
+  // Cálculo unificado de tramo_presupuesto_habiles
+  const tramoPresComp = calcularTramoPresupuestoHabiles(tramite, feriadosSet, fechaReferenciaHoy);
+  const tramoPresFinal = tramoPresComp !== null ? tramoPresComp : (typeof fasePresDias === "number" && fasePresDias > 0 ? fasePresDias : null);
+
+  // tiempo_real_trabajado_dias:
+  // Desde fecha_entrega_control_previo hasta autorización/pago.
+  // Si ent está definido y hubo fase de secretaría, no sumar tramo_secretaria
+  let tiempoRealComp = trabCal;
+  if (ent && rec && ent.getTime() > rec.getTime() && typeof faseSecDias === "number" && faseSecDias > 0) {
+    tiempoRealComp = Math.max(0, Number((trabCal - faseSecDias).toFixed(1)));
+  }
+
+  const esExentoComp =
+    tramite.estado_general.toUpperCase() === "DEVUELTO" ||
+    tramite.estado_general.toUpperCase() === "INSUBSISTENTE" ||
+    (tramite.estado_general.toUpperCase() === "ARCHIVO" && tramite.tipo_gestion === "ARCHIVO");
+
+  if (esExentoComp) {
+    tiempoRealComp = 0;
+  }
 
   return {
     id_tramite: tramite.id_tramite,
@@ -777,7 +944,8 @@ export function calcularTiemposTramite(
     estado_general: tramite.estado_general,
 
     tiempo_total_calendario_dias: totalCal,
-    tiempo_real_trabajado_dias: trabCal,
+    tiempo_real_trabajado_dias: tiempoRealComp,
+    tramo_presupuesto_habiles: tramoPresFinal,
     dias_pausa: diasPausaComp,
     dias_no_laborables: noLabCal,
     dias_espera_pago: postAutCal,

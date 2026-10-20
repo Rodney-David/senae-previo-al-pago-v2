@@ -39,10 +39,13 @@ export async function GET(request: NextRequest) {
     const criterioFecha = searchParams.get("criterio_fecha") || "INGRESO";
     const idAreaParam = searchParams.get("id_area");
     const idFuncionarioParam = searchParams.get("id_funcionario");
+    const modoFuncionarioParam = searchParams.get("modo_funcionario");
     const idTipoTramiteParam = searchParams.get("id_tipo_tramite");
     const codigoProcesoCanonico = searchParams.get("codigo_proceso_canonico") || searchParams.get("codigo_proceso");
     const calidadDato = searchParams.get("calidad_dato");
     const estadoGeneral = searchParams.get("estado_general");
+    const subEstadoParam = searchParams.get("sub_estado");
+    const tipoGestionParam = searchParams.get("tipo_gestion");
     const estadoFiltro = searchParams.get("estado_filtro");
     const busqueda = searchParams.get("busqueda") || searchParams.get("q");
 
@@ -54,6 +57,9 @@ export async function GET(request: NextRequest) {
       criterio_fecha: criterioFecha,
       id_area: idAreaParam && idAreaParam !== "TODAS" && idAreaParam !== "TODOS" ? idAreaParam : undefined,
       id_funcionario: idFuncionarioParam && idFuncionarioParam !== "TODOS" ? idFuncionarioParam : undefined,
+      modo_funcionario: (modoFuncionarioParam && modoFuncionarioParam !== "TODOS" ? modoFuncionarioParam : "TODOS") as any,
+      sub_estado: subEstadoParam && subEstadoParam !== "TODOS" ? subEstadoParam : undefined,
+      tipo_gestion: tipoGestionParam && tipoGestionParam !== "TODOS" ? tipoGestionParam : undefined,
       id_tipo_tramite: idTipoTramiteParam && idTipoTramiteParam !== "TODOS" ? idTipoTramiteParam : undefined,
       codigo_proceso_canonico: codigoProcesoCanonico && codigoProcesoCanonico !== "TODOS" ? codigoProcesoCanonico : undefined,
       codigo_proceso: codigoProcesoCanonico && codigoProcesoCanonico !== "TODOS" ? codigoProcesoCanonico : undefined,
@@ -397,9 +403,28 @@ export async function GET(request: NextRequest) {
       cargo: f.cargo,
       area: f.area,
       area_nombre: f.area_nombre,
+
+      // Dimensión 1: Productividad Histórica del Analista (id_analista_presupuesto_previo)
+      total_asignados_historico: f.total_asignados_historico,
+      total_despachados: f.total_despachados,
+      mediana_dias_presupuesto: f.mediana_dias_presupuesto,
+      promedio_dias_presupuesto: f.promedio_dias_presupuesto,
+      en_observacion_pausados: f.en_observacion_pausados,
+      porcentaje_productividad: f.porcentaje_productividad,
+      porcentaje_cumplimiento_sla_presupuesto: f.porcentaje_cumplimiento_sla_presupuesto,
+      productividad_historica: f.productividad_historica,
+
+      // Dimensión 2: Carga Activa Hoy / Pendientes (id_custodio_actual en estados REVISION, OBSERVADO, DFI)
+      pendientes_en_revision: f.pendientes_en_revision,
+      pendientes_observados: f.pendientes_observados,
+      pendientes_dfi: f.pendientes_dfi,
+      total_pendientes_custodia: f.total_pendientes_custodia,
+      carga_activa: f.carga_activa,
+
+      // Retrocompatibilidad con vistas previas
       total_tramites_recibidos: f.total_asignados,
       tramites_despachados: f.tramites_despachados,
-      total_despachados: f.tramites_despachados,
+      total_despachados_compat: f.tramites_despachados,
       tiempo_promedio_trabajo_dias: f.tiempo_promedio_trabajo_dias,
       tiempo_promedio_dias: f.tiempo_promedio_trabajo_dias,
       tiempo_mediana_trabajo_dias: f.tiempo_mediana_trabajo_dias,
