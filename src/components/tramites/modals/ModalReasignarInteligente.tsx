@@ -34,10 +34,12 @@ export const ModalReasignarInteligente: React.FC<ModalReasignarInteligenteProps>
       // Cargar analistas de presupuesto disponibles
       const loadAnalistas = async () => {
         try {
-          const res = await fetch("/api/admin/usuarios");
+          let res = await fetch("/api/auth/usuarios");
+          if (!res.ok) res = await fetch("/api/admin/usuarios");
           const data = await res.json();
-          if (data.usuarios) {
-            const disponibles = data.usuarios.filter(
+          const lista = Array.isArray(data) ? data : (data.usuarios || data.data || []);
+          if (Array.isArray(lista)) {
+            const disponibles = lista.filter(
               (u: any) =>
                 u.id_area === 2 &&
                 u.rol === "ANALISTA" &&

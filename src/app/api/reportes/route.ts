@@ -88,7 +88,7 @@ export async function GET(request: NextRequest) {
       }),
       prisma.usuarios.findMany({
         where: { activo: true },
-        select: { id_usuario: true, nombre_completo: true, cargo: true, id_area: true, iniciales: true },
+        select: { id_usuario: true, nombre_completo: true, cargo: true, id_area: true },
         orderBy: { nombre_completo: "asc" },
       }),
       prisma.tipos_tramite.findMany({

@@ -59,13 +59,19 @@ export const SearchableSelect: React.FC<SearchableSelectProps> = ({
     }
   }, [isOpen]);
 
-  const selectedOption = options.find((opt) => opt.value === value);
-
-  const filteredOptions = options.filter(
-    (opt) =>
-      opt.label.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (opt.sublabel && opt.sublabel.toLowerCase().includes(searchTerm.toLowerCase()))
+  const safeOptions = Array.isArray(options) ? options : [];
+  const selectedOption = safeOptions.find(
+    (opt) => opt && String(opt.value ?? "") === String(value ?? "")
   );
+
+  const term = (searchTerm || "").trim().toLowerCase();
+  const filteredOptions = safeOptions.filter((opt) => {
+    if (!opt) return false;
+    if (!term) return true;
+    const label = String(opt.label ?? "").toLowerCase();
+    const sublabel = String(opt.sublabel ?? "").toLowerCase();
+    return label.includes(term) || sublabel.includes(term);
+  });
 
   return (
     <div ref={containerRef} className={`relative w-full ${className}`}>
@@ -146,7 +152,9 @@ export const SearchableSelect: React.FC<SearchableSelectProps> = ({
           <div className="max-h-60 overflow-y-auto p-1 divide-y divide-slate-50">
             {filteredOptions.length === 0 ? (
               <div className="p-3 text-center text-xs text-slate-400 italic">
-                No se encontraron opciones para &quot;{searchTerm}&quot;
+                {safeOptions.length === 0
+                  ? "Cargando o no hay opciones registradas"
+                  : `No se encontraron opciones para "${searchTerm}"`}
               </div>
             ) : (
               filteredOptions.map((opt) => {
@@ -182,7 +190,9 @@ export const SearchableSelect: React.FC<SearchableSelectProps> = ({
 
           {/* Footer informativo */}
           <div className="px-3 py-1.5 bg-slate-50 border-t border-slate-100 text-[10px] text-slate-400 flex items-center justify-between">
-            <span>{filteredOptions.length} opciones disponibles</span>
+            <span>
+              {filteredOptions.length} de {safeOptions.length} opciones disponibles
+            </span>
             <span>Esc para cerrar</span>
           </div>
         </div>

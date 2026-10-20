@@ -82,7 +82,17 @@ export async function middleware(request: NextRequest) {
   }
 
   // M-11: Proteger rutas administrativas verificando el rol de la sesión
-  const isAdminRoute = pathname.startsWith("/administracion") || pathname.startsWith("/api/admin");
+  // Permitir lectura (GET) de catálogos y procesos normativos a todos los funcionarios autenticados
+  const isCatalogReadRoute =
+    request.method === "GET" &&
+    (pathname.startsWith("/api/admin/catalogos") ||
+      pathname.startsWith("/api/admin/procesos") ||
+      pathname.startsWith("/api/catalogos"));
+
+  const isAdminRoute =
+    (pathname.startsWith("/administracion") || pathname.startsWith("/api/admin")) &&
+    !isCatalogReadRoute;
+
   if (isAdminRoute && !["ADMIN", "ADMINISTRADOR"].includes(session.role)) {
     if (pathname.startsWith("/api/")) {
       return NextResponse.json(

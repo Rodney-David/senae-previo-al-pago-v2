@@ -93,10 +93,12 @@ export const TarjetaPresupuesto: React.FC<TarjetaPresupuestoProps> = ({
     const fetchItems = async () => {
       try {
         setLoadingItems(true);
-        const res = await fetch("/api/admin/catalogos?tipo=items");
+        let res = await fetch("/api/catalogos?tipo=items");
+        if (!res.ok) res = await fetch("/api/admin/catalogos?tipo=items");
         const data = await res.json();
-        if (res.ok && data.items) {
-          setItemsCatalog(data.items);
+        const items = Array.isArray(data) ? data : (data.items || data.data || []);
+        if (Array.isArray(items) && items.length > 0) {
+          setItemsCatalog(items);
         }
       } catch (err) {
         console.error("Error al cargar catálogo de ítems:", err);

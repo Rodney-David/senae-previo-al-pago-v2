@@ -70,25 +70,37 @@ export const ModalEditarDatosGenerales: React.FC<ModalEditarDatosGeneralesProps>
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    fetch("/api/admin/procesos")
-      .then((r) => r.json())
+    const fetchSafely = async (url1: string, url2: string) => {
+      try {
+        const res = await fetch(url1);
+        if (res.ok) return await res.json();
+      } catch (e) {}
+      try {
+        const resFb = await fetch(url2);
+        if (resFb.ok) return await resFb.json();
+      } catch (e) {}
+      return null;
+    };
+
+    fetchSafely("/api/catalogos?tipo=procesos", "/api/admin/procesos")
       .then((d) => {
-        if (d.tipos) setProcesos(d.tipos);
+        const list = Array.isArray(d) ? d : (d?.tipos || d?.items || d?.procesos || d?.data || []);
+        if (Array.isArray(list) && list.length > 0) setProcesos(list);
       })
       .catch((err) => console.error("Error loading procesos:", err));
 
-    fetch("/api/admin/catalogos?tipo=areas")
-      .then((r) => r.json())
+    fetchSafely("/api/catalogos?tipo=areas", "/api/admin/catalogos?tipo=areas")
       .then((d) => {
-        if (d.items) setAreas(d.items);
+        const list = Array.isArray(d) ? d : (d?.items || d?.areas || d?.data || []);
+        if (Array.isArray(list) && list.length > 0) setAreas(list);
       })
       .catch((err) => console.error("Error loading areas:", err));
 
-    fetch("/api/admin/catalogos?tipo=gestion")
-      .then((r) => r.json())
+    fetchSafely("/api/catalogos?tipo=gestion", "/api/admin/catalogos?tipo=gestion")
       .then((d) => {
-        if (d.items && d.items.length > 0) {
-          setCatalogoGestiones(d.items.filter((item: any) => item.activo !== false));
+        const list = Array.isArray(d) ? d : (d?.items || d?.gestiones || d?.data || []);
+        if (Array.isArray(list) && list.length > 0) {
+          setCatalogoGestiones(list.filter((item: any) => item.activo !== false));
         }
       })
       .catch((err) => console.error("Error loading gestiones:", err));

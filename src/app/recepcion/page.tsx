@@ -97,30 +97,55 @@ export default function RecepcionPage() {
     checkAuth();
   }, [router]);
 
-  // Cargar catálogos
+  // Cargar catálogos institucionales con desempaquetado universal y fallback resiliente
   useEffect(() => {
     async function loadCatalogos() {
       try {
-        const [resP, resA, resG] = await Promise.all([
-          fetch("/api/admin/procesos"),
-          fetch("/api/admin/catalogos?tipo=areas"),
-          fetch("/api/admin/catalogos?tipo=gestion"),
+        // Consultar primero endpoint universal /api/catalogos y fallback a /api/admin/*
+        const fetchSafely = async (primaryUrl: string, fallbackUrl: string) => {
+          try {
+            const res = await fetch(primaryUrl);
+            if (res.ok) return await res.json();
+          } catch (e) {}
+          try {
+            const resFb = await fetch(fallbackUrl);
+            if (resFb.ok) return await resFb.json();
+          } catch (e) {}
+          return null;
+        };
+
+        const [dataP, dataA, dataG] = await Promise.all([
+          fetchSafely("/api/catalogos?tipo=procesos", "/api/admin/procesos"),
+          fetchSafely("/api/catalogos?tipo=areas", "/api/admin/catalogos?tipo=areas"),
+          fetchSafely("/api/catalogos?tipo=gestion", "/api/admin/catalogos?tipo=gestion"),
         ]);
-        const [dataP, dataA, dataG] = await Promise.all([resP.json(), resA.json(), resG.json()]);
-        if (dataP.tipos) {
-          setTiposProceso(dataP.tipos);
-          if (dataP.tipos.length > 0) {
-            setIdTipoTramite(String(dataP.tipos[0].id_tipo_tramite));
-          }
+
+        // Desempaquetar Tipos de Proceso (array directo o propiedades: tipos, items, procesos, data)
+        const rawTipos = Array.isArray(dataP)
+          ? dataP
+          : (dataP?.tipos || dataP?.items || dataP?.procesos || dataP?.data || []);
+        if (Array.isArray(rawTipos) && rawTipos.length > 0) {
+          setTiposProceso(rawTipos);
+          setIdTipoTramite((prev) => prev || String(rawTipos[0].id_tipo_tramite || rawTipos[0].id || "1"));
         }
-        if (dataA.items) {
-          setAreas(dataA.items);
+
+        // Desempaquetar Áreas Requirentes (array directo o propiedades: items, areas, data)
+        const rawAreas = Array.isArray(dataA)
+          ? dataA
+          : (dataA?.items || dataA?.areas || dataA?.data || []);
+        if (Array.isArray(rawAreas) && rawAreas.length > 0) {
+          setAreas(rawAreas);
         }
-        if (dataG.items) {
-          setCatalogoGestiones(dataG.items.filter((item: any) => item.activo !== false));
+
+        // Desempaquetar Tipos de Gestión (array directo o propiedades: items, gestiones, data)
+        const rawGestiones = Array.isArray(dataG)
+          ? dataG
+          : (dataG?.items || dataG?.gestiones || dataG?.data || []);
+        if (Array.isArray(rawGestiones) && rawGestiones.length > 0) {
+          setCatalogoGestiones(rawGestiones.filter((item: any) => item.activo !== false));
         }
       } catch (err) {
-        console.error("Error cargando catálogos:", err);
+        console.error("Error cargando catálogos en Recepción:", err);
       } finally {
         setLoadingTipos(false);
         setLoadingAreas(false);
@@ -128,6 +153,33 @@ export default function RecepcionPage() {
     }
     loadCatalogos();
   }, []);
+
+  // Mapeo explícito y seguro a OptionItem para el Combobox de Tipos de Proceso
+  const opcionesProcesos = useMemo(() => {
+    return tiposProceso.map((t: any) => {
+      const id = String(t.id_tipo_tramite ?? t.id ?? t.value ?? "");
+      const nombre = String(t.nombre ?? t.label ?? t.descripcion ?? "");
+      const codigo = t.codigo ? String(t.codigo) : "";
+      return {
+        value: id,
+        label: nombre,
+        sublabel: codigo ? `Código: ${codigo}` : (t.descripcion || undefined),
+      };
+    }).filter((opt) => Boolean(opt.value && opt.label));
+  }, [tiposProceso]);
+
+  // Mapeo explícito y seguro a OptionItem para el Combobox de Áreas Requirentes
+  const opcionesAreas = useMemo(() => {
+    return areas.map((a: any) => {
+      const nombre = String(a.nombre ?? a.label ?? a.descripcion ?? "");
+      const codigo = a.codigo ? String(a.codigo) : "";
+      return {
+        value: nombre,
+        label: nombre,
+        sublabel: codigo ? `Código: ${codigo}` : undefined,
+      };
+    }).filter((opt) => Boolean(opt.value && opt.label));
+  }, [areas]);
 
   // Opciones de subtipos dependientes del padre seleccionado
   const subtiposDisponibles = useMemo(() => {
@@ -360,11 +412,7 @@ export default function RecepcionPage() {
                 Área Requirente / Solicitante *
               </label>
               <SearchableSelect
-                options={areas.map((a) => ({
-                  value: a.nombre,
-                  label: a.nombre,
-                  sublabel: a.codigo ? `Código: ${a.codigo}` : undefined,
-                }))}
+                options={opcionesAreas}
                 value={areaRequirente}
                 onChange={setAreaRequirente}
                 placeholder="Seleccione o busque el área..."
@@ -399,11 +447,7 @@ export default function RecepcionPage() {
                 Tipo de Proceso Normativo (SENAE) *
               </label>
               <SearchableSelect
-                options={tiposProceso.map((t) => ({
-                  value: String(t.id_tipo_tramite),
-                  label: t.nombre,
-                  sublabel: t.descripcion || undefined,
-                }))}
+                options={opcionesProcesos}
                 value={idTipoTramite}
                 onChange={setIdTipoTramite}
                 placeholder="Seleccione o busque el proceso normativo..."
