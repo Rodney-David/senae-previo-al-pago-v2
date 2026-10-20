@@ -148,8 +148,8 @@ export const TabAuditoriaTramites: React.FC<TabAuditoriaTramitesProps> = ({
         valA = typeof a.reloj_b?.dias_laborables_efectivos === "number" ? a.reloj_b.dias_laborables_efectivos : -1;
         valB = typeof b.reloj_b?.dias_laborables_efectivos === "number" ? b.reloj_b.dias_laborables_efectivos : -1;
       } else if (ordenCampo === "codigo") {
-        valA = a.codigo_tramite;
-        valB = b.codigo_tramite;
+        valA = a.numero_quipux || a.codigo_tramite;
+        valB = b.numero_quipux || b.codigo_tramite;
       }
 
       if (valA < valB) return ordenAsc ? -1 : 1;
@@ -366,7 +366,7 @@ export const TabAuditoriaTramites: React.FC<TabAuditoriaTramitesProps> = ({
                     onClick={() => cambiarOrden("codigo")}
                   >
                     <div className="flex items-center gap-1">
-                      <span>Quipux / Código</span>
+                      <span>Quipux</span>
                       <ArrowUpDown className="w-3 h-3 text-slate-400" />
                     </div>
                   </th>
@@ -410,13 +410,10 @@ export const TabAuditoriaTramites: React.FC<TabAuditoriaTramitesProps> = ({
                       onClick={() => abrirDetalle(t)}
                       className="hover:bg-blue-50/40 transition cursor-pointer group"
                     >
-                      {/* Quipux / Código */}
+                      {/* Quipux */}
                       <td className="py-3.5 px-4">
                         <div className="font-mono font-bold text-slate-900 group-hover:text-blue-700">
                           {t.numero_quipux || t.codigo_tramite}
-                        </div>
-                        <div className="text-[11px] text-slate-500 font-mono">
-                          {t.codigo_tramite}
                         </div>
                       </td>
 
@@ -524,7 +521,7 @@ export const TabAuditoriaTramites: React.FC<TabAuditoriaTramitesProps> = ({
             <table className="w-full text-left border-collapse text-xs">
               <thead>
                 <tr className="bg-amber-100/50 text-amber-900 border-b border-amber-200 uppercase font-semibold text-[10px] tracking-wider">
-                  <th className="py-3 px-4">Trámite / Quipux</th>
+                  <th className="py-3 px-4">Quipux</th>
                   <th className="py-3 px-4">Proveedor</th>
                   <th className="py-3 px-4">Calidad</th>
                   <th className="py-3 px-4">Motivos de la Alerta</th>
@@ -547,8 +544,7 @@ export const TabAuditoriaTramites: React.FC<TabAuditoriaTramitesProps> = ({
                       className="hover:bg-amber-50 transition cursor-pointer"
                     >
                       <td className="py-3 px-4">
-                        <div className="font-mono font-bold text-slate-900">{t.codigo_tramite}</div>
-                        <div className="text-[11px] text-slate-500 font-mono">{t.numero_quipux}</div>
+                        <div className="font-mono font-bold text-slate-900">{t.numero_quipux || t.codigo_tramite}</div>
                       </td>
                       <td className="py-3 px-4 font-medium text-slate-800">{t.proveedor_nombre}</td>
                       <td className="py-3 px-4">

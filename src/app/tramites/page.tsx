@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState, useCallback, useMemo } from "react";
 import { TramiteCompletoDTO, UsuarioInstitucional } from "@/types";
-import { formatCurrency, formatDate, toIsoDateString } from "@/lib/utils";
+import { formatCurrency, formatDate } from "@/lib/utils";
 import { BadgeEstado, SemaforoSLA } from "@/components/ui";
 import Link from "next/link";
 import {
@@ -12,7 +12,6 @@ import {
   Filter,
   User,
   FilePlus2,
-  Calendar,
   LayoutGrid,
   List,
   ChevronRight,
@@ -27,9 +26,7 @@ export default function TramitesCatalogoPage() {
   const [filtroArea, setFiltroArea] = useState("TODAS");
   const [filtroFuncionario, setFiltroFuncionario] = useState("TODOS");
   const [filtroEstado, setFiltroEstado] = useState("TODOS");
-  const [criterioFecha, setCriterioFecha] = useState<"INGRESO" | "MEMORANDO" | "MOVIMIENTO">("INGRESO");
-  const [fechaDesde, setFechaDesde] = useState("");
-  const [fechaHasta, setFechaHasta] = useState("");
+  const [filtroGestion, setFiltroGestion] = useState("TODAS");
   const [vistaModo, setVistaModo] = useState<"auto" | "tabla" | "tarjetas">("auto");
   const [usuariosList, setUsuariosList] = useState<{ id_usuario: number; nombre_completo: string; cargo?: string | null; iniciales?: string | null }[]>([]);
   const [currentUser, setCurrentUser] = useState<UsuarioInstitucional | null>(null);
@@ -101,6 +98,7 @@ export default function TramitesCatalogoPage() {
     { value: "FACTURA", label: "FACTURA" },
     { value: "CONTABILIDAD", label: "CONTABILIDAD" },
     { value: "DFI", label: "DFI" },
+    { value: "PAGO_APROBADO", label: "PAGO APROBADO" },
     { value: "PAGADO", label: "PAGADO" },
     { value: "ARCHIVO", label: "ARCHIVO" },
     { value: "OBSERVADO", label: "OBSERVADO" },
@@ -141,24 +139,10 @@ export default function TramitesCatalogoPage() {
         }
       }
 
-      // 4. Filtro por Fechas (Rango Desde / Hasta)
-      if (fechaDesde || fechaHasta) {
-        let rawDate: Date | string | null | undefined = null;
-        if (criterioFecha === "INGRESO") {
-          rawDate = t.fecha_ingreso || t.fecha_recepcion_fisica;
-        } else if (criterioFecha === "MEMORANDO") {
-          rawDate = t.fecha_memorando || t.fecha_ingreso;
-        } else if (criterioFecha === "MOVIMIENTO") {
-          rawDate = t.fecha_ultimo_movimiento;
-        }
-
-        const dateStr = toIsoDateString(rawDate);
-        if (!dateStr) return false;
-
-        if (fechaDesde && dateStr < fechaDesde) {
-          return false;
-        }
-        if (fechaHasta && dateStr > fechaHasta) {
+      // 4. Filtro por Gestión (padre_gestion: PAGO / GARANTIA)
+      if (filtroGestion !== "TODAS") {
+        const gestionPadre = (t.padre_gestion || "").toUpperCase();
+        if (gestionPadre !== filtroGestion.toUpperCase()) {
           return false;
         }
       }
@@ -189,7 +173,7 @@ export default function TramitesCatalogoPage() {
 
       return true;
     });
-  }, [tramites, filtroArea, filtroFuncionario, filtroEstado, criterioFecha, fechaDesde, fechaHasta, search]);
+  }, [tramites, filtroArea, filtroFuncionario, filtroEstado, filtroGestion, search]);
 
   return (
     <div className="w-full max-w-full min-w-0 space-y-5">
@@ -342,76 +326,30 @@ export default function TramitesCatalogoPage() {
             ))}
           </select>
 
-          {/* 4. FILTRO DE FECHAS RESPONSIVE */}
-          <div className="w-full lg:w-auto flex flex-wrap items-center gap-1.5 bg-slate-50 border border-slate-300 rounded-lg p-1.5 text-xs">
-            <div className="flex items-center gap-1 pl-1 text-[11px] font-bold text-slate-600 uppercase shrink-0">
-              <Calendar className="w-3.5 h-3.5 text-blue-600 shrink-0" />
-              <span>Fecha:</span>
-            </div>
-
-            <select
-              value={criterioFecha}
-              onChange={(e) => setCriterioFecha(e.target.value as any)}
-              className="text-xs bg-white border border-slate-300 rounded py-1 px-2 focus:ring-1 focus:ring-blue-500 focus:outline-none font-semibold text-slate-700 cursor-pointer uppercase min-w-[130px] flex-1 sm:flex-initial"
-              title="Seleccionar tipo de fecha para el rango"
-            >
-              <option value="INGRESO">Ingreso / Radicación</option>
-              <option value="MEMORANDO">Memorando Quipux</option>
-              <option value="MOVIMIENTO">Último Movimiento</option>
-            </select>
-
-            <div className="flex items-center gap-1 flex-1 sm:flex-initial min-w-[125px]">
-              <span className="text-[10px] font-bold text-slate-500 uppercase shrink-0">Desde:</span>
-              <input
-                type="date"
-                value={fechaDesde}
-                onChange={(e) => setFechaDesde(e.target.value)}
-                className="w-full text-xs bg-white border border-slate-300 rounded py-1 px-1.5 focus:ring-1 focus:ring-blue-500 focus:outline-none font-mono text-slate-700 cursor-pointer"
-                title="Fecha inicial"
-              />
-            </div>
-
-            <div className="flex items-center gap-1 flex-1 sm:flex-initial min-w-[125px]">
-              <span className="text-[10px] font-bold text-slate-500 uppercase shrink-0">Hasta:</span>
-              <input
-                type="date"
-                value={fechaHasta}
-                onChange={(e) => setFechaHasta(e.target.value)}
-                className="w-full text-xs bg-white border border-slate-300 rounded py-1 px-1.5 focus:ring-1 focus:ring-blue-500 focus:outline-none font-mono text-slate-700 cursor-pointer"
-                title="Fecha final"
-              />
-            </div>
-
-            {(fechaDesde || fechaHasta) && (
-              <button
-                type="button"
-                onClick={() => {
-                  setFechaDesde("");
-                  setFechaHasta("");
-                }}
-                className="text-slate-400 hover:text-rose-600 p-1 text-xs font-bold transition-colors shrink-0"
-                title="Limpiar rango de fechas"
-              >
-                ✕
-              </button>
-            )}
-          </div>
+          {/* 4. GESTIÓN (padre_gestion) */}
+          <select
+            value={filtroGestion}
+            onChange={(e) => setFiltroGestion(e.target.value)}
+            className="w-full sm:w-auto text-xs min-w-[140px] max-w-full sm:max-w-[200px] bg-slate-50 hover:bg-slate-100 border border-slate-300 rounded-lg py-2 px-3 focus:ring-2 focus:ring-blue-500 focus:outline-none uppercase font-semibold text-slate-700 cursor-pointer transition-colors truncate"
+            title="Filtrar por Gestión (Pago / Garantía)"
+          >
+            <option value="TODAS">TODAS LAS GESTIONES</option>
+            <option value="PAGO">PAGO</option>
+            <option value="GARANTIA">GARANTÍA</option>
+          </select>
 
           {/* Botón para restablecer filtros si hay alguno activo */}
           {(filtroArea !== "TODAS" ||
             filtroFuncionario !== "TODOS" ||
             filtroEstado !== "TODOS" ||
-            fechaDesde !== "" ||
-            fechaHasta !== "" ||
+            filtroGestion !== "TODAS" ||
             search.trim() !== "") && (
             <button
               onClick={() => {
                 setFiltroArea("TODAS");
                 setFiltroFuncionario("TODOS");
                 setFiltroEstado("TODOS");
-                setFechaDesde("");
-                setFechaHasta("");
-                setCriterioFecha("INGRESO");
+                setFiltroGestion("TODAS");
                 setSearch("");
               }}
               className="px-2.5 py-1.5 text-[11px] font-bold text-rose-600 hover:text-rose-800 bg-rose-50 hover:bg-rose-100 border border-rose-200 rounded-lg transition-colors uppercase tracking-wider cursor-pointer shrink-0"

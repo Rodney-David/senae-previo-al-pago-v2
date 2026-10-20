@@ -377,11 +377,13 @@ export default function CajasPage() {
     }
   };
 
-  // Enviar caja al Archivo Central (Adm. Caja)
+  // Enviar caja al Archivo Central (Adm. Caja) - Abre Vista Previa interactiva con opción de imprimir y confirmar
   const handleEnviarArchivo = (caja: CajaDTO) => {
     if (loadingAccionCaja[caja.id_caja]) return;
+    setSelectedCaja(caja);
+    fetchCajaDetail(caja.id_caja);
     setCajaAEnviar(caja);
-    setModalEnviarArchivoOpen(true);
+    setModalImprimirOpen(true);
   };
 
   const handleConfirmarEnviarArchivo = async () => {
@@ -400,6 +402,7 @@ export default function CajasPage() {
 
       setSuccessMsg(data.message || `Caja "${cajaAEnviar.codigo_caja}" enviada exitosamente a Custodia de Archivo.`);
       setModalEnviarArchivoOpen(false);
+      setModalImprimirOpen(false);
       setCajaAEnviar(null);
       await fetchCajas();
       if (selectedCaja?.id_caja === cajaAEnviar.id_caja) {
@@ -1843,6 +1846,20 @@ export default function CajasPage() {
                 </h3>
               </div>
               <div className="flex items-center gap-2 flex-wrap">
+                {selectedCaja.estado === "CERRADA" && (isAdmCaja || isAdmin) && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setCajaAEnviar(selectedCaja);
+                      setModalEnviarArchivoOpen(true);
+                    }}
+                    disabled={enviandoArchivo}
+                    className="px-3.5 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-md flex items-center gap-1.5 transition-colors shadow-xs cursor-pointer"
+                    title="Enviar formalmente esta caja al Archivo Central"
+                  >
+                    <Send className="w-3.5 h-3.5" /> Enviar a Archivo
+                  </button>
+                )}
                 <button
                   type="button"
                   onClick={handleDescargarPdf}
@@ -1854,7 +1871,7 @@ export default function CajasPage() {
                 <button
                   type="button"
                   onClick={() => window.print()}
-                  className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-md flex items-center gap-1.5 transition-colors shadow-xs cursor-pointer"
+                  className="px-3 py-1.5 bg-slate-700 hover:bg-slate-800 text-white text-xs font-bold rounded-md flex items-center gap-1.5 transition-colors shadow-xs cursor-pointer"
                   title="Imprimir documento oficial en formato A4 horizontal"
                 >
                   <Printer className="w-3.5 h-3.5" /> Imprimir Documento
@@ -1897,13 +1914,13 @@ export default function CajasPage() {
                 <table className="min-w-[700px] w-full text-[11px] border-collapse border border-slate-900 font-sans">
                   <thead>
                     <tr className="bg-[#244062] text-white font-bold uppercase border-b border-slate-900">
-                      <th className="border border-slate-900 py-2.5 px-2 text-center w-[5%]">NO</th>
-                      <th className="border border-slate-900 py-2.5 px-2 text-center w-[6%]">CARTON</th>
-                      <th className="border border-slate-900 py-2.5 px-2 text-center w-[18%]">NUMERO DE QUIPUX</th>
-                      <th className="border border-slate-900 py-2.5 px-2 text-center w-[13%]">NRO CUR</th>
-                      <th className="border border-slate-900 py-2.5 px-3.5 text-left w-[32%]">PROVEEDOR</th>
+                      <th className="border border-slate-900 py-2.5 px-2 text-center w-[5%]">No</th>
+                      <th className="border border-slate-900 py-2.5 px-2 text-center w-[8%]">No CARTON</th>
+                      <th className="border border-slate-900 py-2.5 px-2 text-center w-[8%]">Nro HOJAS</th>
+                      <th className="border border-slate-900 py-2.5 px-2 text-center w-[12%]">NRO CUR</th>
+                      <th className="border border-slate-900 py-2.5 px-3.5 text-left w-[40%]">PROVEEDOR Y NUMERO DE QUIPUX</th>
                       <th className="border border-slate-900 py-2.5 px-3 text-right w-[12%]">MONTO</th>
-                      <th className="border border-slate-900 py-2.5 px-2 text-center w-[14%]">OBSERVACION</th>
+                      <th className="border border-slate-900 py-2.5 px-2 text-center w-[15%]">OBSERVACION</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -1925,32 +1942,37 @@ export default function CajasPage() {
 
                         return (
                           <tr key={t.id_tramite} className="border-b border-slate-900">
-                            {/* Col 1: NO (Secuencial 1, 2, 3...) */}
+                            {/* Col 1: No (Secuencial 1, 2, 3...) */}
                             <td className="border border-slate-900 py-3 px-2 text-center font-bold">
                               {idx + 1}
                             </td>
-                            {/* Col 2: CARTON (Predeterminado 1) */}
+                            {/* Col 2: No CARTON */}
                             <td className="border border-slate-900 py-3 px-2 text-center font-bold">
                               {carton}
                             </td>
-                            {/* Col 3: NUMERO DE QUIPUX */}
-                            <td className="border border-slate-900 py-3 px-2 text-center font-mono font-medium text-slate-900">
-                              {t.numero_quipux || "-"}
+                            {/* Col 3: Nro HOJAS */}
+                            <td className="border border-slate-900 py-3 px-2 text-center font-mono font-bold text-slate-800">
+                              {t.numero_hojas ?? "-"}
                             </td>
                             {/* Col 4: NRO CUR */}
                             <td className="border border-slate-900 py-3 px-2 text-center font-bold text-slate-900">
                               {curDisplay}
                             </td>
-                            {/* Col 5: PROVEEDOR */}
+                            {/* Col 5: PROVEEDOR Y NUMERO DE QUIPUX unificados */}
                             <td className="border border-slate-900 py-3 px-3.5 text-left font-semibold text-slate-900 leading-snug">
-                              {t.proveedor_beneficiario || "-"}
+                              <div>{t.proveedor_beneficiario || "-"}</div>
+                              <div className="font-mono text-[10px] text-blue-700 font-bold mt-0.5">
+                                Quipux: {t.numero_quipux || "-"}
+                              </div>
                             </td>
                             {/* Col 6: MONTO */}
                             <td className="border border-slate-900 py-3 px-3 text-right font-bold text-slate-900">
                               {formatCurrency(t.monto_total || 0)}
                             </td>
-                            {/* Col 7: OBSERVACION (Vacía para anotación física) */}
-                            <td className="border border-slate-900 py-3 px-2 text-center"></td>
+                            {/* Col 7: OBSERVACION */}
+                            <td className="border border-slate-900 py-3 px-2 text-center text-slate-500 italic">
+                              {(t as any).observacion || (t as any).novedad || ""}
+                            </td>
                           </tr>
                         );
                       })
@@ -1972,17 +1994,32 @@ export default function CajasPage() {
             </div>
 
             {/* Footer modal - Fijo abajo */}
-            <div className="px-5 py-3 bg-slate-100 border-t border-slate-200 flex items-center justify-between shrink-0 print:hidden">
+            <div className="px-5 py-3 bg-slate-100 border-t border-slate-200 flex flex-wrap items-center justify-between gap-3 shrink-0 print:hidden">
               <span className="text-xs text-slate-500">
-                Puede descargar el archivo en formato PDF o Excel oficial, o imprimirlo directamente en hoja horizontal.
+                Puede descargar el archivo en formato PDF o Excel oficial, o imprimirlo directamente en hoja horizontal antes de confirmar el envío.
               </span>
-              <button
-                type="button"
-                onClick={() => setModalImprimirOpen(false)}
-                className="px-3 py-1.5 text-xs font-semibold uppercase text-slate-700 bg-white border border-slate-300 hover:bg-slate-50 rounded-lg transition-colors cursor-pointer"
-              >
-                Cerrar Vista Previa
-              </button>
+              <div className="flex items-center gap-2">
+                {selectedCaja.estado === "CERRADA" && (isAdmCaja || isAdmin) && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setCajaAEnviar(selectedCaja);
+                      setModalEnviarArchivoOpen(true);
+                    }}
+                    disabled={enviandoArchivo}
+                    className="px-4 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-lg flex items-center gap-1.5 transition-colors shadow-xs cursor-pointer"
+                  >
+                    <Send className="w-3.5 h-3.5" /> Confirmar Envío a Archivo
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={() => setModalImprimirOpen(false)}
+                  className="px-3 py-1.5 text-xs font-semibold uppercase text-slate-700 bg-white border border-slate-300 hover:bg-slate-50 rounded-lg transition-colors cursor-pointer"
+                >
+                  Cerrar Vista Previa
+                </button>
+              </div>
             </div>
           </div>
         </div>

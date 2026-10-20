@@ -47,8 +47,8 @@ export interface BarraFiltrosProps {
   estadoOficial: string;
   onChangeEstadoOficial: (val: string) => void;
 
-  calidadDato: "TODOS" | "COMPLETO" | "HISTORICO_PARCIAL" | "INCOMPLETO";
-  onChangeCalidadDato: (val: "TODOS" | "COMPLETO" | "HISTORICO_PARCIAL" | "INCOMPLETO") => void;
+  calidadDato?: "TODOS" | "COMPLETO" | "HISTORICO_PARCIAL" | "INCOMPLETO";
+  onChangeCalidadDato?: (val: "TODOS" | "COMPLETO" | "HISTORICO_PARCIAL" | "INCOMPLETO") => void;
 
   filtroEstadoRapido: "TODOS" | "COMPLETADOS" | "EN_CURSO";
   onChangeFiltroEstadoRapido: (val: "TODOS" | "COMPLETADOS" | "EN_CURSO") => void;
@@ -338,10 +338,11 @@ export const BarraFiltrosReporte: React.FC<BarraFiltrosProps> = ({
           <button
             type="button"
             onClick={onLimpiarFiltros}
-            title="Restablecer todos los filtros"
-            className="p-2 text-slate-500 hover:text-slate-800 hover:bg-slate-100 rounded-xl transition border border-slate-200"
+            title="Restablecer todos los filtros a valores iniciales"
+            className="flex items-center gap-1.5 px-3.5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 hover:text-slate-900 border border-slate-300 rounded-xl text-xs font-bold shadow-xs transition active:scale-95"
           >
-            <RotateCcw className="w-4 h-4" />
+            <RotateCcw className="w-3.5 h-3.5 text-slate-600" />
+            <span>Limpiar Filtros</span>
           </button>
         </div>
       </div>
@@ -455,8 +456,8 @@ export const BarraFiltrosReporte: React.FC<BarraFiltrosProps> = ({
         </div>
       </div>
 
-      {/* 3. SELECTORES DE DIMENSIONES: PROCESO, ÁREA, FUNCIONARIO, ESTADO, CALIDAD */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-3 pt-1">
+      {/* 3. SELECTORES DE DIMENSIONES: PROCESO, ÁREA, FUNCIONARIO, ESTADO */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 pt-1">
         {/* Selector de Tipo de Proceso */}
         <div>
           <label className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider block mb-1">
@@ -514,25 +515,6 @@ export const BarraFiltrosReporte: React.FC<BarraFiltrosProps> = ({
                 {est === "TODOS" ? "Todos los Estados" : est}
               </option>
             ))}
-          </select>
-        </div>
-
-        {/* Selector de Calidad del Dato */}
-        <div>
-          <label className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider block mb-1">
-            Calidad del Dato
-          </label>
-          <select
-            value={calidadDato}
-            onChange={(e) =>
-              onChangeCalidadDato(e.target.value as "TODOS" | "COMPLETO" | "HISTORICO_PARCIAL" | "INCOMPLETO")
-            }
-            className="w-full px-3 py-2 text-xs font-semibold border border-slate-300 rounded-xl bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none text-slate-800"
-          >
-            <option value="TODOS">Todas las Calidades</option>
-            <option value="COMPLETO">Completo (Doble Reloj)</option>
-            <option value="HISTORICO_PARCIAL">Histórico Parcial (Migrado)</option>
-            <option value="INCOMPLETO">Incompleto (Para Corrección)</option>
           </select>
         </div>
       </div>

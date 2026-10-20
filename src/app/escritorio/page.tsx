@@ -20,6 +20,9 @@ import {
   Package,
   User,
   ShieldCheck,
+  Printer,
+  X,
+  FileDown,
 } from "lucide-react";
 
 export default function EscritorioPage() {
@@ -30,6 +33,7 @@ export default function EscritorioPage() {
     | "escritorio"
     | "reasignados"
     | "aprobacion"
+    | "aprobados"
     | "observados"
     | "todos_area"
     | "ingresados"
@@ -128,7 +132,7 @@ export default function EscritorioPage() {
     );
   }, [currentUser]);
 
-  // Criterio para trámites en espera de Autorización DFI
+  // Criterio para trámites en espera de Autorización DFI (Directora)
   const isTramiteParaAutorizarDFI = (t: TramiteCompletoDTO) => {
     if (t.autorizado_pago) return false;
     return (
@@ -138,9 +142,22 @@ export default function EscritorioPage() {
     );
   };
 
-  // Trámites seleccionables en estado INGRESADO
+  // Criterio para trámites con Pago Aprobado (listos para entrega a Tesorería por Secretaría)
+  const isTramitePagoAprobado = (t: TramiteCompletoDTO) => {
+    return (
+      t.estado_general === "PAGO_APROBADO" ||
+      t.sub_estado === "APROBADO_POR_ENTREGAR_TESORERIA"
+    );
+  };
+
+  // Trámites seleccionables en estado INGRESADO (Por entregar a Presupuesto)
   const tramitesIngresadosEnVista = useMemo(() => {
     return tramites.filter((t) => t.estado_general === "INGRESADO");
+  }, [tramites]);
+
+  // Trámites seleccionables en estado PAGO_APROBADO (Por entregar a Tesorería)
+  const tramitesPagoAprobadoEnVista = useMemo(() => {
+    return tramites.filter(isTramitePagoAprobado);
   }, [tramites]);
 
   // Trámites seleccionables para Autorización DFI
@@ -165,8 +182,30 @@ export default function EscritorioPage() {
     );
   }, [tramites, selectedIds]);
 
+  const selectedSonDeIngresados = useMemo(() => {
+    const selectedTramites = tramites.filter((t) => selectedIds.includes(t.id_tramite));
+    return (
+      selectedTramites.length > 0 &&
+      selectedTramites.every((t) => t.estado_general === "INGRESADO")
+    );
+  }, [tramites, selectedIds]);
+
+  const selectedSonDePagoAprobado = useMemo(() => {
+    const selectedTramites = tramites.filter((t) => selectedIds.includes(t.id_tramite));
+    return (
+      selectedTramites.length > 0 &&
+      selectedTramites.every((t) => isTramitePagoAprobado(t))
+    );
+  }, [tramites, selectedIds]);
+
   // Universo de trámites seleccionables en la vista actual
   const selectableTramitesEnVista = useMemo(() => {
+    if (activeTab === "aprobados" || selectedSonDePagoAprobado) {
+      return tramitesPagoAprobadoEnVista;
+    }
+    if (activeTab === "ingresados" || selectedSonDeIngresados) {
+      return tramitesIngresadosEnVista;
+    }
     if (selectedSonDeDfi) return tramitesDfiEnVista;
     if (
       selectedSonDePresupuesto ||
@@ -177,13 +216,20 @@ export default function EscritorioPage() {
     if (isDirectoraOrAdmin && tramitesDfiEnVista.length > 0) {
       return tramitesDfiEnVista;
     }
+    if (tramitesPagoAprobadoEnVista.length > 0 && !selectedSonDeIngresados) {
+      return tramitesPagoAprobadoEnVista;
+    }
     return tramitesIngresadosEnVista;
   }, [
+    activeTab,
+    selectedSonDePagoAprobado,
+    selectedSonDeIngresados,
     selectedSonDeDfi,
     selectedSonDePresupuesto,
     selectedIds,
     tramitesDfiEnVista,
     tramitesIngresadosEnVista,
+    tramitesPagoAprobadoEnVista,
     isDirectoraOrAdmin,
   ]);
 
@@ -203,15 +249,46 @@ export default function EscritorioPage() {
 
   const toggleSelectAllIngresados = toggleSelectAll;
 
+  // Selección individual con BLOQUEO ESTRICTO DE MEZCLA entre 'Por Entregar' y 'PAGO_APROBADO'
   const toggleSelectOne = (id: number) => {
+    const target = tramites.find((t) => t.id_tramite === id);
+    if (!target) return;
+
+    if (!selectedIds.includes(id)) {
+      const selectedTramites = tramites.filter((t) => selectedIds.includes(t.id_tramite));
+      const yaTieneIngresado = selectedTramites.some((t) => t.estado_general === "INGRESADO");
+      const yaTieneAprobado = selectedTramites.some((t) => isTramitePagoAprobado(t));
+      const isTargetIngresado = target.estado_general === "INGRESADO";
+      const isTargetAprobado = isTramitePagoAprobado(target);
+
+      if (isTargetAprobado && yaTieneIngresado) {
+        setBatchErrorMessage(
+          "No puedes mezclar en un mismo documento trámites 'Por Entregar a Presupuesto' con trámites 'Aprobados para Tesorería'. Selecciónalos por separado."
+        );
+        return;
+      }
+      if (isTargetIngresado && yaTieneAprobado) {
+        setBatchErrorMessage(
+          "No puedes mezclar en un mismo documento trámites 'Por Entregar a Presupuesto' con trámites 'Aprobados para Tesorería'. Selecciónalos por separado."
+        );
+        return;
+      }
+    }
+
+    setBatchErrorMessage(null);
     setSelectedIds((prev) =>
       prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]
     );
   };
 
-  // Estados para modal de confirmación de entrega Secretaría
+  // Estados para modal de confirmación de entrega Secretaría -> Control Previo
   const [modalConfirmarEntregaOpen, setModalConfirmarEntregaOpen] = useState(false);
   const [downloadingExcel, setDownloadingExcel] = useState(false);
+
+  // Estados para modal de confirmación y entrega Secretaría -> Tesorería (PAGO_APROBADO)
+  const [modalConfirmarEntregaTesoreriaOpen, setModalConfirmarEntregaTesoreriaOpen] = useState(false);
+  const [downloadingAprobadosExcel, setDownloadingAprobadosExcel] = useState(false);
+  const [deliveringTesoreriaBatch, setDeliveringTesoreriaBatch] = useState(false);
 
   // Estados para modal de confirmación y descarga de Autorización DFI
   const [modalConfirmarAutorizacionDfiOpen, setModalConfirmarAutorizacionDfiOpen] = useState(false);
@@ -394,7 +471,7 @@ export default function EscritorioPage() {
 
       setBatchSuccessMessage(
         data.mensaje ||
-          `¡Autorización completada! ${selectedIds.length} trámite(s) autorizados y derivados formalmente a Tesorería / Pagos.`
+          `¡Autorización completada! ${selectedIds.length} trámite(s) autorizados y derivados formalmente a Secretaría para acta y entrega a Tesorería.`
       );
       setModalConfirmarAutorizacionDfiOpen(false);
       setSelectedIds([]);
@@ -403,6 +480,85 @@ export default function EscritorioPage() {
       setBatchErrorMessage(err.message || "Error al autorizar los trámites");
     } finally {
       setAuthorizingDfiBatch(false);
+    }
+  };
+
+  // MODO SECRETARÍA -> TESORERÍA 1: Descargar Acta Excel de Trámites Aprobados
+  const handleDescargarActaAprobadosExcel = async () => {
+    if (selectedIds.length === 0) return;
+    setDownloadingAprobadosExcel(true);
+    setBatchSuccessMessage(null);
+    setBatchErrorMessage(null);
+
+    try {
+      const res = await fetch("/api/tramites/entregar-tesoreria-lote", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ids: selectedIds, accion: "EXCEL" }),
+      });
+
+      if (!res.ok) {
+        const errData = await res.json();
+        throw new Error(errData.error || "Error al generar el Acta Excel de entrega a Tesorería");
+      }
+
+      const blob = await res.blob();
+      const contentDisposition = res.headers.get("content-disposition");
+      let filename = "Acta_Entrega_Tesoreria_Aprobados.xlsx";
+      if (contentDisposition) {
+        const match = contentDisposition.match(/filename="?([^"]+)"?/);
+        if (match && match[1]) filename = match[1];
+      }
+
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(url);
+
+      setBatchSuccessMessage(
+        `Acta Excel para Tesorería descargada exitosamente (${selectedIds.length} trámites). Revise el documento antes de confirmar el envío.`
+      );
+    } catch (err: any) {
+      setBatchErrorMessage(err.message || "Error al descargar el Acta Excel");
+    } finally {
+      setDownloadingAprobadosExcel(false);
+    }
+  };
+
+  // MODO SECRETARÍA -> TESORERÍA 2: Confirmar Entrega de Trámites Aprobados a Tesorería
+  const handleConfirmarEntregaTesoreriaLote = async () => {
+    if (selectedIds.length === 0) return;
+    setDeliveringTesoreriaBatch(true);
+    setBatchSuccessMessage(null);
+    setBatchErrorMessage(null);
+
+    try {
+      const res = await fetch("/api/tramites/entregar-tesoreria-lote", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ids: selectedIds, accion: "ENTREGAR" }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || "Error al entregar los trámites a Tesorería");
+      }
+
+      setBatchSuccessMessage(
+        data.mensaje ||
+          `¡Entrega completada! ${selectedIds.length} trámite(s) entregados formalmente a Tesorería / Pagos.`
+      );
+      setModalConfirmarEntregaTesoreriaOpen(false);
+      setSelectedIds([]);
+      fetchTramites();
+    } catch (err: any) {
+      setBatchErrorMessage(err.message || "Error al entregar los trámites a Tesorería");
+    } finally {
+      setDeliveringTesoreriaBatch(false);
     }
   };
 
@@ -527,9 +683,11 @@ export default function EscritorioPage() {
             </span>
             <span className="text-xs font-medium text-slate-100">
               {selectedSonDeDfi && isDirectoraOrAdmin
-                ? "Expedientes DFI listos para emisión de acta y autorización formal de pago a Tesorería."
+                ? "Expedientes DFI listos para emisión de acta y autorización formal de pago."
                 : selectedSonDePresupuesto
                 ? "Expedientes físicos entregados a Presupuesto listos para confirmar recepción e iniciar SLA institucional."
+                : selectedSonDePagoAprobado
+                ? "Expedientes con pago aprobado por la Directora listos para emitir acta y entregar a Tesorería."
                 : "Trámites en estado INGRESADO listos para entregar a Control Previo (Presupuesto)."}
             </span>
           </div>
@@ -557,10 +715,10 @@ export default function EscritorioPage() {
                   onClick={() => setModalConfirmarAutorizacionDfiOpen(true)}
                   disabled={authorizingDfiBatch}
                   className="px-4 py-2 bg-emerald-500 hover:bg-emerald-600 text-white text-xs font-bold rounded-lg transition-all shadow-md flex items-center gap-2"
-                  title="Autorizar formalmente el pago de los expedientes y derivar a Tesorería"
+                  title="Autorizar formalmente el pago de los expedientes y derivar a Secretaría"
                 >
                   <CheckCircle2 className="w-4 h-4" />
-                  {authorizingDfiBatch ? "Autorizando..." : "Autorizar y Derivar a Tesorería"}
+                  {authorizingDfiBatch ? "Autorizando..." : "Autorizar Pago"}
                 </button>
               </>
             ) : selectedSonDePresupuesto && isPresupuestoOrAdmin ? (
@@ -573,6 +731,27 @@ export default function EscritorioPage() {
                 <CheckCircle2 className="w-4 h-4" />
                 {deliveringBatch ? "Recibiendo..." : `Recibir Físicamente (${selectedIds.length})`}
               </button>
+            ) : selectedSonDePagoAprobado && isDFIOrAdmin ? (
+              <>
+                <button
+                  onClick={handleDescargarActaAprobadosExcel}
+                  disabled={downloadingAprobadosExcel}
+                  className="px-3.5 py-2 bg-blue-800/80 hover:bg-blue-700 text-white text-xs font-semibold rounded-lg border border-blue-400/30 transition-all shadow-xs flex items-center gap-2"
+                  title="Descargar Acta oficial de Entrega a Tesorería en Excel"
+                >
+                  <FileSpreadsheet className="w-4 h-4 text-emerald-400" />
+                  {downloadingAprobadosExcel ? "Descargando..." : "Descargar Acta de Entrega (Excel)"}
+                </button>
+                <button
+                  onClick={() => setModalConfirmarEntregaTesoreriaOpen(true)}
+                  disabled={deliveringTesoreriaBatch}
+                  className="px-4 py-2 bg-emerald-500 hover:bg-emerald-600 text-white text-xs font-bold rounded-lg transition-all shadow-md flex items-center gap-2"
+                  title="Confirmar entrega de expedientes aprobados a Tesorería / Pagos"
+                >
+                  <Send className="w-4 h-4" />
+                  {deliveringTesoreriaBatch ? "Entregando..." : "Entregar a Tesorería"}
+                </button>
+              </>
             ) : (
               <>
                 <button
@@ -599,159 +778,464 @@ export default function EscritorioPage() {
         </div>
       )}
 
-      {/* Modal de Confirmación de Entrega Definitiva a Control Previo */}
+      {/* MODAL 1: VISTA PREVIA Y FORMATO DE IMPRESIÓN OFICIAL - ENTREGA A CONTROL PREVIO */}
       {modalConfirmarEntregaOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-200">
-          <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 max-w-lg w-full overflow-hidden p-6 space-y-5">
-            <div className="flex items-start gap-3">
-              <div className="p-2.5 bg-emerald-100 text-emerald-700 rounded-xl shrink-0">
-                <Send className="w-6 h-6" />
-              </div>
-              <div className="space-y-1">
-                <h3 className="text-base font-bold text-slate-900">
-                  Confirmar Entrega a Control Previo
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/70 backdrop-blur-xs p-2 sm:p-4 md:p-6 print:p-0 print:bg-white print:static print-document-root">
+          <div className="bg-white rounded-xl shadow-2xl border border-slate-200 w-full max-w-5xl max-h-[92vh] flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-150 print:border-none print:shadow-none print:max-w-none print:max-h-none print:overflow-visible">
+            {/* Header del modal */}
+            <div className="px-5 py-3.5 bg-slate-900 text-white flex flex-wrap items-center justify-between gap-3 shrink-0 shadow-md print:hidden">
+              <div className="flex items-center gap-2">
+                <Printer className="w-4 h-4 text-blue-400 shrink-0" />
+                <h3 className="text-xs font-bold uppercase tracking-wider truncate">
+                  Documento Oficial de Entrega a Control Previo
                 </h3>
-                <p className="text-xs text-slate-500">
-                  ¿Está seguro de enviar formalmente estos expedientes a la Jefatura de Control Previo (Presupuesto)?
-                </p>
-              </div>
-            </div>
-
-            <div className="p-3.5 bg-slate-50 border border-slate-200 rounded-xl space-y-2">
-              <div className="flex items-center justify-between text-xs font-semibold text-slate-700">
-                <span>Trámites seleccionados:</span>
-                <span className="font-mono bg-blue-100 text-blue-800 px-2 py-0.5 rounded font-bold">
-                  {selectedIds.length} trámite(s)
+                <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-blue-800 text-blue-200 border border-blue-600">
+                  {selectedIds.length} expediente(s)
                 </span>
               </div>
-              <div className="text-[11px] text-slate-500 max-h-36 overflow-y-auto space-y-1 divide-y divide-slate-100">
-                {tramites
-                  .filter((t) => selectedIds.includes(t.id_tramite))
-                  .map((t) => (
-                    <div key={t.id_tramite} className="pt-1 flex items-center justify-between">
-                      <span className="font-mono font-medium text-slate-700">
-                        {t.numero_quipux}
-                      </span>
-                      <span className="text-[10px] text-slate-500 truncate max-w-[200px]">
-                        {t.proveedor_beneficiario}
-                      </span>
-                    </div>
-                  ))}
+              <div className="flex items-center gap-2 flex-wrap">
+                <button
+                  type="button"
+                  onClick={() => window.print()}
+                  className="px-3 py-1.5 bg-slate-700 hover:bg-slate-800 text-white text-xs font-bold rounded-md flex items-center gap-1.5 transition-colors shadow-xs cursor-pointer"
+                  title="Imprimir documento oficial en formato horizontal"
+                >
+                  <Printer className="w-3.5 h-3.5" /> Imprimir Documento
+                </button>
+                <button
+                  type="button"
+                  onClick={handleDescargarActaExcel}
+                  disabled={downloadingExcel}
+                  className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-md flex items-center gap-1.5 transition-colors shadow-xs cursor-pointer"
+                  title="Descargar acta oficial en Excel (.xlsx)"
+                >
+                  <FileSpreadsheet className="w-3.5 h-3.5" /> {downloadingExcel ? "Descargando..." : "Descargar Excel"}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setModalConfirmarEntregaOpen(false)}
+                  className="text-slate-400 hover:text-white transition-colors p-1.5 rounded-md hover:bg-slate-800 cursor-pointer ml-1"
+                  title="Cerrar modal"
+                >
+                  <X className="w-4 h-4" />
+                </button>
               </div>
             </div>
 
-            <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg text-[11px] text-amber-800 leading-relaxed">
-              💡 <strong>Recomendación:</strong> Si aún no ha verificado el listado físico, puede presionar <em>Cancelar</em> y pulsar <em>"Generar Acta Excel"</em> para constatar los números de quipux antes del envío.
+            {/* Hoja Documento Oficial */}
+            <div className="flex-1 overflow-y-auto overflow-x-auto p-4 sm:p-8 bg-white text-slate-900 print:p-0 print:overflow-visible font-sans">
+              <div className="bg-[#0B3B60] text-white py-2.5 px-4 text-center border border-slate-900">
+                <h2 className="text-sm font-bold uppercase tracking-wide font-sans">
+                  DOCUMENTO ENTREGADOS A CONTROL PREVIO
+                </h2>
+              </div>
+              <div className="bg-[#F1F5F9] text-[#475569] py-2 px-4 text-center border-x border-b border-slate-900 font-bold font-sans text-[11px] tracking-wide">
+                SERVICIO NACIONAL DE ADUANA DEL ECUADOR | FECHA DE EMISIÓN: {new Date().toLocaleDateString("es-EC")}
+              </div>
+
+              <div className="overflow-x-auto w-full max-w-full min-w-0">
+                <table className="min-w-[850px] w-full text-[11px] border-collapse border border-slate-900 font-sans">
+                  <thead>
+                    <tr className="bg-[#0B3B60] text-white font-bold uppercase border-b border-slate-900">
+                      <th className="border border-slate-900 py-2.5 px-2 text-center w-[4%]">Nro</th>
+                      <th className="border border-slate-900 py-2.5 px-2 text-center w-[10%]">TIPO GESTION</th>
+                      <th className="border border-slate-900 py-2.5 px-2 text-center w-[10%]">AREA</th>
+                      <th className="border border-slate-900 py-2.5 px-2 text-center w-[16%]">Documento / Quipux</th>
+                      <th className="border border-slate-900 py-2.5 px-2 text-center w-[10%]">FECHA MEMORANDO</th>
+                      <th className="border border-slate-900 py-2.5 px-2 text-center w-[10%]">FECHA RECEPCION</th>
+                      <th className="border border-slate-900 py-2.5 px-3 text-left w-[24%]">ASUNTO</th>
+                      <th className="border border-slate-900 py-2.5 px-2 text-center w-[8%]">RECIBE</th>
+                      <th className="border border-slate-900 py-2.5 px-2 text-center w-[8%]">FECHA RECIBIDO</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {tramites
+                      .filter((t) => selectedIds.includes(t.id_tramite))
+                      .map((t, idx) => (
+                        <tr key={t.id_tramite} className="border-b border-slate-900">
+                          <td className="border border-slate-900 py-2.5 px-2 text-center font-bold">
+                            {idx + 1}
+                          </td>
+                          <td className="border border-slate-900 py-2.5 px-2 text-center font-semibold">
+                            {t.tipo_gestion || t.padre_gestion || "PAGO"}
+                          </td>
+                          <td className="border border-slate-900 py-2.5 px-2 text-center text-slate-700">
+                            {t.area_requirente || "-"}
+                          </td>
+                          <td className="border border-slate-900 py-2.5 px-2 text-center font-mono font-bold text-blue-900">
+                            {t.numero_quipux}
+                          </td>
+                          <td className="border border-slate-900 py-2.5 px-2 text-center">
+                            {formatDate(t.fecha_memorando) || "-"}
+                          </td>
+                          <td className="border border-slate-900 py-2.5 px-2 text-center">
+                            {formatDate(t.fecha_recepcion_fisica) || "-"}
+                          </td>
+                          <td className="border border-slate-900 py-2.5 px-3 text-left text-[10px] leading-tight text-slate-800">
+                            <div className="line-clamp-2 font-medium">{t.asunto || "-"}</div>
+                            <div className="text-[10px] text-slate-500 font-semibold mt-0.5">
+                              {t.proveedor_beneficiario}
+                            </div>
+                          </td>
+                          <td className="border border-slate-900 py-2.5 px-2 text-center text-slate-400 italic">
+                            {/* Espacio para firma física */}
+                          </td>
+                          <td className="border border-slate-900 py-2.5 px-2 text-center text-slate-400 italic">
+                            {/* Espacio para fecha de recepción física */}
+                          </td>
+                        </tr>
+                      ))}
+                  </tbody>
+                  <tfoot>
+                    <tr className="bg-[#E2E8F0] font-bold text-slate-900 border-t border-slate-900">
+                      <td colSpan={6} className="border border-slate-900 py-2 px-3 text-right">
+                        TOTAL DE EXPEDIENTES:
+                      </td>
+                      <td colSpan={3} className="border border-slate-900 py-2 px-3 text-left font-mono">
+                        {selectedIds.length} trámite(s)
+                      </td>
+                    </tr>
+                  </tfoot>
+                </table>
+              </div>
             </div>
 
-            <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
-              <button
-                type="button"
-                onClick={() => setModalConfirmarEntregaOpen(false)}
-                disabled={deliveringBatch}
-                className="px-3.5 py-2 text-xs font-medium text-slate-600 hover:text-slate-800 hover:bg-slate-100 rounded-lg transition-colors"
-              >
-                Cancelar y Revisar
-              </button>
-              <button
-                type="button"
-                onClick={handleConfirmarEntregaLote}
-                disabled={deliveringBatch}
-                className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-lg transition-all shadow-md flex items-center gap-1.5"
-              >
-                <CheckCircle2 className="w-4 h-4" />
-                {deliveringBatch ? "Procesando Entrega..." : "Confirmar y Enviar Trámites"}
-              </button>
+            {/* Footer modal */}
+            <div className="px-5 py-3 bg-slate-100 border-t border-slate-200 flex flex-wrap items-center justify-between gap-3 shrink-0 print:hidden">
+              <span className="text-xs text-slate-500">
+                Revise y/o imprima el acta de entrega antes de formalizar el despacho a Control Previo (Presupuesto).
+              </span>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setModalConfirmarEntregaOpen(false)}
+                  disabled={deliveringBatch}
+                  className="px-3.5 py-2 text-xs font-medium text-slate-600 hover:text-slate-800 hover:bg-slate-200 rounded-lg transition-colors cursor-pointer"
+                >
+                  Cancelar y Revisar
+                </button>
+                <button
+                  type="button"
+                  onClick={handleConfirmarEntregaLote}
+                  disabled={deliveringBatch}
+                  className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-lg transition-all shadow-md flex items-center gap-1.5 cursor-pointer"
+                >
+                  <Send className="w-4 h-4" />
+                  {deliveringBatch ? "Procesando Entrega..." : "Confirmar y Enviar a Control Previo"}
+                </button>
+              </div>
             </div>
           </div>
         </div>
       )}
 
-      {/* Modal de Confirmación de Autorización DFI y Pase a Tesorería */}
+      {/* MODAL 2: VISTA PREVIA Y AUTORIZACIÓN DFI */}
       {modalConfirmarAutorizacionDfiOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-200">
-          <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 max-w-lg w-full overflow-hidden p-6 space-y-5">
-            <div className="flex items-start gap-3">
-              <div className="p-2.5 bg-blue-100 text-blue-800 rounded-xl shrink-0">
-                <ShieldCheck className="w-6 h-6" />
-              </div>
-              <div className="space-y-1">
-                <h3 className="text-base font-bold text-slate-900">
-                  Autorizar Pago y Derivar a Tesorería
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/70 backdrop-blur-xs p-2 sm:p-4 md:p-6 print:p-0 print:bg-white print:static print-document-root">
+          <div className="bg-white rounded-xl shadow-2xl border border-slate-200 w-full max-w-5xl max-h-[92vh] flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-150 print:border-none print:shadow-none print:max-w-none print:max-h-none print:overflow-visible">
+            {/* Header del modal */}
+            <div className="px-5 py-3.5 bg-slate-900 text-white flex flex-wrap items-center justify-between gap-3 shrink-0 shadow-md print:hidden">
+              <div className="flex items-center gap-2">
+                <ShieldCheck className="w-4 h-4 text-emerald-400 shrink-0" />
+                <h3 className="text-xs font-bold uppercase tracking-wider truncate">
+                  Acta Oficial de Autorización de Pago DFI
                 </h3>
-                <p className="text-xs text-slate-500">
-                  ¿Está segura de autorizar formalmente el pago de estos expedientes y derivar su custodia a Tesorería / Pagos?
-                </p>
+                <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-blue-800 text-blue-200 border border-blue-600">
+                  {selectedIds.length} expediente(s)
+                </span>
+              </div>
+              <div className="flex items-center gap-2 flex-wrap">
+                <button
+                  type="button"
+                  onClick={() => window.print()}
+                  className="px-3 py-1.5 bg-slate-700 hover:bg-slate-800 text-white text-xs font-bold rounded-md flex items-center gap-1.5 transition-colors shadow-xs cursor-pointer"
+                  title="Imprimir acta oficial de autorización DFI"
+                >
+                  <Printer className="w-3.5 h-3.5" /> Imprimir Documento
+                </button>
+                <button
+                  type="button"
+                  onClick={handleDescargarActaAutorizacionDfiExcel}
+                  disabled={downloadingDfiExcel}
+                  className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-md flex items-center gap-1.5 transition-colors shadow-xs cursor-pointer"
+                  title="Descargar acta oficial en Excel (.xlsx)"
+                >
+                  <FileSpreadsheet className="w-3.5 h-3.5" /> {downloadingDfiExcel ? "Descargando..." : "Descargar Excel"}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setModalConfirmarAutorizacionDfiOpen(false)}
+                  className="text-slate-400 hover:text-white transition-colors p-1.5 rounded-md hover:bg-slate-800 cursor-pointer ml-1"
+                  title="Cerrar modal"
+                >
+                  <X className="w-4 h-4" />
+                </button>
               </div>
             </div>
 
-            <div className="p-3.5 bg-slate-50 border border-slate-200 rounded-xl space-y-2">
-              <div className="flex items-center justify-between text-xs font-semibold text-slate-700">
-                <span>Trámites a autorizar:</span>
-                <span className="font-mono bg-blue-100 text-blue-800 px-2 py-0.5 rounded font-bold">
-                  {selectedIds.length} trámite(s)
-                </span>
+            {/* Hoja Documento Oficial */}
+            <div className="flex-1 overflow-y-auto overflow-x-auto p-4 sm:p-8 bg-white text-slate-900 print:p-0 print:overflow-visible font-sans">
+              <div className="bg-[#0B3B60] text-white py-2.5 px-4 text-center border border-slate-900">
+                <h2 className="text-sm font-bold uppercase tracking-wide font-sans">
+                  ACTA DE AUTORIZACIÓN DE PAGO - DIRECCIÓN FINANCIERA
+                </h2>
               </div>
-              <div className="text-[11px] text-slate-500 max-h-40 overflow-y-auto space-y-1.5 divide-y divide-slate-100">
-                {tramites
-                  .filter((t) => selectedIds.includes(t.id_tramite))
-                  .map((t) => (
-                    <div key={t.id_tramite} className="pt-1.5 flex items-center justify-between">
-                      <div className="min-w-0 pr-2">
-                        <div className="font-mono font-bold text-slate-800 truncate">
-                          {t.numero_quipux}
-                        </div>
-                        <div className="text-[10px] text-slate-500 truncate">
-                          {t.proveedor_beneficiario}
-                        </div>
-                      </div>
-                      <div className="text-right shrink-0">
-                        <div className="font-mono font-bold text-emerald-700">
-                          {formatCurrency(t.monto_total || t.subtotal || 0)}
-                        </div>
-                        {t.numero_cur_devengado && (
-                          <div className="text-[9px] font-mono text-slate-400">
-                            CUR Dev: {t.numero_cur_devengado}
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  ))}
+              <div className="bg-[#F1F5F9] text-[#475569] py-2 px-4 text-center border-x border-b border-slate-900 font-bold font-sans text-[11px] tracking-wide">
+                SERVICIO NACIONAL DE ADUANA DEL ECUADOR | FECHA DE EMISIÓN: {new Date().toLocaleDateString("es-EC")}
               </div>
-              <div className="pt-2 border-t border-slate-200 flex items-center justify-between text-xs font-bold text-slate-800">
-                <span>Monto Total Autorizado:</span>
-                <span className="font-mono text-sm text-emerald-800">
-                  {formatCurrency(
-                    tramites
+
+              <div className="overflow-x-auto w-full max-w-full min-w-0">
+                <table className="min-w-[850px] w-full text-[11px] border-collapse border border-slate-900 font-sans">
+                  <thead>
+                    <tr className="bg-[#0B3B60] text-white font-bold uppercase border-b border-slate-900">
+                      <th className="border border-slate-900 py-2.5 px-2 text-center w-[4%]">No.</th>
+                      <th className="border border-slate-900 py-2.5 px-2 text-center w-[16%]">Documento / Quipux</th>
+                      <th className="border border-slate-900 py-2.5 px-3 text-left w-[24%]">Proveedor / Beneficiario</th>
+                      <th className="border border-slate-900 py-2.5 px-2 text-center w-[11%]">RUC / Cédula</th>
+                      <th className="border border-slate-900 py-2.5 px-2 text-center w-[11%]">N° CUR</th>
+                      <th className="border border-slate-900 py-2.5 px-3 text-right w-[14%]">Monto Autorizado</th>
+                      <th className="border border-slate-900 py-2.5 px-2 text-center w-[20%]">Firma Autorización DFI</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {tramites
                       .filter((t) => selectedIds.includes(t.id_tramite))
-                      .reduce((acc, curr) => acc + (Number(curr.monto_total || curr.subtotal) || 0), 0)
-                  )}
-                </span>
+                      .map((t, idx) => {
+                        const curDisplay = [
+                          t.numero_cur_devengado,
+                          t.numero_cur_contable,
+                          t.numero_cur_compromiso,
+                        ].filter(Boolean).join(", ") || "-";
+
+                        return (
+                          <tr key={t.id_tramite} className="border-b border-slate-900">
+                            <td className="border border-slate-900 py-2.5 px-2 text-center font-bold">
+                              {idx + 1}
+                            </td>
+                            <td className="border border-slate-900 py-2.5 px-2 text-center font-mono font-bold text-blue-900">
+                              {t.numero_quipux}
+                            </td>
+                            <td className="border border-slate-900 py-2.5 px-3 text-left">
+                              <div className="font-semibold text-slate-900">{t.proveedor_beneficiario}</div>
+                              {t.asunto && (
+                                <div className="text-[10px] text-slate-500 line-clamp-1 italic">{t.asunto}</div>
+                              )}
+                            </td>
+                            <td className="border border-slate-900 py-2.5 px-2 text-center font-mono text-slate-700">
+                              {t.ruc_proveedor || "-"}
+                            </td>
+                            <td className="border border-slate-900 py-2.5 px-2 text-center font-mono font-bold text-slate-800">
+                              {curDisplay}
+                            </td>
+                            <td className="border border-slate-900 py-2.5 px-3 text-right font-mono font-bold text-emerald-800">
+                              {formatCurrency(t.monto_total || t.subtotal || 0)}
+                            </td>
+                            <td className="border border-slate-900 py-2.5 px-2 text-center text-slate-400 italic text-[10px]">
+                              {/* Espacio para firma institucional */}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                  </tbody>
+                  <tfoot>
+                    <tr className="bg-[#E2E8F0] font-bold text-slate-900 border-t border-slate-900">
+                      <td colSpan={5} className="border border-slate-900 py-2 px-3 text-right">
+                        TOTAL MONTO AUTORIZADO:
+                      </td>
+                      <td className="border border-slate-900 py-2 px-3 text-right font-mono text-emerald-900">
+                        {formatCurrency(
+                          tramites
+                            .filter((t) => selectedIds.includes(t.id_tramite))
+                            .reduce((acc, curr) => acc + (Number(curr.monto_total || curr.subtotal) || 0), 0)
+                        )}
+                      </td>
+                      <td className="border border-slate-900 py-2 px-2"></td>
+                    </tr>
+                  </tfoot>
+                </table>
               </div>
             </div>
 
-            <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg text-[11px] text-blue-900 leading-relaxed">
-              🏛️ <strong>Efecto institucional:</strong> Se registrará su firma digital de autorización de pago (<em>autorizado_pago = true</em>), se actualizará el estado a <em>AUTORIZADO_EN_TESORERIA</em> y la custodia física pasará automáticamente a la Jefatura de Tesorería.
+            {/* Footer modal */}
+            <div className="px-5 py-3 bg-slate-100 border-t border-slate-200 flex flex-wrap items-center justify-between gap-3 shrink-0 print:hidden">
+              <span className="text-xs text-slate-500">
+                Al autorizar, los expedientes pasarán a estado PAGO_APROBADO bajo custodia de Secretaría para emitir el acta física hacia Tesorería.
+              </span>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setModalConfirmarAutorizacionDfiOpen(false)}
+                  disabled={authorizingDfiBatch}
+                  className="px-3.5 py-2 text-xs font-medium text-slate-600 hover:text-slate-800 hover:bg-slate-200 rounded-lg transition-colors cursor-pointer"
+                >
+                  Cancelar y Revisar
+                </button>
+                <button
+                  type="button"
+                  onClick={handleConfirmarAutorizarDfiLote}
+                  disabled={authorizingDfiBatch}
+                  className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-lg transition-all shadow-md flex items-center gap-1.5 cursor-pointer"
+                >
+                  <CheckCircle2 className="w-4 h-4" />
+                  {authorizingDfiBatch ? "Autorizando..." : "Confirmar Autorización de Pago"}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL 3: VISTA PREVIA Y FORMATO DE IMPRESIÓN OFICIAL - ENTREGA A TESORERÍA (PAGO_APROBADO) */}
+      {modalConfirmarEntregaTesoreriaOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/70 backdrop-blur-xs p-2 sm:p-4 md:p-6 print:p-0 print:bg-white print:static print-document-root">
+          <div className="bg-white rounded-xl shadow-2xl border border-slate-200 w-full max-w-5xl max-h-[92vh] flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-150 print:border-none print:shadow-none print:max-w-none print:max-h-none print:overflow-visible">
+            {/* Header del modal */}
+            <div className="px-5 py-3.5 bg-slate-900 text-white flex flex-wrap items-center justify-between gap-3 shrink-0 shadow-md print:hidden">
+              <div className="flex items-center gap-2">
+                <Printer className="w-4 h-4 text-emerald-400 shrink-0" />
+                <h3 className="text-xs font-bold uppercase tracking-wider truncate">
+                  Acta Oficial de Entrega de Trámites Aprobados a Tesorería
+                </h3>
+                <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-emerald-800 text-emerald-200 border border-emerald-600">
+                  {selectedIds.length} expediente(s)
+                </span>
+              </div>
+              <div className="flex items-center gap-2 flex-wrap">
+                <button
+                  type="button"
+                  onClick={() => window.print()}
+                  className="px-3 py-1.5 bg-slate-700 hover:bg-slate-800 text-white text-xs font-bold rounded-md flex items-center gap-1.5 transition-colors shadow-xs cursor-pointer"
+                  title="Imprimir acta oficial de entrega a Tesorería"
+                >
+                  <Printer className="w-3.5 h-3.5" /> Imprimir Documento
+                </button>
+                <button
+                  type="button"
+                  onClick={handleDescargarActaAprobadosExcel}
+                  disabled={downloadingAprobadosExcel}
+                  className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-md flex items-center gap-1.5 transition-colors shadow-xs cursor-pointer"
+                  title="Descargar acta oficial en Excel (.xlsx)"
+                >
+                  <FileSpreadsheet className="w-3.5 h-3.5" /> {downloadingAprobadosExcel ? "Descargando..." : "Descargar Excel"}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setModalConfirmarEntregaTesoreriaOpen(false)}
+                  className="text-slate-400 hover:text-white transition-colors p-1.5 rounded-md hover:bg-slate-800 cursor-pointer ml-1"
+                  title="Cerrar modal"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
             </div>
 
-            <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
-              <button
-                type="button"
-                onClick={() => setModalConfirmarAutorizacionDfiOpen(false)}
-                disabled={authorizingDfiBatch}
-                className="px-3.5 py-2 text-xs font-medium text-slate-600 hover:text-slate-800 hover:bg-slate-100 rounded-lg transition-colors"
-              >
-                Cancelar y Revisar
-              </button>
-              <button
-                type="button"
-                onClick={handleConfirmarAutorizarDfiLote}
-                disabled={authorizingDfiBatch}
-                className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-lg transition-all shadow-md flex items-center gap-1.5"
-              >
-                <CheckCircle2 className="w-4 h-4" />
-                {authorizingDfiBatch ? "Autorizando..." : "Confirmar Autorización y Derivar"}
-              </button>
+            {/* Hoja Documento Oficial */}
+            <div className="flex-1 overflow-y-auto overflow-x-auto p-4 sm:p-8 bg-white text-slate-900 print:p-0 print:overflow-visible font-sans">
+              <div className="bg-[#0B3B60] text-white py-2.5 px-4 text-center border border-slate-900">
+                <h2 className="text-sm font-bold uppercase tracking-wide font-sans">
+                  ACTA DE ENTREGA DE TRÁMITES APROBADOS A TESORERÍA / PAGOS
+                </h2>
+              </div>
+              <div className="bg-[#F1F5F9] text-[#475569] py-2 px-4 text-center border-x border-b border-slate-900 font-bold font-sans text-[11px] tracking-wide">
+                SERVICIO NACIONAL DE ADUANA DEL ECUADOR - DIRECCIÓN FINANCIERA | FECHA DE EMISIÓN: {new Date().toLocaleDateString("es-EC")}
+              </div>
+
+              <div className="overflow-x-auto w-full max-w-full min-w-0">
+                <table className="min-w-[850px] w-full text-[11px] border-collapse border border-slate-900 font-sans">
+                  <thead>
+                    <tr className="bg-[#0B3B60] text-white font-bold uppercase border-b border-slate-900">
+                      <th className="border border-slate-900 py-2.5 px-2 text-center w-[4%]">No.</th>
+                      <th className="border border-slate-900 py-2.5 px-2 text-center w-[16%]">Documento / Quipux</th>
+                      <th className="border border-slate-900 py-2.5 px-3 text-left w-[24%]">Proveedor / Beneficiario</th>
+                      <th className="border border-slate-900 py-2.5 px-2 text-center w-[11%]">RUC / Cédula</th>
+                      <th className="border border-slate-900 py-2.5 px-2 text-center w-[11%]">N° CUR</th>
+                      <th className="border border-slate-900 py-2.5 px-3 text-right w-[14%]">Monto a Pagar</th>
+                      <th className="border border-slate-900 py-2.5 px-2 text-center w-[20%]">Firma / Recepción Tesorería</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {tramites
+                      .filter((t) => selectedIds.includes(t.id_tramite))
+                      .map((t, idx) => {
+                        const curDisplay = [
+                          t.numero_cur_devengado,
+                          t.numero_cur_contable,
+                          t.numero_cur_compromiso,
+                        ].filter(Boolean).join(", ") || "-";
+
+                        return (
+                          <tr key={t.id_tramite} className="border-b border-slate-900">
+                            <td className="border border-slate-900 py-2.5 px-2 text-center font-bold">
+                              {idx + 1}
+                            </td>
+                            <td className="border border-slate-900 py-2.5 px-2 text-center font-mono font-bold text-blue-900">
+                              {t.numero_quipux}
+                            </td>
+                            <td className="border border-slate-900 py-2.5 px-3 text-left">
+                              <div className="font-semibold text-slate-900">{t.proveedor_beneficiario}</div>
+                              {t.asunto && (
+                                <div className="text-[10px] text-slate-500 line-clamp-1 italic">{t.asunto}</div>
+                              )}
+                            </td>
+                            <td className="border border-slate-900 py-2.5 px-2 text-center font-mono text-slate-700">
+                              {t.ruc_proveedor || "-"}
+                            </td>
+                            <td className="border border-slate-900 py-2.5 px-2 text-center font-mono font-bold text-slate-800">
+                              {curDisplay}
+                            </td>
+                            <td className="border border-slate-900 py-2.5 px-3 text-right font-mono font-bold text-emerald-800">
+                              {formatCurrency(t.monto_total || t.subtotal || 0)}
+                            </td>
+                            <td className="border border-slate-900 py-2.5 px-2 text-center text-slate-400 italic text-[10px]">
+                              {/* Espacio para firma de Tesorería */}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                  </tbody>
+                  <tfoot>
+                    <tr className="bg-[#E2E8F0] font-bold text-slate-900 border-t border-slate-900">
+                      <td colSpan={5} className="border border-slate-900 py-2 px-3 text-right">
+                        TOTAL MONTO A PAGAR:
+                      </td>
+                      <td className="border border-slate-900 py-2 px-3 text-right font-mono text-emerald-900">
+                        {formatCurrency(
+                          tramites
+                            .filter((t) => selectedIds.includes(t.id_tramite))
+                            .reduce((acc, curr) => acc + (Number(curr.monto_total || curr.subtotal) || 0), 0)
+                        )}
+                      </td>
+                      <td className="border border-slate-900 py-2 px-2"></td>
+                    </tr>
+                  </tfoot>
+                </table>
+              </div>
+            </div>
+
+            {/* Footer modal */}
+            <div className="px-5 py-3 bg-slate-100 border-t border-slate-200 flex flex-wrap items-center justify-between gap-3 shrink-0 print:hidden">
+              <span className="text-xs text-slate-500">
+                Al confirmar, los expedientes aprobados saldrán de Secretaría y pasarán a custodia formal de Tesorería / Pagos para su cancelación.
+              </span>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setModalConfirmarEntregaTesoreriaOpen(false)}
+                  disabled={deliveringTesoreriaBatch}
+                  className="px-3.5 py-2 text-xs font-medium text-slate-600 hover:text-slate-800 hover:bg-slate-200 rounded-lg transition-colors cursor-pointer"
+                >
+                  Cancelar y Revisar
+                </button>
+                <button
+                  type="button"
+                  onClick={handleConfirmarEntregaTesoreriaLote}
+                  disabled={deliveringTesoreriaBatch}
+                  className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-lg transition-all shadow-md flex items-center gap-1.5 cursor-pointer"
+                >
+                  <Send className="w-4 h-4" />
+                  {deliveringTesoreriaBatch ? "Entregando..." : "Confirmar y Enviar a Tesorería"}
+                </button>
+              </div>
             </div>
           </div>
         </div>
@@ -861,6 +1345,24 @@ export default function EscritorioPage() {
             </button>
           )}
 
+          {/* 6.1 Aprobados: SOLO para Secretaría DFI y Admin */}
+          {isDFIOrAdmin && (
+            <button
+              onClick={() => {
+                setActiveTab("aprobados");
+                setSelectedIds([]);
+              }}
+              className={`shrink-0 whitespace-nowrap px-3 py-1.5 rounded-md transition-all ${
+                activeTab === "aprobados"
+                  ? "bg-white text-emerald-900 shadow-xs font-bold"
+                  : "text-slate-600 hover:text-slate-900"
+              }`}
+              title="Expedientes con pago aprobado por la Directora listos para emitir acta y entregar a Tesorería"
+            >
+              Aprobados
+            </button>
+          )}
+
           {/* 7. En Caja: SOLO para Tesorería, Adm. Caja, Archivo o Admin */}
           {canManageCajas && (
             <button
@@ -924,6 +1426,8 @@ export default function EscritorioPage() {
                     <span>
                       {allSelectableSelected
                         ? "Deseleccionar todos"
+                        : activeTab === "aprobados" || selectedSonDePagoAprobado
+                        ? "Seleccionar todos los Aprobados"
                         : selectedSonDeDfi || (isDirectoraOrAdmin && tramitesDfiEnVista.length > 0)
                         ? "Seleccionar todos para Autorización DFI"
                         : "Seleccionar todos los Ingresados"}
@@ -937,10 +1441,15 @@ export default function EscritorioPage() {
 
               {tramites.map((t) => {
                 const isIngresado = t.estado_general === "INGRESADO";
+                const isAprobado = isTramitePagoAprobado(t);
                 const isDfiPendiente = isTramiteParaAutorizarDFI(t);
                 const canSelectIngresado = (isDFIOrAdmin || isPresupuestoOrAdmin) && isIngresado;
+                const canSelectAprobado = isDFIOrAdmin && isAprobado;
                 const canSelectDfi = isDirectoraOrAdmin && isDfiPendiente;
-                const canSelectThisRow = canSelectIngresado || canSelectDfi;
+                const disabledPorMezcla =
+                  (isIngresado && selectedSonDePagoAprobado) ||
+                  (isAprobado && selectedSonDeIngresados);
+                const canSelectThisRow = (canSelectIngresado || canSelectAprobado || canSelectDfi) && !disabledPorMezcla;
                 const isSelected = selectedIds.includes(t.id_tramite);
 
                 return (
@@ -1060,6 +1569,8 @@ export default function EscritorioPage() {
                           title={
                             allSelectableSelected
                               ? "Deseleccionar todos"
+                              : activeTab === "aprobados" || selectedSonDePagoAprobado
+                              ? "Seleccionar todos los Aprobados"
                               : selectedSonDeDfi || (isDirectoraOrAdmin && tramitesDfiEnVista.length > 0)
                               ? "Seleccionar todos para Autorización DFI"
                               : "Seleccionar todos los Ingresados"
@@ -1093,10 +1604,15 @@ export default function EscritorioPage() {
               <tbody className="divide-y divide-slate-100 text-xs">
                 {tramites.map((t) => {
                   const isIngresado = t.estado_general === "INGRESADO";
+                  const isAprobado = isTramitePagoAprobado(t);
                   const isDfiPendiente = isTramiteParaAutorizarDFI(t);
                   const canSelectIngresado = (isDFIOrAdmin || isPresupuestoOrAdmin) && isIngresado;
+                  const canSelectAprobado = isDFIOrAdmin && isAprobado;
                   const canSelectDfi = isDirectoraOrAdmin && isDfiPendiente;
-                  const canSelectThisRow = canSelectIngresado || canSelectDfi;
+                  const disabledPorMezcla =
+                    (isIngresado && selectedSonDePagoAprobado) ||
+                    (isAprobado && selectedSonDeIngresados);
+                  const canSelectThisRow = (canSelectIngresado || canSelectAprobado || canSelectDfi) && !disabledPorMezcla;
                   const isSelected = selectedIds.includes(t.id_tramite);
 
                   return (

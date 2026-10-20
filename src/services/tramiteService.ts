@@ -226,8 +226,8 @@ export class TramiteService {
 
   /**
    * Paso 5: Autorización de Pago por la Directora Financiera (DFI) por lote.
-   * Cambia estado_general: "DFI", sub_estado: "AUTORIZADO_EN_TESORERIA",
-   * marca autorizado_pago: true, fecha_autorizacion_pago y deriva a Tesorería (id_area: 4).
+   * Cambia estado_general: "PAGO_APROBADO", sub_estado: "APROBADO_POR_ENTREGAR_TESORERIA",
+   * marca autorizado_pago: true, fecha_autorizacion_pago y deriva a Secretaría DFI (id_area: 1).
    */
   public static async autorizarPagoDfiLote(
     idsTramites: number[],
@@ -237,13 +237,20 @@ export class TramiteService {
       throw new Error("Debe seleccionar al menos un trámite para autorizar");
     }
 
-    const tesorero = await prisma.usuarios.findFirst({
-      where: { id_area: 4, rol: "JEFE", activo: true },
+    // Buscar a la secretaria activa de DFI (Lorena Zambrano o secretaria activa)
+    const secretaria = await prisma.usuarios.findFirst({
+      where: {
+        id_area: 1,
+        activo: true,
+        OR: [
+          { rol: "SECRETARIA" },
+          { rol: "SECRETARIA_DFI" },
+          { cargo: { contains: "SECRETARIA" } },
+          { id_usuario: 2 },
+        ],
+      },
     });
-    if (!tesorero) {
-      throw new Error("No se encontró un Tesorero activo para autorizar y recibir los trámites en Tesorería.");
-    }
-    const idTesorero = tesorero.id_usuario;
+    const idSecretaria = secretaria?.id_usuario || 2;
     const now = new Date();
 
     await prisma.$transaction(async (tx) => {
@@ -254,6 +261,64 @@ export class TramiteService {
             autorizado_pago: true,
             id_usuario_autoriza_pago: idUsuarioAutoriza,
             fecha_autorizacion_pago: now,
+            id_area_actual: 1, // Permanece en DFI
+            id_custodio_actual: idSecretaria, // Secretaria DFI
+            estado_general: "PAGO_APROBADO",
+            sub_estado: "APROBADO_POR_ENTREGAR_TESORERIA",
+            fecha_ultimo_movimiento: now,
+            fecha_ultima_modificacion: now,
+          },
+        });
+
+        await registrarBitacora(
+          {
+            id_tramite: id,
+            id_usuario_entrega: idUsuarioAutoriza,
+            id_usuario_recibe: idSecretaria,
+            id_area_origen: 1, // DFI
+            id_area_destino: 1, // DFI Secretaría
+            tipo_accion: "AUTORIZACION_PAGO_DFI",
+            comentarios:
+              "Pago autorizado en lote por la Dirección Financiera. Expedientes derivados a Secretaría para emisión de acta y entrega formal a Tesorería.",
+            fecha_hora: now,
+          },
+          tx
+        );
+      }
+    });
+
+    return prisma.tramites.findMany({
+      where: { id_tramite: { in: idsTramites } },
+    });
+  }
+
+  /**
+   * Paso 5.1: Entrega física de trámites PAGO_APROBADO por Secretaría a Tesorería.
+   * Cambia estado_general: "DFI", sub_estado: "AUTORIZADO_EN_TESORERIA",
+   * y deriva formalmente a Tesorería (id_area: 4) en custodia del Tesorero.
+   */
+  public static async entregarTesoreriaLote(
+    idsTramites: number[],
+    idUsuarioEntrega: number
+  ) {
+    if (!idsTramites || idsTramites.length === 0) {
+      throw new Error("Debe seleccionar al menos un trámite para entregar a Tesorería");
+    }
+
+    const tesorero = await prisma.usuarios.findFirst({
+      where: { id_area: 4, rol: "JEFE", activo: true },
+    });
+    if (!tesorero) {
+      throw new Error("No se encontró un Tesorero activo para recibir los trámites en Tesorería.");
+    }
+    const idTesorero = tesorero.id_usuario;
+    const now = new Date();
+
+    await prisma.$transaction(async (tx) => {
+      for (const id of idsTramites) {
+        await tx.tramites.update({
+          where: { id_tramite: id },
+          data: {
             id_area_actual: 4, // Tesorería
             id_custodio_actual: idTesorero,
             estado_general: "DFI",
@@ -266,13 +331,13 @@ export class TramiteService {
         await registrarBitacora(
           {
             id_tramite: id,
-            id_usuario_entrega: idUsuarioAutoriza,
+            id_usuario_entrega: idUsuarioEntrega,
             id_usuario_recibe: idTesorero,
             id_area_origen: 1, // DFI
             id_area_destino: 4, // Tesorería
-            tipo_accion: "AUTORIZACION_DFI_PASE_TESORERIA",
+            tipo_accion: "ENTREGA_SECRETARIA_A_TESORERIA",
             comentarios:
-              "Pago autorizado en lote por la Dirección Financiera. Expedientes derivados formalmente a Tesorería / Pagos.",
+              "Expedientes con pago autorizado entregados formalmente por Secretaría a Tesorería / Pagos.",
             fecha_hora: now,
           },
           tx

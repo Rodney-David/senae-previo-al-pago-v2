@@ -129,6 +129,15 @@ export async function GET(request: NextRequest) {
           estado_general: "INGRESADO",
           NOT: NOT_CONDICIONES_INACTIVOS,
         });
+      } else if (tipo === "aprobados") {
+        // Exclusivo para DFI / Secretaría: trámites en estado PAGO_APROBADO listos para generar acta y entregar a Tesorería
+        conditions.push({
+          OR: [
+            { estado_general: "PAGO_APROBADO" },
+            { sub_estado: "APROBADO_POR_ENTREGAR_TESORERIA" },
+          ],
+          NOT: NOT_CONDICIONES_INACTIVOS,
+        });
       } else if (tipo === "caja") {
         // Trámites en caja en custodia de Tesorería o Archivo
         conditions.push({

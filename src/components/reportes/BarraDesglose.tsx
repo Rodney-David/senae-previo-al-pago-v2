@@ -3,13 +3,24 @@
 import React, { useState } from "react";
 import { MetricasRelojA, MetricasHistoricoParcial, CalidadDato } from "@/lib/tiemposCalculator";
 
-interface BarraDesgloseProps {
+export interface BarraDesgloseProps {
   relojA?: MetricasRelojA;
   historicoParcial?: MetricasHistoricoParcial;
   calidadDato?: CalidadDato;
   className?: string;
   altura?: string; // Ej: "h-2.5", "h-3"
   mostrarTotal?: boolean;
+  diasCalendarioTotales?: number;
+  diasTrabajoEfectivo?: number;
+  diasNoLaborables?: number;
+  diasPausas?: number;
+  fasesTiempos?: {
+    dfi_dias?: number;
+    presupuesto_dias?: number;
+    pausa_factura_dias?: number;
+    contabilidad_dias?: number;
+    caja_dias?: number;
+  };
 }
 
 interface SegmentoBarra {
@@ -28,55 +39,122 @@ export const BarraDesglose: React.FC<BarraDesgloseProps> = ({
   className = "",
   altura = "h-3",
   mostrarTotal = false,
+  diasCalendarioTotales,
+  diasTrabajoEfectivo,
+  diasNoLaborables,
+  diasPausas,
+  fasesTiempos,
 }) => {
   const [tooltip, setTooltip] = useState<{ texto: string; x: number; y: number } | null>(null);
 
-  // Si es un trámite migrado HISTORICO_PARCIAL, particionamos en sus 3 tramos hábiles brutos
+  // Si es un trámite migrado HISTORICO_PARCIAL, particionamos en sus tramos y días no laborables
   if (calidadDato === "HISTORICO_PARCIAL") {
-    const tSec = historicoParcial?.tramo_secretaria_habiles || 0;
-    const tPres = historicoParcial?.tramo_presupuesto_habiles || 0;
-    const tCont = historicoParcial?.tramo_contabilidad_tesoreria_habiles || 0;
-    const totalHabiles = Math.max(0.1, tSec + tPres + tCont);
+    const tSec = historicoParcial?.tramo_secretaria_habiles ?? fasesTiempos?.dfi_dias ?? 0;
+    const tPres = historicoParcial?.tramo_presupuesto_habiles ?? fasesTiempos?.presupuesto_dias ?? 0;
+    const tCont = historicoParcial?.tramo_contabilidad_tesoreria_habiles ??
+      (((fasesTiempos?.contabilidad_dias || 0) + (fasesTiempos?.caja_dias || 0)) > 0
+        ? Number((((fasesTiempos?.contabilidad_dias || 0) + (fasesTiempos?.caja_dias || 0))).toFixed(1))
+        : 0);
 
-    const segmentosHist: SegmentoBarra[] = [
-      {
+    const sumaTramos = Number((tSec + tPres + tCont).toFixed(1));
+    const trabajoEfectivo = sumaTramos > 0 ? sumaTramos : (diasTrabajoEfectivo || 0);
+
+    const totalCal =
+      diasCalendarioTotales ??
+      relojA?.total_calendario_dias ??
+      historicoParcial?.total_calendario_dias ??
+      0;
+
+    const pausas =
+      diasPausas ??
+      Number((((relojA?.dias_pausa_factura || 0) + (relojA?.dias_pausa_observado || 0))).toFixed(1));
+
+    const noLab =
+      diasNoLaborables ??
+      Math.max(0, Number((totalCal - trabajoEfectivo - pausas).toFixed(1)));
+
+    const baseTotal = Math.max(0.1, totalCal || (trabajoEfectivo + noLab + pausas));
+
+    const segmentosHist: SegmentoBarra[] = [];
+
+    if (tSec > 0) {
+      segmentosHist.push({
         id: "sec",
         etiqueta: "Tramo Secretaría (Recepción -> Entrega)",
         dias: tSec,
-        porcentaje: (tSec / totalHabiles) * 100,
-        colorHex: "#475569",
-        colorBgClass: "bg-slate-600",
-      },
-      {
+        porcentaje: (tSec / baseTotal) * 100,
+        colorHex: "#3B82F6",
+        colorBgClass: "bg-blue-500",
+      });
+    }
+
+    if (tPres > 0) {
+      segmentosHist.push({
         id: "pres",
         etiqueta: "Tramo Presupuesto (Entrega -> Aprobación JCO)",
         dias: tPres,
-        porcentaje: (tPres / totalHabiles) * 100,
-        colorHex: "#94A3B8",
-        colorBgClass: "bg-slate-400",
-      },
-      {
+        porcentaje: (tPres / baseTotal) * 100,
+        colorHex: "#6366F1",
+        colorBgClass: "bg-indigo-500",
+      });
+    }
+
+    if (tCont > 0) {
+      segmentosHist.push({
         id: "cont",
         etiqueta: "Tramo Contab./Tesorería (JCO -> Pago)",
         dias: tCont,
-        porcentaje: (tCont / totalHabiles) * 100,
-        colorHex: "#CBD5E1",
-        colorBgClass: "bg-slate-300",
-      },
-    ].filter((s) => s.dias > 0);
+        porcentaje: (tCont / baseTotal) * 100,
+        colorHex: "#10B981",
+        colorBgClass: "bg-emerald-500",
+      });
+    }
+
+    if (sumaTramos === 0 && trabajoEfectivo > 0) {
+      segmentosHist.push({
+        id: "trabajo",
+        etiqueta: "Trabajo efectivo institucional",
+        dias: trabajoEfectivo,
+        porcentaje: (trabajoEfectivo / baseTotal) * 100,
+        colorHex: "#2563EB",
+        colorBgClass: "bg-blue-600",
+      });
+    }
+
+    if (pausas > 0) {
+      segmentosHist.push({
+        id: "pausas",
+        etiqueta: "Pausas y Observaciones",
+        dias: pausas,
+        porcentaje: (pausas / baseTotal) * 100,
+        colorHex: "#F59E0B",
+        colorBgClass: "bg-amber-500",
+      });
+    }
+
+    if (noLab > 0) {
+      segmentosHist.push({
+        id: "no_lab",
+        etiqueta: "Fines de semana y feriados (No laborables)",
+        dias: noLab,
+        porcentaje: (noLab / baseTotal) * 100,
+        colorHex: "#94A3B8",
+        colorBgClass: "bg-slate-400",
+      });
+    }
 
     return (
       <div className={`relative flex items-center gap-2 ${className}`}>
         <div
           className={`relative w-full ${altura} bg-slate-100 rounded-full overflow-hidden flex shadow-inner border border-slate-200 cursor-pointer`}
-          title={`Histórico Parcial (Tramos brutos): Secretaría ${tSec}d | Presupuesto ${tPres}d | Contab./Tesorería ${tCont}d`}
+          title={`Histórico Parcial: Trabajo ${trabajoEfectivo}d | No Laborables ${noLab}d | Pausas ${pausas}d`}
         >
           {segmentosHist.length === 0 ? (
-            <div className="w-full h-full bg-slate-200 flex items-center justify-center text-[9px] text-slate-500 font-medium">
-              Sin tramos
+            <div className="w-full h-full bg-blue-500/20 flex items-center justify-center text-[9px] text-blue-700 font-medium">
+              {totalCal > 0 ? `${totalCal}d cal.` : "Sin tramos"}
             </div>
           ) : (
-            segmentosHist.map((seg, idx) => (
+            segmentosHist.map((seg) => (
               <div
                 key={seg.id}
                 style={{ width: `${Math.max(3, seg.porcentaje)}%`, backgroundColor: seg.colorHex }}
@@ -97,7 +175,7 @@ export const BarraDesglose: React.FC<BarraDesgloseProps> = ({
 
         {mostrarTotal && (
           <span className="text-xs font-semibold text-slate-700 whitespace-nowrap min-w-[38px] text-right">
-            {(historicoParcial?.total_habiles_brutos ?? totalHabiles).toFixed(1)}d
+            {(totalCal || trabajoEfectivo).toFixed(1)}d
           </span>
         )}
 
@@ -113,16 +191,19 @@ export const BarraDesglose: React.FC<BarraDesgloseProps> = ({
     );
   }
 
-  // Trámite estándar o COMPLETO (Reloj A: 5 componentes deterministas)
-  const total = relojA?.total_calendario_dias || 0;
-  const trabajo = relojA?.dias_laborables_trabajo || 0;
-  const pausaFactura = relojA?.dias_pausa_factura || 0;
-  const pausaObservado = relojA?.dias_pausa_observado || 0;
-  const noLaborables = relojA?.dias_no_laborables || 0;
+  // Trámite estándar o COMPLETO (Reloj A: 5 componentes deterministas con fallbacks)
+  const total = diasCalendarioTotales ?? relojA?.total_calendario_dias ?? 0;
+  const trabajo = diasTrabajoEfectivo ?? relojA?.dias_laborables_trabajo ?? 0;
+  const pausaFactura = relojA?.dias_pausa_factura ?? 0;
+  const pausaObservado = relojA?.dias_pausa_observado ?? diasPausas ?? 0;
+  const noLaborables =
+    diasNoLaborables ??
+    relojA?.dias_no_laborables ??
+    Math.max(0, Number((total - trabajo - pausaFactura - pausaObservado).toFixed(1)));
   const postAutorizacion = relojA?.dias_post_autorizacion || 0;
   const exento = relojA?.dias_exento || 0;
 
-  const baseTotal = Math.max(0.1, total);
+  const baseTotal = Math.max(0.1, total || (trabajo + noLaborables + pausaFactura + pausaObservado + postAutorizacion + exento));
 
   const segmentos: SegmentoBarra[] = [
     {

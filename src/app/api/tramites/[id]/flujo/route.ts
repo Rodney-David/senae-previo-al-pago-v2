@@ -730,7 +730,7 @@ export async function POST(
         }
 
         // ==========================================
-        // 5. DIRECCIÓN FINANCIERA (DFI) Y TESORERÍA
+        // 5. DIRECCIÓN FINANCIERA (DFI): AUTORIZACIÓN A SECRETARÍA Y PASE A TESORERÍA
         // ==========================================
         case "AUTORIZAR_Y_DERIVAR_A_TESORERIA":
         case "AUTORIZAR_PAGO_DFI": {
@@ -739,6 +739,60 @@ export async function POST(
               403,
               "Únicamente la Directora Financiera tiene facultad legal para autorizar el pago"
             );
+          }
+
+          // Buscar la secretaria activa de DFI
+          const secretaria = await tx.usuarios.findFirst({
+            where: {
+              id_area: 1,
+              activo: true,
+              OR: [
+                { rol: "SECRETARIA" },
+                { rol: "SECRETARIA_DFI" },
+                { cargo: { contains: "SECRETARIA" } },
+                { id_usuario: 2 },
+              ],
+            },
+          });
+          const idSecretaria = secretaria?.id_usuario || 2;
+
+          tramiteActualizado = await tx.tramites.update({
+            where: { id_tramite: idTramite },
+            data: {
+              autorizado_pago: true,
+              id_usuario_autoriza_pago: currentUserId,
+              fecha_autorizacion_pago: now,
+              id_area_actual: 1, // Permanece en DFI
+              id_custodio_actual: idSecretaria, // Deriva a Secretaría para generar acta y entrega
+              estado_general: "PAGO_APROBADO",
+              sub_estado: "APROBADO_POR_ENTREGAR_TESORERIA",
+              fecha_ultimo_movimiento: now,
+              fecha_ultima_modificacion: now,
+            },
+          });
+
+          await registrarBitacora(
+            {
+              id_tramite: idTramite,
+              id_usuario_entrega: currentUserId,
+              id_usuario_recibe: idSecretaria,
+              id_area_origen: 1,
+              id_area_destino: 1,
+              tipo_accion: "AUTORIZACION_PAGO_DFI",
+              comentarios: `Pago autorizado por la Directora Financiera. Expediente derivado a Secretaría para generación de acta y entrega física a Tesorería. ${comentarios || ""}`,
+            },
+            tx
+          );
+          break;
+        }
+
+        case "ENTREGAR_A_TESORERIA":
+        case "SECRETARIA_ENTREGAR_A_TESORERIA": {
+          const esSecretariaOAdmin =
+            currentUser.id_area === 1 ||
+            ["SECRETARIA", "SECRETARIA_DFI", "DIRECTORA", "DIRECTORA_FINANCIERA", "ADMIN", "ADMINISTRADOR"].includes(currentUser.rol || "");
+          if (!esSecretariaOAdmin) {
+            throw new HttpError(403, "No tiene permisos para entregar trámites a Tesorería.");
           }
 
           const tesorero = await tx.usuarios.findFirst({
@@ -755,9 +809,6 @@ export async function POST(
           tramiteActualizado = await tx.tramites.update({
             where: { id_tramite: idTramite },
             data: {
-              autorizado_pago: true,
-              id_usuario_autoriza_pago: currentUserId,
-              fecha_autorizacion_pago: now,
               id_area_actual: 4, // TESORERIA
               id_custodio_actual: idTesorero,
               estado_general: "DFI",
@@ -772,10 +823,10 @@ export async function POST(
               id_tramite: idTramite,
               id_usuario_entrega: currentUserId,
               id_usuario_recibe: idTesorero,
-              id_area_origen: 1,
-              id_area_destino: 4,
-              tipo_accion: "AUTORIZACION_DFI_PASE_TESORERIA",
-              comentarios: `Pago autorizado por la Directora Financiera. Expediente despachado a Tesorería/Caja. ${comentarios || ""}`,
+              id_area_origen: 1, // DFI
+              id_area_destino: 4, // Tesorería
+              tipo_accion: "ENTREGA_SECRETARIA_A_TESORERIA",
+              comentarios: `Expediente con pago autorizado entregado formalmente por Secretaría a Tesorería para pago definitivo. ${comentarios || ""}`,
             },
             tx
           );

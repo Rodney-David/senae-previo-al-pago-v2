@@ -172,6 +172,7 @@ export const BarraAcciones: React.FC<BarraAccionesProps> = ({
   const isFactura = estado === "FACTURA" && !isObservado;
   const isContabilidad = estado === "CONTABILIDAD";
   const isDFI = estado === "DFI";
+  const isPagoAprobado = estado === "PAGO_APROBADO" || tramite.sub_estado === "APROBADO_POR_ENTREGAR_TESORERIA";
   const isPagado = estado === "PAGADO";
 
   const isJefePresupuesto = currentUser.id_area === 2 && currentUser.rol === "JEFE";
@@ -621,6 +622,58 @@ export const BarraAcciones: React.FC<BarraAccionesProps> = ({
                   Autorizar Pago
                 </button>
               </>
+            )}
+
+            {/* 6.1 ESTADO PAGO_APROBADO (Secretaría DFI -> Entrega a Tesorería) */}
+            {isPagoAprobado && (
+              <div className="flex items-center gap-2 shrink-0 flex-nowrap sm:flex-wrap">
+                {(isSecretaria || isDirectora || isAdmin) && tramite.id_area_actual === 1 && (
+                  <>
+                    <button
+                      onClick={async () => {
+                        setLoadingAction(true);
+                        setActionError(null);
+                        try {
+                          const res = await fetch("/api/tramites/entregar-tesoreria-lote", {
+                            method: "POST",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({ ids: [tramite.id_tramite], accion: "EXCEL" }),
+                          });
+                          if (!res.ok) throw new Error("Error al descargar Acta Excel");
+                          const blob = await res.blob();
+                          const url = window.URL.createObjectURL(blob);
+                          const a = document.createElement("a");
+                          a.href = url;
+                          a.download = `Acta_Entrega_Tesoreria_${tramite.numero_quipux.replace(/[\/\\]/g, "_")}.xlsx`;
+                          document.body.appendChild(a);
+                          a.click();
+                          a.remove();
+                          window.URL.revokeObjectURL(url);
+                        } catch (err: any) {
+                          setActionError(err.message);
+                        } finally {
+                          setLoadingAction(false);
+                        }
+                      }}
+                      disabled={loadingAction}
+                      className="px-3 py-1.5 text-xs font-semibold bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-300 rounded-lg transition-colors flex items-center gap-1.5 shadow-2xs shrink-0 whitespace-nowrap"
+                      title="Descargar Acta oficial de entrega a Tesorería en Excel"
+                    >
+                      <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-600" />
+                      Descargar Acta
+                    </button>
+                    <button
+                      onClick={() => handleAction("ENTREGAR_A_TESORERIA")}
+                      disabled={loadingAction}
+                      className="px-4 py-1.5 text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg transition-colors flex items-center gap-1.5 shadow-xs shrink-0 whitespace-nowrap"
+                      title="Entregar formalmente expediente a Tesorería / Pagos"
+                    >
+                      <Send className="w-3.5 h-3.5" />
+                      Entregar a Tesorería
+                    </button>
+                  </>
+                )}
+              </div>
             )}
 
             {/* 7. EN TESORERIA O COBRANZAS (Se mantiene en DFI o pasa a PAGADO) */}

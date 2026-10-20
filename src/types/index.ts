@@ -129,6 +129,7 @@ export type EstadoTramiteOficial =
   | "ANULADO"
   | "CAJA"
   | "AUTORIZADO_PAGO"
+  | "PAGO_APROBADO"
   | "PRESUPUESTO"
   | "JUSTIFICACION_CONTABILIDAD";
 

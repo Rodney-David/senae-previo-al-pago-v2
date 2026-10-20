@@ -37,7 +37,8 @@ export const BadgeEstado: React.FC<BadgeEstadoProps> = ({
       style = "bg-indigo-50 text-indigo-800 border-indigo-300";
       break;
     case "AUTORIZADO_PAGO":
-      style = "bg-blue-50 text-blue-800 border-blue-300";
+    case "PAGO_APROBADO":
+      style = "bg-emerald-50 text-emerald-800 border-emerald-300";
       break;
     case "PAGADO":
       style = "bg-emerald-50 text-emerald-800 border-emerald-300";

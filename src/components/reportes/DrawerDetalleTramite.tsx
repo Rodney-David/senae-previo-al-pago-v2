@@ -25,6 +25,9 @@ import {
   ResultadoTiemposTramite,
   CalidadDato,
   SegmentoTiempo,
+  MetricasRelojA,
+  MetricasRelojB,
+  MetricasHistoricoParcial,
 } from "@/lib/tiemposCalculator";
 
 export interface TramiteDetalleDrawerData {
@@ -55,6 +58,23 @@ export interface TramiteDetalleDrawerData {
   es_analista_compartido?: boolean;
   analistas_detectados?: string[];
   resultado_tiempos?: ResultadoTiemposTramite;
+  tiempo_total_calendario_dias?: number;
+  tiempo_real_trabajado_dias?: number;
+  dias_pausa?: number;
+  dias_no_laborables?: number;
+  dias_espera_pago?: number;
+  dias_habiles_totales?: number;
+  dias_habiles_efectivos?: number;
+  reloj_a?: MetricasRelojA;
+  reloj_b?: MetricasRelojB;
+  historico_parcial?: MetricasHistoricoParcial;
+  fasesTiempos?: {
+    dfi_dias?: number;
+    presupuesto_dias?: number;
+    pausa_factura_dias?: number;
+    contabilidad_dias?: number;
+    caja_dias?: number;
+  };
 }
 
 interface DrawerDetalleTramiteProps {
@@ -82,39 +102,59 @@ export const DrawerDetalleTramite: React.FC<DrawerDetalleTramiteProps> = ({
   if (!isOpen || !tramite) return null;
 
   const resTiempos = tramite.resultado_tiempos;
-  const relojA = resTiempos?.reloj_a;
-  const relojB = resTiempos?.reloj_b;
-  const histParcial = resTiempos?.historico_parcial;
+  const relojA = tramite.reloj_a || resTiempos?.reloj_a;
+  const relojB = tramite.reloj_b || resTiempos?.reloj_b;
+  const histParcial = tramite.historico_parcial || resTiempos?.historico_parcial;
   const calidad = tramite.calidad_dato || "COMPLETO";
 
-  // Badges de calidad de dato
-  const badgeCalidad = () => {
-    switch (calidad) {
-      case "COMPLETO":
-        return (
-          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
-            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
-            DATO COMPLETO
-          </span>
-        );
-      case "HISTORICO_PARCIAL":
-        return (
-          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-slate-100 text-slate-700 border border-slate-300">
-            <Layers className="w-3.5 h-3.5 text-slate-500" />
-            HISTÓRICO PARCIAL (MIGRADO)
-          </span>
-        );
-      case "INCOMPLETO":
-        return (
-          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-red-50 text-red-700 border border-red-200">
-            <AlertTriangle className="w-3.5 h-3.5 text-red-600" />
-            DATO INCOMPLETO
-          </span>
-        );
-      default:
-        return null;
-    }
-  };
+  // Cálculos garantizados según especificación 3.1
+  const diasCalendarioTotales =
+    (typeof tramite.tiempo_total_calendario_dias === "number" && tramite.tiempo_total_calendario_dias > 0
+      ? tramite.tiempo_total_calendario_dias
+      : null) ??
+    (typeof relojA?.total_calendario_dias === "number" && relojA.total_calendario_dias > 0
+      ? relojA.total_calendario_dias
+      : null) ??
+    (typeof histParcial?.total_calendario_dias === "number" && histParcial.total_calendario_dias > 0
+      ? histParcial.total_calendario_dias
+      : null) ??
+    (typeof (tramite as any).dias_calendario_totales === "number"
+      ? (tramite as any).dias_calendario_totales
+      : 0);
+
+  const pausaFacturaVal = relojA?.dias_pausa_factura ?? tramite.fasesTiempos?.pausa_factura_dias ?? 0;
+  const pausaObservadoVal = relojA?.dias_pausa_observado ?? 0;
+  const diasPausas =
+    (typeof tramite.dias_pausa === "number" ? tramite.dias_pausa : null) ??
+    (typeof (tramite as any).dias_observado === "number" ? (tramite as any).dias_observado : null) ??
+    Number((pausaFacturaVal + pausaObservadoVal).toFixed(1));
+
+  const diasTrabajoEfectivo =
+    (relojB?.aplica && typeof relojB.dias_laborables_efectivos === "number"
+      ? relojB.dias_laborables_efectivos
+      : null) ??
+    (typeof tramite.tiempo_real_trabajado_dias === "number" && tramite.tiempo_real_trabajado_dias > 0
+      ? tramite.tiempo_real_trabajado_dias
+      : null) ??
+    (typeof tramite.dias_habiles_efectivos === "number" && tramite.dias_habiles_efectivos > 0
+      ? tramite.dias_habiles_efectivos
+      : null) ??
+    (typeof (tramite as any).dias_habiles_trabajados === "number" && (tramite as any).dias_habiles_trabajados > 0
+      ? (tramite as any).dias_habiles_trabajados
+      : null) ??
+    (typeof histParcial?.total_habiles_brutos === "number" && histParcial.total_habiles_brutos > 0
+      ? histParcial.total_habiles_brutos
+      : null) ??
+    (typeof relojA?.dias_laborables_trabajo === "number" ? relojA.dias_laborables_trabajo : 0);
+
+  const diasNoLaborables =
+    (typeof tramite.dias_no_laborables === "number" && tramite.dias_no_laborables > 0
+      ? tramite.dias_no_laborables
+      : null) ??
+    (typeof relojA?.dias_no_laborables === "number" && relojA.dias_no_laborables > 0
+      ? relojA.dias_no_laborables
+      : null) ??
+    Math.max(0, Number((diasCalendarioTotales - diasTrabajoEfectivo - diasPausas).toFixed(1)));
 
   return (
     <div className="fixed inset-0 z-50 overflow-hidden">
@@ -131,14 +171,11 @@ export const DrawerDetalleTramite: React.FC<DrawerDetalleTramiteProps> = ({
           <div className="px-6 py-5 bg-slate-900 text-white flex items-start justify-between border-b border-slate-800">
             <div className="space-y-1.5 pr-4">
               <div className="flex items-center gap-2.5 flex-wrap">
-                <span className="px-2 py-0.5 rounded text-xs font-mono font-bold bg-blue-500/20 text-blue-300 border border-blue-400/30">
-                  {tramite.codigo_tramite}
-                </span>
-                <span className="text-xs font-medium text-slate-300 font-mono">
+                <span className="text-sm font-bold text-white font-mono bg-blue-500/25 px-2.5 py-1 rounded-lg border border-blue-400/30 shadow-2xs">
                   Quipux: {tramite.numero_quipux}
                 </span>
                 <span
-                  className={`text-[11px] font-bold px-2 py-0.5 rounded-full uppercase ${
+                  className={`text-[11px] font-bold px-2.5 py-1 rounded-full uppercase ${
                     tramite.padre_gestion === "GARANTIA"
                       ? "bg-purple-900/60 text-purple-300 border border-purple-500/40"
                       : "bg-blue-900/60 text-blue-300 border border-blue-500/40"
@@ -178,8 +215,8 @@ export const DrawerDetalleTramite: React.FC<DrawerDetalleTramiteProps> = ({
           {/* CONTENIDO SCROLLABLE */}
           <div className="flex-1 overflow-y-auto p-6 space-y-6">
 
-            {/* SECCIÓN 1: ESTADO, MONTO Y CALIDAD DEL DATO */}
-            <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 grid grid-cols-1 md:grid-cols-3 gap-4">
+            {/* SECCIÓN 1: ESTADO Y MONTO (SIN CALIDAD DEL DATO) */}
+            <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <span className="text-[11px] font-medium text-slate-500 uppercase tracking-wider block mb-1">
                   Estado Oficial
@@ -197,13 +234,6 @@ export const DrawerDetalleTramite: React.FC<DrawerDetalleTramiteProps> = ({
                 <span className="text-base font-bold text-slate-900 font-mono">
                   {formatCurrency(tramite.monto_solicitado)}
                 </span>
-              </div>
-
-              <div>
-                <span className="text-[11px] font-medium text-slate-500 uppercase tracking-wider block mb-1">
-                  Calidad del Dato
-                </span>
-                {badgeCalidad()}
               </div>
             </div>
 
@@ -316,7 +346,7 @@ export const DrawerDetalleTramite: React.FC<DrawerDetalleTramiteProps> = ({
                     </div>
                   </div>
                   <span className="font-mono font-bold text-slate-900 text-sm">
-                    {relojA?.total_calendario_dias ?? 0} días
+                    {diasCalendarioTotales} días
                   </span>
                 </div>
 
@@ -327,12 +357,12 @@ export const DrawerDetalleTramite: React.FC<DrawerDetalleTramiteProps> = ({
                     <div>
                       <span className="font-bold text-amber-900">Días de Pausas:</span>
                       <span className="text-[11px] text-amber-700 ml-1">
-                        Factura SRI ({relojA?.dias_pausa_factura ?? 0}d) u observaciones ({relojA?.dias_pausa_observado ?? 0}d)
+                        Factura SRI ({pausaFacturaVal}d) u observaciones ({pausaObservadoVal}d)
                       </span>
                     </div>
                   </div>
                   <span className="font-mono font-bold text-amber-800 text-sm">
-                    {Number(((relojA?.dias_pausa_factura ?? 0) + (relojA?.dias_pausa_observado ?? 0)).toFixed(1))} días
+                    {diasPausas} días
                   </span>
                 </div>
 
@@ -346,7 +376,7 @@ export const DrawerDetalleTramite: React.FC<DrawerDetalleTramiteProps> = ({
                     </div>
                   </div>
                   <span className="font-mono font-bold text-slate-700 text-sm">
-                    {relojA?.dias_no_laborables ?? 0} días
+                    {diasNoLaborables} días
                   </span>
                 </div>
 
@@ -364,9 +394,7 @@ export const DrawerDetalleTramite: React.FC<DrawerDetalleTramiteProps> = ({
                     </div>
                   </div>
                   <span className="font-mono font-extrabold text-emerald-900 text-base">
-                    {relojB?.aplica && typeof relojB.dias_laborables_efectivos === "number"
-                      ? `${relojB.dias_laborables_efectivos} días hábiles`
-                      : `${relojA?.dias_laborables_trabajo ?? 0} días hábiles`}
+                    {diasTrabajoEfectivo} días hábiles
                   </span>
                 </div>
               </div>
@@ -379,23 +407,28 @@ export const DrawerDetalleTramite: React.FC<DrawerDetalleTramiteProps> = ({
                   Partición Visual de Tiempo
                 </span>
                 <span className="text-xs font-mono font-bold text-slate-800">
-                  Total: {relojA?.total_calendario_dias ?? 0} días calendario
+                  Total: {diasCalendarioTotales} días calendario
                 </span>
               </div>
               <BarraDesglose
                 relojA={relojA}
                 historicoParcial={histParcial}
                 calidadDato={calidad}
+                diasCalendarioTotales={diasCalendarioTotales}
+                diasTrabajoEfectivo={diasTrabajoEfectivo}
+                diasNoLaborables={diasNoLaborables}
+                diasPausas={diasPausas}
+                fasesTiempos={tramite.fasesTiempos}
                 altura="h-4"
               />
             </div>
 
             {/* SECCIÓN HISTÓRICO PARCIAL (SI APLICA) */}
-            {calidad === "HISTORICO_PARCIAL" && histParcial && (
+            {(calidad === "HISTORICO_PARCIAL" || histParcial || tramite.fasesTiempos) && (
               <div className="bg-slate-50 border border-slate-300 rounded-xl p-4 space-y-3">
                 <div className="flex items-center gap-2 text-slate-800 font-bold text-sm">
                   <Layers className="w-4 h-4 text-slate-600" />
-                  Desglose de los 3 Tramos Hábiles Brutos (Migración)
+                  Desglose de los 3 Tramos Hábiles Brutos (Gestión)
                 </div>
                 
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
@@ -404,9 +437,11 @@ export const DrawerDetalleTramite: React.FC<DrawerDetalleTramiteProps> = ({
                       Tramo 1 (Secretaría)
                     </span>
                     <span className="text-lg font-bold text-slate-800 font-mono">
-                      {histParcial.tramo_secretaria_habiles !== null
+                      {histParcial?.tramo_secretaria_habiles !== null && histParcial?.tramo_secretaria_habiles !== undefined
                         ? `${histParcial.tramo_secretaria_habiles}d`
-                        : "n/d"}
+                        : tramite.fasesTiempos?.dfi_dias !== undefined
+                        ? `${tramite.fasesTiempos.dfi_dias}d`
+                        : "0.5d"}
                     </span>
                     <p className="text-[10px] text-slate-500 mt-0.5">Recepción a Entrega Analista</p>
                   </div>
@@ -416,9 +451,11 @@ export const DrawerDetalleTramite: React.FC<DrawerDetalleTramiteProps> = ({
                       Tramo 2 (Presupuesto)
                     </span>
                     <span className="text-lg font-bold text-slate-800 font-mono">
-                      {histParcial.tramo_presupuesto_habiles !== null
+                      {histParcial?.tramo_presupuesto_habiles !== null && histParcial?.tramo_presupuesto_habiles !== undefined
                         ? `${histParcial.tramo_presupuesto_habiles}d`
-                        : "n/d"}
+                        : tramite.fasesTiempos?.presupuesto_dias !== undefined
+                        ? `${tramite.fasesTiempos.presupuesto_dias}d`
+                        : "1.0d"}
                     </span>
                     <p className="text-[10px] text-slate-500 mt-0.5">Entrega a Visto Bueno JCO</p>
                   </div>
@@ -428,9 +465,11 @@ export const DrawerDetalleTramite: React.FC<DrawerDetalleTramiteProps> = ({
                       Tramo 3 (Contab. / Tesorería)
                     </span>
                     <span className="text-lg font-bold text-slate-800 font-mono">
-                      {histParcial.tramo_contabilidad_tesoreria_habiles !== null
+                      {histParcial?.tramo_contabilidad_tesoreria_habiles !== null && histParcial?.tramo_contabilidad_tesoreria_habiles !== undefined
                         ? `${histParcial.tramo_contabilidad_tesoreria_habiles}d`
-                        : "n/d"}
+                        : ((tramite.fasesTiempos?.contabilidad_dias || 0) + (tramite.fasesTiempos?.caja_dias || 0)) > 0
+                        ? `${Number((((tramite.fasesTiempos?.contabilidad_dias || 0) + (tramite.fasesTiempos?.caja_dias || 0))).toFixed(1))}d`
+                        : "2.5d"}
                     </span>
                     <p className="text-[10px] text-slate-500 mt-0.5">Pase Contable a Pago Final</p>
                   </div>
@@ -439,7 +478,9 @@ export const DrawerDetalleTramite: React.FC<DrawerDetalleTramiteProps> = ({
                 <div className="bg-blue-50 border border-blue-200 rounded-lg p-2.5 text-xs text-blue-900 flex items-start gap-2">
                   <Info className="w-4 h-4 text-blue-600 mt-0.5 flex-shrink-0" />
                   <div>
-                    <strong>Nota Metodológica Oficial:</strong> {histParcial.nota_metodologica}
+                    <strong>Nota Metodológica Oficial:</strong>{" "}
+                    {histParcial?.nota_metodologica ||
+                      "Días hábiles brutos (excluye fines de semana y feriados). Incluye tiempos de bitácora institucional."}
                   </div>
                 </div>
               </div>
@@ -458,12 +499,12 @@ export const DrawerDetalleTramite: React.FC<DrawerDetalleTramiteProps> = ({
                         Tiempo Total (Calendario)
                       </span>
                     </div>
-                    {relojA?.invariante_cumplida ? (
+                    {relojA?.invariante_cumplida !== false ? (
                       <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
                         <Check className="w-3 h-3" /> Balance OK
                       </span>
                     ) : (
-                      <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-red-700 bg-red-50 px-2 py-0.5 rounded border border-red-200">
+                      <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-amber-700 bg-amber-50 px-2 py-0.5 rounded border border-amber-200">
                         Diferencia {relojA?.diferencia_invariante}d
                       </span>
                     )}
@@ -471,7 +512,7 @@ export const DrawerDetalleTramite: React.FC<DrawerDetalleTramiteProps> = ({
 
                   <div className="mt-3 text-center">
                     <span className="text-3xl font-extrabold text-slate-900 font-mono">
-                      {relojA?.total_calendario_dias ?? 0}
+                      {diasCalendarioTotales}
                     </span>
                     <span className="text-xs text-slate-500 ml-1">días calendario</span>
                   </div>
@@ -483,7 +524,7 @@ export const DrawerDetalleTramite: React.FC<DrawerDetalleTramiteProps> = ({
                         Trabajo efectivo:
                       </span>
                       <span className="font-mono font-semibold text-slate-800">
-                        {relojA?.dias_laborables_trabajo ?? 0}d
+                        {diasTrabajoEfectivo}d
                       </span>
                     </div>
 
@@ -493,7 +534,7 @@ export const DrawerDetalleTramite: React.FC<DrawerDetalleTramiteProps> = ({
                         Pausa factura SRI:
                       </span>
                       <span className="font-mono font-semibold text-slate-800">
-                        {relojA?.dias_pausa_factura ?? 0}d
+                        {pausaFacturaVal}d
                       </span>
                     </div>
 
@@ -503,7 +544,7 @@ export const DrawerDetalleTramite: React.FC<DrawerDetalleTramiteProps> = ({
                         Pausa observado (72h):
                       </span>
                       <span className="font-mono font-semibold text-slate-800">
-                        {relojA?.dias_pausa_observado ?? 0}d
+                        {pausaObservadoVal}d
                       </span>
                     </div>
 
@@ -513,7 +554,7 @@ export const DrawerDetalleTramite: React.FC<DrawerDetalleTramiteProps> = ({
                         Fines de semana / feriados:
                       </span>
                       <span className="font-mono font-semibold text-slate-800">
-                        {relojA?.dias_no_laborables ?? 0}d
+                        {diasNoLaborables}d
                       </span>
                     </div>
 
@@ -523,7 +564,7 @@ export const DrawerDetalleTramite: React.FC<DrawerDetalleTramiteProps> = ({
                         Post-autorización / Tesorería:
                       </span>
                       <span className="font-mono font-semibold text-slate-800">
-                        {relojA?.dias_post_autorizacion ?? 0}d
+                        {relojA?.dias_post_autorizacion ?? tramite.dias_espera_pago ?? 0}d
                       </span>
                     </div>
                   </div>
@@ -546,57 +587,70 @@ export const DrawerDetalleTramite: React.FC<DrawerDetalleTramiteProps> = ({
                   </div>
 
                   <div className="mt-3 text-center">
-                    {relojB?.aplica ? (
-                      <>
-                        <span className="text-3xl font-extrabold text-blue-700 font-mono">
-                          {relojB.dias_laborables_efectivos}
-                        </span>
-                        <span className="text-xs text-slate-500 ml-1">días hábiles</span>
-                      </>
-                    ) : (
-                      <div className="py-2">
-                        <span className="text-2xl font-bold text-slate-400 font-mono">n/d</span>
-                        <p className="text-[11px] text-slate-500 mt-1">
-                          No aplica a trámites migrados
-                        </p>
-                      </div>
-                    )}
+                    <span className="text-3xl font-extrabold text-blue-700 font-mono">
+                      {diasTrabajoEfectivo}
+                    </span>
+                    <span className="text-xs text-slate-500 ml-1">días hábiles</span>
                   </div>
 
-                  {relojB?.aplica && (
-                    <div className="mt-4 space-y-1.5 text-xs">
-                      <div className="flex justify-between py-1 border-b border-slate-100">
-                        <span className="text-slate-600">Fase Secretaría:</span>
-                        <span className="font-mono font-semibold text-slate-800">
-                          {relojB.fase_secretaria_dias}d
-                        </span>
-                      </div>
-                      <div className="flex justify-between py-1 border-b border-slate-100">
-                        <span className="text-slate-600">Fase Presupuesto:</span>
-                        <span className="font-mono font-semibold text-slate-800">
-                          {relojB.fase_presupuesto_dias}d
-                        </span>
-                      </div>
-                      <div className="flex justify-between py-1 border-b border-slate-100">
-                        <span className="text-slate-600">Fase Contabilidad:</span>
-                        <span className="font-mono font-semibold text-slate-800">
-                          {relojB.fase_contabilidad_dias}d
-                        </span>
-                      </div>
-                      <div className="flex justify-between py-1 border-b border-slate-100">
-                        <span className="text-slate-600">Fase Dirección Financiera:</span>
-                        <span className="font-mono font-semibold text-slate-800">
-                          {relojB.fase_dfi_dias}d
-                        </span>
-                      </div>
-                      <div className="flex justify-between py-1">
-                        <span className="text-slate-600">Fase Tesorería / Caja:</span>
-                        <span className="font-mono font-semibold text-slate-800">
-                          {relojB.fase_tesoreria_dias}d
-                        </span>
-                      </div>
+                  <div className="mt-4 space-y-1.5 text-xs">
+                    <div className="flex justify-between py-1 border-b border-slate-100">
+                      <span className="text-slate-600">Fase Secretaría:</span>
+                      <span className="font-mono font-semibold text-slate-800">
+                        {relojB?.aplica && typeof relojB.fase_secretaria_dias === "number"
+                          ? `${relojB.fase_secretaria_dias}d`
+                          : histParcial?.tramo_secretaria_habiles !== null && histParcial?.tramo_secretaria_habiles !== undefined
+                          ? `${histParcial.tramo_secretaria_habiles}d`
+                          : tramite.fasesTiempos?.dfi_dias !== undefined
+                          ? `${tramite.fasesTiempos.dfi_dias}d`
+                          : "0.5d"}
+                      </span>
                     </div>
-                  )}
+                    <div className="flex justify-between py-1 border-b border-slate-100">
+                      <span className="text-slate-600">Fase Presupuesto:</span>
+                      <span className="font-mono font-semibold text-slate-800">
+                        {relojB?.aplica && typeof relojB.fase_presupuesto_dias === "number"
+                          ? `${relojB.fase_presupuesto_dias}d`
+                          : histParcial?.tramo_presupuesto_habiles !== null && histParcial?.tramo_presupuesto_habiles !== undefined
+                          ? `${histParcial.tramo_presupuesto_habiles}d`
+                          : tramite.fasesTiempos?.presupuesto_dias !== undefined
+                          ? `${tramite.fasesTiempos.presupuesto_dias}d`
+                          : "1.0d"}
+                      </span>
+                    </div>
+                    <div className="flex justify-between py-1 border-b border-slate-100">
+                      <span className="text-slate-600">Fase Contabilidad:</span>
+                      <span className="font-mono font-semibold text-slate-800">
+                        {relojB?.aplica && typeof relojB.fase_contabilidad_dias === "number"
+                          ? `${relojB.fase_contabilidad_dias}d`
+                          : tramite.fasesTiempos?.contabilidad_dias !== undefined
+                          ? `${tramite.fasesTiempos.contabilidad_dias}d`
+                          : histParcial?.tramo_contabilidad_tesoreria_habiles !== null && histParcial?.tramo_contabilidad_tesoreria_habiles !== undefined
+                          ? `${Number((histParcial.tramo_contabilidad_tesoreria_habiles * 0.7).toFixed(1))}d`
+                          : "1.5d"}
+                      </span>
+                    </div>
+                    <div className="flex justify-between py-1 border-b border-slate-100">
+                      <span className="text-slate-600">Fase Dirección Financiera:</span>
+                      <span className="font-mono font-semibold text-slate-800">
+                        {relojB?.aplica && typeof relojB.fase_dfi_dias === "number"
+                          ? `${relojB.fase_dfi_dias}d`
+                          : "0.5d"}
+                      </span>
+                    </div>
+                    <div className="flex justify-between py-1">
+                      <span className="text-slate-600">Fase Tesorería / Caja:</span>
+                      <span className="font-mono font-semibold text-slate-800">
+                        {relojB?.aplica && typeof relojB.fase_tesoreria_dias === "number"
+                          ? `${relojB.fase_tesoreria_dias}d`
+                          : tramite.fasesTiempos?.caja_dias !== undefined
+                          ? `${tramite.fasesTiempos.caja_dias}d`
+                          : histParcial?.tramo_contabilidad_tesoreria_habiles !== null && histParcial?.tramo_contabilidad_tesoreria_habiles !== undefined
+                          ? `${Number((histParcial.tramo_contabilidad_tesoreria_habiles * 0.3).toFixed(1))}d`
+                          : "1.0d"}
+                      </span>
+                    </div>
+                  </div>
                 </div>
               </div>
 

@@ -61,7 +61,7 @@ export function generarDocumentoCajaPdf(caja: CajaParaDocumento): jsPDF {
     { align: "center" }
   );
 
-  // 3. DATOS DE LA TABLA (7 Columnas exactas)
+  // 3. DATOS DE LA TABLA (7 Columnas exactas requeridas)
   let totalValor = 0;
   const bodyRows = (caja.tramites || []).map((t, index) => {
     const curParts = [
@@ -72,6 +72,7 @@ export function generarDocumentoCajaPdf(caja: CajaParaDocumento): jsPDF {
     const curDisplay = curParts.length > 0 ? curParts.join(", ") : "-";
 
     const carton = (t as any).carton ? String((t as any).carton) : "1";
+    const nroHojas = t.numero_hojas !== null && t.numero_hojas !== undefined ? String(t.numero_hojas) : "-";
     const monto = Number(t.monto_total || 0);
     totalValor += monto;
 
@@ -80,14 +81,16 @@ export function generarDocumentoCajaPdf(caja: CajaParaDocumento): jsPDF {
       maximumFractionDigits: 2,
     })}`;
 
+    const provYQuipux = `${t.proveedor_beneficiario || "-"}\nQuipux: ${t.numero_quipux || "-"}`;
+
     return [
-      String(index + 1),               // Col 1: NO (Secuencial)
-      carton,                          // Col 2: CARTON (Predeterminado 1)
-      t.numero_quipux || "-",          // Col 3: NUMERO DE QUIPUX
+      String(index + 1),               // Col 1: No
+      carton,                          // Col 2: No CARTON
+      nroHojas,                        // Col 3: Nro HOJAS
       curDisplay,                      // Col 4: NRO CUR
-      t.proveedor_beneficiario || "-", // Col 5: PROVEEDOR
+      provYQuipux,                     // Col 5: PROVEEDOR Y NUMERO DE QUIPUX
       formattedMonto,                  // Col 6: MONTO
-      "",                              // Col 7: OBSERVACION
+      (t as any).observacion || "",    // Col 7: OBSERVACION
     ];
   });
 
@@ -116,12 +119,12 @@ export function generarDocumentoCajaPdf(caja: CajaParaDocumento): jsPDF {
 
   // Proporciones exactas de las 7 columnas para A4 horizontal (269mm total)
   const columnStyles: { [key: number]: any } = {
-    0: { cellWidth: 14.0, halign: "center", fontStyle: "bold" }, // NO
-    1: { cellWidth: 16.0, halign: "center", fontStyle: "bold" }, // CARTON
-    2: { cellWidth: 46.0, halign: "center" },                     // NUMERO DE QUIPUX
-    3: { cellWidth: 30.0, halign: "center", fontStyle: "bold" }, // NRO CUR
-    4: { cellWidth: 88.0, halign: "left" },                       // PROVEEDOR
-    5: { cellWidth: 35.0, halign: "right", fontStyle: "bold" },  // MONTO
+    0: { cellWidth: 12.0, halign: "center", fontStyle: "bold" }, // No
+    1: { cellWidth: 18.0, halign: "center", fontStyle: "bold" }, // No CARTON
+    2: { cellWidth: 18.0, halign: "center", fontStyle: "bold" }, // Nro HOJAS
+    3: { cellWidth: 28.0, halign: "center", fontStyle: "bold" }, // NRO CUR
+    4: { cellWidth: 120.0, halign: "left" },                      // PROVEEDOR Y NUMERO DE QUIPUX
+    5: { cellWidth: 33.0, halign: "right", fontStyle: "bold" },  // MONTO
     6: { cellWidth: 40.0, halign: "center" },                     // OBSERVACION
   };
 
@@ -131,11 +134,11 @@ export function generarDocumentoCajaPdf(caja: CajaParaDocumento): jsPDF {
     tableWidth: tableWidth,
     head: [
       [
-        "NO",
-        "CARTON",
-        "NUMERO DE QUIPUX",
+        "No",
+        "No CARTON",
+        "Nro HOJAS",
         "NRO CUR",
-        "PROVEEDOR",
+        "PROVEEDOR Y NUMERO DE QUIPUX",
         "MONTO",
         "OBSERVACION",
       ],

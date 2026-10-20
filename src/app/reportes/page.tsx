@@ -127,15 +127,19 @@ export default function ReportesPage() {
   // CARGA DE DATOS CENTRALIZADA DESDE /api/reportes
   // Acceso universal: todos los roles institucionales pueden consultar la reportería
   // Se solicita padre_gestion=TODOS para mantener el universo total y evitar que los conteos de pestañas queden en 0
-  const cargarDatos = useCallback(async () => {
+  const cargarDatos = useCallback(async (fDesde?: string, fHasta?: string, cFecha?: string) => {
     setLoading(true);
     try {
+      const fd = fDesde !== undefined ? fDesde : fechaDesde;
+      const fh = fHasta !== undefined ? fHasta : fechaHasta;
+      const cf = cFecha !== undefined ? cFecha : criterioFecha;
+
       const params = new URLSearchParams({
-        fecha_desde: fechaDesde,
-        fecha_hasta: fechaHasta,
-        criterio_fecha: criterioFecha,
         padre_gestion: "TODOS",
       });
+      if (fd) params.set("fecha_desde", fd);
+      if (fh) params.set("fecha_hasta", fh);
+      if (cf) params.set("criterio_fecha", cf);
 
       const res = await fetch(`/api/reportes?${params.toString()}`);
       const json = await res.json();
@@ -377,6 +381,10 @@ export default function ReportesPage() {
   };
 
   const handleLimpiarFiltros = () => {
+    setPadreGestion("TODOS");
+    setFechaDesde("");
+    setFechaHasta("");
+    setCriterioFecha("recepcion");
     setProcesoCanonico("TODOS");
     setArea("TODAS");
     setFuncionario("TODOS");
@@ -384,6 +392,7 @@ export default function ReportesPage() {
     setCalidadDato("TODOS");
     setFiltroEstadoRapido("TODOS");
     setBusqueda("");
+    cargarDatos("", "", "recepcion");
   };
 
   // CONTROL DE ACCESO
@@ -450,7 +459,7 @@ export default function ReportesPage() {
               </div>
               <button
                 type="button"
-                onClick={cargarDatos}
+                onClick={() => cargarDatos()}
                 disabled={loading}
                 title="Actualizar datos del servidor"
                 className="p-2 text-slate-600 hover:text-blue-700 hover:bg-blue-50 border border-slate-200 rounded-xl transition"
@@ -557,8 +566,6 @@ export default function ReportesPage() {
           catalogoUsuarios={catalogoUsuarios}
           estadoOficial={estadoOficial}
           onChangeEstadoOficial={setEstadoOficial}
-          calidadDato={calidadDato}
-          onChangeCalidadDato={setCalidadDato}
           filtroEstadoRapido={filtroEstadoRapido}
           onChangeFiltroEstadoRapido={setFiltroEstadoRapido}
           busqueda={busqueda}

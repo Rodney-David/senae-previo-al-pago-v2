@@ -59,14 +59,14 @@ export async function generarDocumentoCajaExcel(caja: CajaParaDocumento): Promis
     },
   });
 
-  // Ancho exacto de las 7 columnas según especificación
-  worksheet.getColumn(1).width = 8.0;  // NO
-  worksheet.getColumn(2).width = 10.0; // CARTON
-  worksheet.getColumn(3).width = 26.0; // NUMERO DE QUIPUX
-  worksheet.getColumn(4).width = 22.0; // NRO CUR
-  worksheet.getColumn(5).width = 45.0; // PROVEEDOR
+  // Ancho exacto de las 7 columnas según especificación oficial SENAE
+  worksheet.getColumn(1).width = 8.0;  // No
+  worksheet.getColumn(2).width = 12.0; // No CARTON
+  worksheet.getColumn(3).width = 12.0; // Nro HOJAS
+  worksheet.getColumn(4).width = 20.0; // NRO CUR
+  worksheet.getColumn(5).width = 52.0; // PROVEEDOR Y NUMERO DE QUIPUX
   worksheet.getColumn(6).width = 18.0; // MONTO
-  worksheet.getColumn(7).width = 30.0; // OBSERVACION
+  worksheet.getColumn(7).width = 25.0; // OBSERVACION
 
   const now = new Date();
   const dd = String(now.getDate()).padStart(2, "0");
@@ -117,11 +117,11 @@ export async function generarDocumentoCajaExcel(caja: CajaParaDocumento): Promis
 
   // 3. FILA 3: ENCABEZADOS DE TABLA (Altura 27.6)
   const headers = [
-    "NO",
-    "CARTON",
-    "NUMERO DE QUIPUX",
+    "No",
+    "No CARTON",
+    "Nro HOJAS",
     "NRO CUR",
-    "PROVEEDOR",
+    "PROVEEDOR Y NUMERO DE QUIPUX",
     "MONTO",
     "OBSERVACION",
   ];
@@ -133,7 +133,7 @@ export async function generarDocumentoCajaExcel(caja: CajaParaDocumento): Promis
     const colNumber = index + 1;
     const cell = headerRow.getCell(colNumber);
     cell.value = headerText;
-    cell.font = { name: "Arial", size: 11, bold: true, color: { argb: "FFFFFFFF" } };
+    cell.font = { name: "Arial", size: 10, bold: true, color: { argb: "FFFFFFFF" } };
     cell.alignment = { horizontal: "center", vertical: "middle", wrapText: true };
     cell.fill = {
       type: "pattern",
@@ -151,19 +151,22 @@ export async function generarDocumentoCajaExcel(caja: CajaParaDocumento): Promis
     caja.tramites.forEach((t, index) => {
       const row = worksheet.getRow(currentRowIdx);
 
-      // Col 1: NO (Secuencial 1, 2, 3...)
+      // Col 1: No (Secuencial 1, 2, 3...)
       const secuencial = index + 1;
 
-      // Col 2: CARTON (Predeterminado 1 o cartón asignado)
+      // Col 2: No CARTON (Predeterminado 1 o cartón asignado)
       const carton =
         t.carton !== undefined && t.carton !== null && String(t.carton).trim() !== ""
           ? t.carton
           : 1;
 
-      // Col 3: NUMERO DE QUIPUX
-      const quipux = t.numero_quipux || "-";
+      // Col 3: Nro HOJAS
+      const nroHojas =
+        t.numero_hojas !== undefined && t.numero_hojas !== null
+          ? t.numero_hojas
+          : "-";
 
-      // Col 4: NRO CUR (numero_cur_devengado || numero_cur_contable || numero_cur_compromiso || '-')
+      // Col 4: NRO CUR
       const curParts = [
         t.numero_cur_devengado,
         t.numero_cur_contable,
@@ -171,41 +174,41 @@ export async function generarDocumentoCajaExcel(caja: CajaParaDocumento): Promis
       ].filter(Boolean);
       const curDisplay = curParts.length > 0 ? curParts.join(", ") : "-";
 
-      // Col 5: PROVEEDOR
+      // Col 5: PROVEEDOR Y NUMERO DE QUIPUX unificados
       const proveedor = t.proveedor_beneficiario || "-";
+      const quipux = t.numero_quipux || "-";
+      const proveedorYQuipux = `${proveedor}\nQuipux: ${quipux}`;
 
       // Col 6: MONTO
       const monto = Number(t.monto_total || 0);
       totalValor += monto;
 
       // Cálculo de altura según contenido
-      const charsPerLineProv = 38;
-      const charsPerLineQuipux = 22;
+      const charsPerLineProv = 45;
       const charsPerLineCur = 18;
-      const estimatedLinesProv = Math.ceil(Math.max(1, proveedor.length) / charsPerLineProv);
-      const estimatedLinesQuipux = Math.ceil(Math.max(1, quipux.length) / charsPerLineQuipux);
+      const estimatedLinesProv = Math.ceil(Math.max(1, proveedorYQuipux.length) / charsPerLineProv);
       const estimatedLinesCur = Math.ceil(Math.max(1, curDisplay.length) / charsPerLineCur);
-      const maxLines = Math.max(1, estimatedLinesProv, estimatedLinesQuipux, estimatedLinesCur);
+      const maxLines = Math.max(2, estimatedLinesProv + 1, estimatedLinesCur);
 
-      row.height = Math.max(28, maxLines * 16 + 10);
+      row.height = Math.max(30, maxLines * 16 + 8);
 
-      // Col 1: NO
+      // Col 1: No
       const c1 = row.getCell(1);
       c1.value = secuencial;
-      c1.font = { name: "Arial", size: 11, bold: true };
+      c1.font = { name: "Arial", size: 10, bold: true };
       c1.alignment = { horizontal: "center", vertical: "middle" };
 
-      // Col 2: CARTON
+      // Col 2: No CARTON
       const c2 = row.getCell(2);
       c2.value = carton;
-      c2.font = { name: "Arial", size: 11, bold: true };
+      c2.font = { name: "Arial", size: 10, bold: true };
       c2.alignment = { horizontal: "center", vertical: "middle" };
 
-      // Col 3: NUMERO DE QUIPUX
+      // Col 3: Nro HOJAS
       const c3 = row.getCell(3);
-      c3.value = quipux;
+      c3.value = nroHojas;
       c3.font = { name: "Arial", size: 10, bold: true };
-      c3.alignment = { horizontal: "center", vertical: "middle", wrapText: true };
+      c3.alignment = { horizontal: "center", vertical: "middle" };
 
       // Col 4: NRO CUR
       const c4 = row.getCell(4);
@@ -213,24 +216,24 @@ export async function generarDocumentoCajaExcel(caja: CajaParaDocumento): Promis
       c4.font = { name: "Arial", size: 10, bold: true };
       c4.alignment = { horizontal: "center", vertical: "middle", wrapText: true };
 
-      // Col 5: PROVEEDOR
+      // Col 5: PROVEEDOR Y NUMERO DE QUIPUX
       const c5 = row.getCell(5);
-      c5.value = proveedor;
+      c5.value = proveedorYQuipux;
       c5.font = { name: "Arial", size: 10 };
       c5.alignment = { horizontal: "left", vertical: "middle", wrapText: true };
 
       // Col 6: MONTO
       const c6 = row.getCell(6);
       c6.value = monto;
-      c6.font = { name: "Arial", size: 11, bold: true };
+      c6.font = { name: "Arial", size: 10, bold: true };
       c6.alignment = { horizontal: "right", vertical: "middle" };
       c6.numFmt = '"$"#,##0.00';
 
-      // Col 7: OBSERVACION (Vacía para anotaciones manuales: 1 FOLDER, 2 CARTON, 2 CARPETAS, etc.)
+      // Col 7: OBSERVACION (Vacía para anotaciones manuales o novedades)
       const c7 = row.getCell(7);
-      c7.value = "";
+      c7.value = (t as any).observacion || "";
       c7.font = { name: "Arial", size: 10 };
-      c7.alignment = { horizontal: "center", vertical: "middle" };
+      c7.alignment = { horizontal: "center", vertical: "middle", wrapText: true };
 
       for (let c = 1; c <= 7; c++) {
         const cell = row.getCell(c);
