@@ -22,7 +22,7 @@ function getMovableHolidaysEcuador(year: number) {
   const month = Math.floor((h + L - 7 * m + 114) / 31) - 1; // 0-indexed
   const day = ((h + L - 7 * m + 114) % 31) + 1;
 
-  const easterSunday = new Date(Date.UTC(year, month, day));
+  const easterSunday = new Date(Date.UTC(year, month, day, 12, 0, 0));
 
   // Carnaval Lunes (Easter - 48 days)
   const carnavalLunes = new Date(easterSunday);
@@ -45,14 +45,14 @@ function getMovableHolidaysEcuador(year: number) {
 
 function getOfficialHolidaysEcuador(year: number) {
   const fixed = [
-    { fecha: new Date(Date.UTC(year, 0, 1)), descripcion: "Año Nuevo", tipo: "NACIONAL" },
-    { fecha: new Date(Date.UTC(year, 4, 1)), descripcion: "Día Internacional del Trabajo", tipo: "NACIONAL" },
-    { fecha: new Date(Date.UTC(year, 4, 24)), descripcion: "Batalla de Pichincha", tipo: "NACIONAL" },
-    { fecha: new Date(Date.UTC(year, 7, 10)), descripcion: "Primer Grito de Independencia", tipo: "NACIONAL" },
-    { fecha: new Date(Date.UTC(year, 9, 9)), descripcion: "Independencia de Guayaquil", tipo: "NACIONAL" },
-    { fecha: new Date(Date.UTC(year, 10, 2)), descripcion: "Día de los Difuntos", tipo: "NACIONAL" },
-    { fecha: new Date(Date.UTC(year, 10, 3)), descripcion: "Independencia de Cuenca", tipo: "NACIONAL" },
-    { fecha: new Date(Date.UTC(year, 11, 25)), descripcion: "Navidad", tipo: "NACIONAL" },
+    { fecha: new Date(Date.UTC(year, 0, 1, 12, 0, 0)), descripcion: "Año Nuevo", tipo: "NACIONAL" },
+    { fecha: new Date(Date.UTC(year, 4, 1, 12, 0, 0)), descripcion: "Día Internacional del Trabajo", tipo: "NACIONAL" },
+    { fecha: new Date(Date.UTC(year, 4, 24, 12, 0, 0)), descripcion: "Batalla de Pichincha", tipo: "NACIONAL" },
+    { fecha: new Date(Date.UTC(year, 7, 10, 12, 0, 0)), descripcion: "Primer Grito de Independencia", tipo: "NACIONAL" },
+    { fecha: new Date(Date.UTC(year, 9, 9, 12, 0, 0)), descripcion: "Independencia de Guayaquil", tipo: "NACIONAL" },
+    { fecha: new Date(Date.UTC(year, 10, 2, 12, 0, 0)), descripcion: "Día de los Difuntos", tipo: "NACIONAL" },
+    { fecha: new Date(Date.UTC(year, 10, 3, 12, 0, 0)), descripcion: "Independencia de Cuenca", tipo: "NACIONAL" },
+    { fecha: new Date(Date.UTC(year, 11, 25, 12, 0, 0)), descripcion: "Navidad", tipo: "NACIONAL" },
   ];
 
   const movable = getMovableHolidaysEcuador(year);

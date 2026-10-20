@@ -31,13 +31,15 @@ yarn-error.log*
 
 # Databases & SQLite (data confidencial y transaccional)
 *.db
+*.db*
 *.db-journal
 *.sqlite
 *.sqlite3
 *.bak
 *.db.bak
+*.backup*
 prisma/dev.db
-prisma/dev.db-journal
+prisma/dev.db*
 /data/*.db
 
 # Hojas de cálculo y bitácoras institucionales (datos confidenciales SENAE)

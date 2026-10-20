@@ -152,7 +152,7 @@ export function parseFechaEcuador(
 
   // Si ya es un objeto Date
   if (val instanceof Date && !isNaN(val.getTime())) {
-    const candidate = new Date(Date.UTC(val.getFullYear(), val.getMonth(), val.getDate(), 12, 0, 0));
+    const candidate = new Date(Date.UTC(val.getUTCFullYear(), val.getUTCMonth(), val.getUTCDate(), 12, 0, 0));
     return ajustarErrataAnioNuevo(candidate, fechaReferenciaIngreso, contextoTexto);
   }
 
@@ -205,10 +205,37 @@ export function parseFechaEcuador(
       }
     }
 
+    // Patrón fechas con mes en texto (ej. "13-jul-26", "03-ene-2026", "13/jul/2026")
+    const matchTextoMes = trimmed.match(/^(\d{1,2})[/.\-\s]([A-Za-z]{3,4})[/.\-\s](\d{2,4})$/);
+    if (matchTextoMes) {
+      const mesesMap: Record<string, number> = {
+        ene: 0, jan: 0,
+        feb: 1,
+        mar: 2,
+        abr: 3, apr: 3,
+        may: 4,
+        jun: 5,
+        jul: 6,
+        ago: 7, aug: 7,
+        sep: 8, set: 8,
+        oct: 9,
+        nov: 10,
+        dic: 11, dec: 11,
+      };
+      const d = parseInt(matchTextoMes[1], 10);
+      const mesClave = matchTextoMes[2].toLowerCase().slice(0, 3);
+      let y = parseInt(matchTextoMes[3], 10);
+      if (y < 100) y = 2000 + y;
+      if (mesesMap[mesClave] !== undefined && d >= 1 && d <= 31) {
+        const candidate = new Date(Date.UTC(y, mesesMap[mesClave], d, 12, 0, 0));
+        return ajustarErrataAnioNuevo(candidate, fechaReferenciaIngreso, contextoTexto);
+      }
+    }
+
     // Fallback ISO o formato parseable estándar
     const parsed = new Date(trimmed);
     if (!isNaN(parsed.getTime())) {
-      const candidate = new Date(Date.UTC(parsed.getFullYear(), parsed.getMonth(), parsed.getDate(), 12, 0, 0));
+      const candidate = new Date(Date.UTC(parsed.getUTCFullYear(), parsed.getUTCMonth(), parsed.getUTCDate(), 12, 0, 0));
       return ajustarErrataAnioNuevo(candidate, fechaReferenciaIngreso, contextoTexto);
     }
   }
@@ -358,9 +385,50 @@ export function extraerQuipux(texto: string): string[] {
 
 export function mapearTipoTramitePago(tipoContratacion: string, descripcion: string = ""): number {
   const s = `${tipoContratacion || ""} ${descripcion || ""}`.toLowerCase();
-  if (s.includes("básico") || s.includes("basico") || s.includes("servicio básico") || s.includes("luz") || s.includes("agua") || s.includes("internet") || s.includes("telefon")) return 1; // SERV_BASICOS
+  const tc = (tipoContratacion || "").toLowerCase();
+
+  // Servicios básicos y recolección / comunicación
+  if (
+    tc.includes("recolección de basura") ||
+    tc.includes("recoleccion de basura") ||
+    tc.includes("servicio de comunicación") ||
+    tc.includes("servicio de comunicacion") ||
+    s.includes("básico") ||
+    s.includes("basico") ||
+    s.includes("servicio básico") ||
+    s.includes("luz") ||
+    s.includes("agua") ||
+    s.includes("internet") ||
+    s.includes("telefon")
+  ) {
+    return 1; // SERV_BASICOS
+  }
+
   if (s.includes("ínfima") || s.includes("infima")) return 2; // INFIMA_CUANTIA
-  if (s.includes("contrato") || s.includes("sncp") || s.includes("subasta") || s.includes("catálogo") || s.includes("catalogo") || s.includes("menor cuantía") || s.includes("cotización") || s.includes("licitación")) return 3; // CONTRATACION_SNCP
+
+  // Contrataciones y órdenes de compra / servicios bajo SNCP
+  if (
+    tc.includes("orden de compra") ||
+    tc.includes("arrendamiento") ||
+    tc.includes("arriendo") ||
+    tc.includes("limpieza") ||
+    tc.includes("mantenimiento") ||
+    tc.includes("combustible") ||
+    tc.includes("abastecimiento") ||
+    tc.includes("parqueo") ||
+    tc.includes("alquiler") ||
+    s.includes("contrato") ||
+    s.includes("sncp") ||
+    s.includes("subasta") ||
+    s.includes("catálogo") ||
+    s.includes("catalogo") ||
+    s.includes("menor cuantía") ||
+    s.includes("cotización") ||
+    s.includes("licitación")
+  ) {
+    return 3; // CONTRATACION_SNCP
+  }
+
   if (s.includes("talento") || s.includes("dnth") || s.includes("honorario") || s.includes("servicios profesionales")) return 4; // CONTRATO_DNTH
   if (s.includes("caja chica") || s.includes("fondo rotativo")) return 5; // CAJA_CHICA
   if (s.includes("viático") || s.includes("viatico") || s.includes("subsistencia") || s.includes("movilización")) return 8; // VIATICOS_FUNC
